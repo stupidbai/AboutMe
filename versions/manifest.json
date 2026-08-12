@@ -1,0 +1,20 @@
+{
+  "canonical": "../index.html",
+  "currentVersion": "2.0.0",
+  "snapshots": [
+    {
+      "version": "1.1.0",
+      "file": "index-v1.1.0-求职简历.html",
+      "title": "AI 技术总监 / AI 应用架构师求职简历",
+      "gitTag": "v1.1.0",
+      "sha256": "E1B54971A0B7C18884FE7C2E5D85160CB70C6A917E00279313AFB47382A3A6EF"
+    },
+    {
+      "version": "2.0.0",
+      "file": "index-v2.0.0-商业合作版.html",
+      "title": "企业 AI 商业合作伙伴介绍",
+      "gitTag": "v2.0.0",
+      "sha256": "4ACF1F598ACC49A232B646956D5E676129EDCF3534160E0BC4649AF94F7B1207"
+    }
+  ]
+}
