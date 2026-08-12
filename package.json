@@ -1,8 +1,8 @@
 {
   "name": "bai-yunfei-resume",
-  "version": "1.1.0",
+  "version": "2.0.0",
   "private": true,
-  "description": "白云飞个人简历静态站点",
+  "description": "白云飞企业 AI 商业合作介绍静态站点",
   "type": "module",
   "scripts": {
     "start": "node server.mjs"
@@ -11,4 +11,3 @@
     "node": ">=18"
   }
 }
-

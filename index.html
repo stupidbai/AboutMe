@@ -1,24 +1,24 @@
 <!doctype html>
 <html lang="zh-CN">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>白云飞 - AI 技术总监 / AI 应用架构师简历</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="白云飞商业合作介绍：企业 AI 解决方案、模型与厂商资源整合、AI 产品共创及项目联合交付。">
+  <title>白云飞｜企业 AI 商业合作伙伴</title>
   <style>
     :root {
-      --ink: #17202a;
-      --muted: #65707f;
-      --soft: #eef2f6;
-      --line: #d9e0e8;
-      --paper: #fbfcfe;
+      --ink: #102a2d;
+      --ink-deep: #071c20;
+      --teal: #0c6f6a;
+      --teal-light: #d8ebe7;
+      --gold: #c8913a;
+      --cream: #f6f1e7;
+      --paper: #fffdf8;
       --white: #ffffff;
-      --navy: #162336;
-      --teal: #087f7c;
-      --mint: #d8f0ec;
-      --amber: #d9872b;
-      --rose: #b9475f;
-      --shadow: 0 18px 52px rgba(22, 35, 54, .14);
-      --radius: 8px;
+      --muted: #627275;
+      --line: #d9dfda;
+      --shadow: 0 24px 64px rgba(7, 28, 32, .12);
+      --radius: 18px;
     }
 
     * {
@@ -33,13 +33,11 @@
       margin: 0;
       color: var(--ink);
       background:
-        linear-gradient(90deg, rgba(8, 127, 124, .09) 0 1px, transparent 1px 100%),
-        linear-gradient(180deg, rgba(22, 35, 54, .07) 0 1px, transparent 1px 100%),
-        var(--paper);
-      background-size: 38px 38px;
-      font-family: "Inter", "Segoe UI", "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
-      line-height: 1.66;
-      overflow-x: clip;
+        radial-gradient(circle at 8% 0%, rgba(12, 111, 106, .12), transparent 28rem),
+        linear-gradient(180deg, #f3eee4, #fbfaf6 42%, #edf3f1);
+      font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
+      line-height: 1.72;
+      -webkit-font-smoothing: antialiased;
     }
 
     a {
@@ -47,24 +45,94 @@
       text-decoration: none;
     }
 
-    .resume {
-      width: min(1180px, calc(100% - 40px));
-      margin: 32px auto;
-      background: var(--white);
+    button {
+      font: inherit;
+    }
+
+    .skip-link {
+      position: fixed;
+      top: 12px;
+      left: 12px;
+      z-index: 99;
+      padding: 9px 14px;
+      color: var(--white);
+      background: var(--teal);
+      border-radius: 8px;
+      transform: translateY(-150%);
+    }
+
+    .skip-link:focus {
+      transform: translateY(0);
+    }
+
+    .page-shell {
+      width: min(1180px, calc(100% - 36px));
+      margin: 26px auto 74px;
+      overflow: hidden;
+      background: var(--paper);
+      border: 1px solid rgba(16, 42, 45, .12);
       box-shadow: var(--shadow);
-      border: 1px solid rgba(217, 224, 232, .9);
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 28px;
+      padding: 18px 44px;
+      color: rgba(255, 255, 255, .88);
+      background: var(--ink-deep);
+      border-bottom: 1px solid rgba(255, 255, 255, .1);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: max-content;
+      font-weight: 700;
+      letter-spacing: .06em;
+    }
+
+    .brand-mark {
+      display: grid;
+      width: 36px;
+      height: 36px;
+      place-items: center;
+      color: var(--ink-deep);
+      background: var(--gold);
+      border-radius: 50%;
+      font-size: 12px;
+      letter-spacing: .04em;
+    }
+
+    .topnav {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 24px;
+      font-size: 14px;
+    }
+
+    .topnav a {
+      transition: color .2s ease;
+    }
+
+    .topnav a:hover,
+    .topnav a:focus-visible {
+      color: #f2c879;
     }
 
     .hero {
       position: relative;
       display: grid;
-      grid-template-columns: 1.15fr .85fr;
-      min-height: 330px;
+      grid-template-columns: minmax(0, 1.45fr) minmax(290px, .55fr);
+      min-height: 590px;
       overflow: hidden;
       color: var(--white);
       background:
-        linear-gradient(135deg, rgba(22, 35, 54, .98), rgba(21, 58, 73, .96) 52%, rgba(8, 127, 124, .9)),
-        var(--navy);
+        linear-gradient(120deg, rgba(7, 28, 32, .98), rgba(9, 56, 59, .96) 62%, rgba(12, 111, 106, .92)),
+        var(--ink-deep);
     }
 
     .hero::before {
@@ -72,608 +140,848 @@
       position: absolute;
       inset: 0;
       background:
-        linear-gradient(90deg, rgba(255, 255, 255, .08) 1px, transparent 1px),
-        linear-gradient(180deg, rgba(255, 255, 255, .07) 1px, transparent 1px);
-      background-size: 46px 46px;
-      mask-image: linear-gradient(120deg, rgba(0,0,0,.9), rgba(0,0,0,.15));
+        linear-gradient(90deg, rgba(255, 255, 255, .045) 1px, transparent 1px),
+        linear-gradient(rgba(255, 255, 255, .045) 1px, transparent 1px);
+      background-size: 42px 42px;
+      mask-image: linear-gradient(115deg, #000, transparent 72%);
+      pointer-events: none;
+    }
+
+    .hero::after {
+      content: "";
+      position: absolute;
+      right: -160px;
+      bottom: -210px;
+      width: 520px;
+      height: 520px;
+      border: 1px solid rgba(242, 200, 121, .34);
+      border-radius: 50%;
+      box-shadow:
+        0 0 0 54px rgba(242, 200, 121, .05),
+        0 0 0 108px rgba(242, 200, 121, .04);
       pointer-events: none;
     }
 
     .hero-main,
-    .hero-side {
+    .hero-panel {
       position: relative;
       z-index: 1;
-      min-width: 0;
     }
 
     .hero-main {
-      padding: 52px 56px 44px;
       display: flex;
       flex-direction: column;
-      justify-content: space-between;
-      gap: 34px;
+      justify-content: center;
+      padding: 72px 58px 76px;
     }
 
-    .identity {
-      display: flex;
-      align-items: flex-start;
-      gap: 22px;
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      margin: 0 0 24px;
+      color: #f2c879;
+      font-size: 13px;
+      font-weight: 750;
+      letter-spacing: .18em;
+      text-transform: uppercase;
     }
 
-    .identity > div {
-      min-width: 0;
+    .eyebrow::before {
+      content: "";
+      width: 38px;
+      height: 1px;
+      background: currentColor;
     }
 
-    .mark {
-      width: 74px;
-      height: 74px;
-      display: grid;
-      place-items: center;
-      flex: 0 0 auto;
-      border: 1px solid rgba(255, 255, 255, .34);
-      background: linear-gradient(145deg, rgba(255,255,255,.16), rgba(255,255,255,.03));
-      color: var(--mint);
-      font-size: 26px;
-      font-weight: 800;
-      letter-spacing: 0;
+    h1,
+    h2,
+    h3,
+    p {
+      margin-top: 0;
     }
 
     h1 {
-      margin: 0;
-      font-size: clamp(42px, 6vw, 72px);
-      line-height: 1;
-      letter-spacing: 0;
-      font-weight: 850;
-    }
-
-    .title {
-      margin: 16px 0 0;
-      max-width: 720px;
-      display: flex;
-      flex-wrap: wrap;
-      color: rgba(255, 255, 255, .88);
-      font-size: clamp(18px, 2.3vw, 27px);
-      font-weight: 600;
-      line-height: 1.42;
-      overflow-wrap: anywhere;
-    }
-
-    .title span + span::before {
-      content: "｜";
-    }
-
-    .thesis {
       max-width: 760px;
-      margin: 0;
-      color: rgba(255, 255, 255, .78);
-      font-size: 17px;
-      line-height: 1.85;
-      overflow-wrap: anywhere;
+      margin-bottom: 24px;
+      font-size: clamp(42px, 6vw, 76px);
+      line-height: 1.08;
+      letter-spacing: -.05em;
     }
 
-    .thesis span {
-      display: inline;
+    h1 span {
+      display: block;
+      margin-bottom: 13px;
+      color: #f2c879;
+      font-size: .29em;
+      font-weight: 650;
+      letter-spacing: .12em;
     }
 
-    .hero-side {
-      padding: 44px 46px;
-      display: grid;
-      gap: 18px;
-      align-content: center;
-      background: rgba(255, 255, 255, .08);
-      border-left: 1px solid rgba(255, 255, 255, .16);
-    }
-
-    .contact {
-      display: grid;
-      gap: 12px;
-      padding: 0;
-      margin: 0;
-      list-style: none;
+    .hero-thesis {
+      max-width: 720px;
+      margin-bottom: 28px;
       color: rgba(255, 255, 255, .88);
-      font-size: 15px;
+      font-size: clamp(17px, 2vw, 21px);
+      line-height: 1.75;
     }
 
-    .contact li {
-      display: grid;
-      grid-template-columns: 86px 1fr;
-      gap: 12px;
-      padding-bottom: 10px;
-      border-bottom: 1px solid rgba(255, 255, 255, .15);
-      overflow-wrap: anywhere;
+    .hero-thesis strong {
+      color: var(--white);
+      font-weight: 750;
     }
 
-    .contact li > * {
-      min-width: 0;
-    }
-
-    .contact span {
-      color: rgba(216, 240, 236, .88);
-      font-weight: 700;
-    }
-
-    .hero-stats {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 12px;
-      margin-top: 10px;
-    }
-
-    .stat {
-      padding: 16px;
-      border: 1px solid rgba(255,255,255,.16);
-      background: rgba(255,255,255,.08);
-    }
-
-    .stat strong {
-      display: block;
-      font-size: 27px;
-      line-height: 1;
-      color: #ffffff;
-    }
-
-    .stat small {
-      display: block;
-      margin-top: 8px;
-      color: rgba(255,255,255,.76);
-      line-height: 1.4;
-    }
-
-    .body {
-      display: grid;
-      grid-template-columns: 310px 1fr;
-      gap: 0;
-    }
-
-    .sidebar {
-      padding: 38px 30px 44px;
-      background: #f3f7f8;
-      border-right: 1px solid var(--line);
-      min-width: 0;
-    }
-
-    .main {
-      padding: 38px 44px 46px;
-      min-width: 0;
-    }
-
-    section + section {
-      margin-top: 34px;
-    }
-
-    .section-title {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      margin: 0 0 18px;
-      color: var(--navy);
-      font-size: 20px;
-      line-height: 1.25;
-      font-weight: 850;
-      letter-spacing: 0;
-    }
-
-    .section-title::before {
-      content: "";
-      width: 7px;
-      height: 24px;
-      background: linear-gradient(180deg, var(--teal), var(--amber));
-    }
-
-    .summary {
-      display: grid;
-      gap: 14px;
-      font-size: 15px;
-      color: #2e3a48;
-    }
-
-    .summary p {
-      margin: 0;
-    }
-
-    .tag-grid {
+    .credibility-row {
       display: flex;
       flex-wrap: wrap;
-      gap: 8px;
-      margin-top: 16px;
+      gap: 10px;
+      margin-bottom: 34px;
     }
 
-    .tag {
-      padding: 5px 9px;
-      border: 1px solid #cbd8de;
-      background: #ffffff;
-      color: #27404c;
-      font-size: 12px;
-      font-weight: 700;
-      line-height: 1.35;
+    .credibility-row span {
+      padding: 7px 12px;
+      color: rgba(255, 255, 255, .84);
+      background: rgba(255, 255, 255, .075);
+      border: 1px solid rgba(255, 255, 255, .13);
+      border-radius: 999px;
+      font-size: 13px;
     }
 
-    .capability {
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 48px;
+      padding: 10px 20px;
+      border: 1px solid transparent;
+      border-radius: 999px;
+      font-size: 15px;
+      font-weight: 750;
+      transition: transform .2s ease, background .2s ease, border-color .2s ease;
+    }
+
+    .button:hover,
+    .button:focus-visible {
+      transform: translateY(-2px);
+    }
+
+    .button-primary {
+      color: var(--ink-deep);
+      background: #f2c879;
+    }
+
+    .button-secondary {
+      color: var(--white);
+      background: transparent;
+      border-color: rgba(255, 255, 255, .34);
+    }
+
+    .hero-panel {
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      margin: 38px 38px 38px 0;
+      padding: 34px;
+      background: rgba(255, 255, 255, .92);
+      color: var(--ink);
+      border: 1px solid rgba(255, 255, 255, .36);
+      border-radius: 26px;
+      box-shadow: 0 20px 60px rgba(3, 20, 23, .22);
+      backdrop-filter: blur(18px);
+    }
+
+    .profile-monogram {
       display: grid;
-      gap: 16px;
+      width: 96px;
+      height: 96px;
+      margin-bottom: 24px;
+      place-items: center;
+      color: var(--white);
+      background: var(--teal);
+      border: 10px solid var(--teal-light);
+      border-radius: 50%;
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: .08em;
     }
 
-    .capability-block {
-      padding: 16px 0 2px;
+    .hero-panel h2 {
+      margin-bottom: 5px;
+      font-size: 29px;
+      letter-spacing: .05em;
+    }
+
+    .role-label {
+      margin-bottom: 24px;
+      color: var(--teal);
+      font-size: 14px;
+      font-weight: 750;
+    }
+
+    .contact-list {
+      display: grid;
+      gap: 11px;
+      margin: 0;
+      padding: 22px 0 0;
+      border-top: 1px solid var(--line);
+      list-style: none;
+      font-size: 14px;
+    }
+
+    .contact-list li {
+      display: grid;
+      grid-template-columns: 48px minmax(0, 1fr);
+      gap: 8px;
+    }
+
+    .contact-list b {
+      color: var(--muted);
+      font-weight: 500;
+    }
+
+    .contact-list a {
+      overflow-wrap: anywhere;
+      font-weight: 650;
+    }
+
+    .content-section {
+      padding: 76px 58px;
+    }
+
+    .content-section + .content-section {
       border-top: 1px solid var(--line);
     }
 
-    .capability-block:first-child {
-      border-top: 0;
-      padding-top: 0;
+    .section-tint {
+      background: #eef4f1;
     }
 
-    .capability-block h3,
-    .side-block h3 {
-      margin: 0 0 10px;
+    .section-dark {
+      color: var(--white);
+      background: var(--ink-deep);
+      border-top: 0 !important;
+    }
+
+    .section-head {
+      display: grid;
+      grid-template-columns: minmax(190px, .55fr) minmax(0, 1.45fr);
+      gap: 54px;
+      align-items: end;
+      margin-bottom: 42px;
+    }
+
+    .section-kicker {
+      margin-bottom: 10px;
       color: var(--teal);
-      font-size: 15px;
-      line-height: 1.35;
-      font-weight: 850;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .18em;
+      text-transform: uppercase;
     }
 
-    ul {
+    .section-dark .section-kicker {
+      color: #f2c879;
+    }
+
+    .section-head h2 {
+      margin-bottom: 0;
+      font-size: clamp(30px, 4vw, 46px);
+      line-height: 1.18;
+      letter-spacing: -.035em;
+    }
+
+    .section-intro {
+      max-width: 660px;
+      margin: 0;
+      color: var(--muted);
+      font-size: 16px;
+    }
+
+    .section-dark .section-intro {
+      color: rgba(255, 255, 255, .68);
+    }
+
+    .partner-signal {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      margin-top: -24px;
+      padding: 0 58px 46px;
+      background: var(--paper);
+    }
+
+    .signal-item {
+      padding: 24px 25px;
+      border: 1px solid var(--line);
+      border-right: 0;
+      background: var(--white);
+    }
+
+    .signal-item:first-child {
+      border-radius: var(--radius) 0 0 var(--radius);
+    }
+
+    .signal-item:last-child {
+      border-right: 1px solid var(--line);
+      border-radius: 0 var(--radius) var(--radius) 0;
+    }
+
+    .signal-item strong {
+      display: block;
+      margin-bottom: 3px;
+      color: var(--teal);
+      font-size: 28px;
+      line-height: 1.2;
+    }
+
+    .signal-item span {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .value-grid,
+    .cooperation-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+    }
+
+    .value-card,
+    .cooperation-card {
+      position: relative;
+      overflow: hidden;
+      padding: 30px;
+      background: var(--white);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+    }
+
+    .value-card::after {
+      content: attr(data-number);
+      position: absolute;
+      top: 12px;
+      right: 22px;
+      color: rgba(12, 111, 106, .1);
+      font-size: 64px;
+      font-weight: 850;
+      line-height: 1;
+    }
+
+    .card-icon {
+      display: grid;
+      width: 44px;
+      height: 44px;
+      margin-bottom: 20px;
+      place-items: center;
+      color: var(--white);
+      background: var(--teal);
+      border-radius: 12px;
+      font-weight: 800;
+    }
+
+    .value-card h3,
+    .cooperation-card h3,
+    .proof-card h3 {
+      position: relative;
+      margin-bottom: 10px;
+      font-size: 20px;
+      line-height: 1.35;
+    }
+
+    .value-card p,
+    .cooperation-card p,
+    .proof-card p {
+      margin-bottom: 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .fit-list {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
       margin: 0;
       padding: 0;
       list-style: none;
     }
 
-    .clean-list {
-      display: grid;
-      gap: 8px;
-      color: #384553;
-      font-size: 14px;
-    }
-
-    .clean-list li {
+    .fit-list li {
       position: relative;
-      padding-left: 16px;
-      overflow-wrap: anywhere;
+      padding: 24px 24px 24px 56px;
+      background: rgba(255, 255, 255, .07);
+      border: 1px solid rgba(255, 255, 255, .12);
+      border-radius: 14px;
+      color: rgba(255, 255, 255, .82);
     }
 
-    .clean-list li::before {
-      content: "";
+    .fit-list li::before {
+      content: "✓";
       position: absolute;
-      left: 0;
-      top: .72em;
-      width: 6px;
-      height: 6px;
-      background: var(--amber);
-      transform: rotate(45deg);
+      top: 25px;
+      left: 24px;
+      color: #f2c879;
+      font-weight: 850;
     }
 
-    .side-block + .side-block {
-      margin-top: 30px;
-    }
-
-    .skill-table {
+    .cooperation-card {
       display: grid;
-      gap: 1px;
-      border: 1px solid var(--line);
-      background: var(--line);
+      grid-template-columns: 72px minmax(0, 1fr);
+      gap: 22px;
+      align-items: start;
     }
 
-    .skill-row {
-      display: grid;
-      grid-template-columns: 82px 1fr;
-      gap: 12px;
-      padding: 9px 11px;
-      background: #ffffff;
-      font-size: 12.5px;
-      line-height: 1.45;
-      overflow-wrap: anywhere;
-    }
-
-    .skill-row b {
-      color: var(--navy);
-      font-size: 12px;
-    }
-
-    .edu {
-      padding: 16px;
-      background: #ffffff;
-      border: 1px solid var(--line);
-    }
-
-    .edu strong {
-      display: block;
-      color: var(--navy);
-      font-size: 16px;
-      line-height: 1.4;
-    }
-
-    .edu span {
-      display: block;
-      margin-top: 6px;
-      color: var(--muted);
-      font-size: 13px;
-    }
-
-    .honors {
-      display: grid;
-      gap: 8px;
-      color: #384553;
-      font-size: 13.5px;
-    }
-
-    .timeline {
-      position: relative;
-      display: grid;
-      gap: 24px;
-    }
-
-    .timeline::before {
-      content: "";
-      position: absolute;
-      left: 117px;
-      top: 7px;
-      bottom: 8px;
-      width: 1px;
-      background: var(--line);
-    }
-
-    .role {
-      display: grid;
-      grid-template-columns: 96px 1fr;
-      gap: 42px;
-      position: relative;
-    }
-
-    .role::before {
-      content: "";
-      position: absolute;
-      left: 111px;
-      top: 8px;
-      width: 13px;
-      height: 13px;
-      background: var(--white);
-      border: 3px solid var(--teal);
-      box-shadow: 0 0 0 5px #eef7f5;
-    }
-
-    .date {
-      color: var(--muted);
-      font-size: 13px;
-      font-weight: 800;
-      line-height: 1.5;
-    }
-
-    .role-card {
-      padding: 0 0 22px;
-      border-bottom: 1px solid var(--line);
-    }
-
-    .role:last-child .role-card {
-      border-bottom: 0;
-      padding-bottom: 0;
-    }
-
-    .role-head {
-      display: flex;
-      justify-content: space-between;
-      align-items: baseline;
-      gap: 16px;
-      margin-bottom: 10px;
-    }
-
-    .role-head h3 {
+    .cooperation-card .card-icon {
+      width: 72px;
+      height: 72px;
       margin: 0;
-      color: var(--navy);
-      font-size: 18px;
-      line-height: 1.35;
-      overflow-wrap: anywhere;
-      min-width: 0;
-    }
-
-    .role-head span {
-      flex: 0 0 auto;
       color: var(--teal);
-      font-size: 13px;
-      font-weight: 850;
-      overflow-wrap: anywhere;
-      min-width: 0;
+      background: var(--teal-light);
+      border-radius: 50%;
+      font-size: 20px;
     }
 
-    .subgroup {
-      margin-top: 12px;
-    }
-
-    .subgroup h4 {
-      margin: 0 0 7px;
-      color: #2d4654;
-      font-size: 14px;
-      font-weight: 850;
-    }
-
-    .project-grid {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 14px;
-    }
-
-    .project {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      min-height: 100%;
-      padding: 18px;
-      border: 1px solid var(--line);
-      background: linear-gradient(180deg, #ffffff, #f8fbfc);
-    }
-
-    .project h3 {
-      margin: 0;
-      color: var(--navy);
-      font-size: 17px;
-      line-height: 1.4;
-    }
-
-    .project .year {
-      color: var(--rose);
-      font-size: 12px;
-      font-weight: 850;
-    }
-
-    .stack {
+    .cooperation-card ul {
       display: flex;
       flex-wrap: wrap;
-      gap: 6px;
+      gap: 7px;
+      margin: 16px 0 0;
+      padding: 0;
+      list-style: none;
     }
 
-    .stack span {
-      padding: 3px 7px;
-      background: #e9f3f2;
-      color: #195853;
-      border: 1px solid #c8e2de;
-      font-size: 11px;
-      font-weight: 800;
-      line-height: 1.35;
+    .cooperation-card li {
+      padding: 4px 9px;
+      color: var(--teal);
+      background: #edf5f3;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 650;
     }
 
-    .project p {
-      margin: 0;
-      color: #3d4856;
-      font-size: 13.5px;
-      line-height: 1.65;
+    .proof-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
     }
 
-    .print-bar {
-      position: sticky;
-      bottom: 18px;
-      z-index: 10;
-      width: min(1180px, calc(100% - 40px));
-      margin: -12px auto 24px;
+    .proof-card {
       display: flex;
-      justify-content: flex-end;
+      flex-direction: column;
+      min-height: 275px;
+      padding: 30px;
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+    }
+
+    .proof-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 28px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 750;
+      letter-spacing: .05em;
+    }
+
+    .proof-meta span:last-child {
+      color: var(--teal);
+    }
+
+    .proof-card p {
+      flex: 1;
+    }
+
+    .result-line {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      margin-top: 24px;
+      padding-top: 20px;
+      border-top: 1px solid var(--line);
+    }
+
+    .result-line strong {
+      color: var(--teal);
+      font-size: 34px;
+      line-height: 1;
+    }
+
+    .result-line span {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .career-track {
+      position: relative;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 0;
+    }
+
+    .career-track::before {
+      content: "";
+      position: absolute;
+      top: 13px;
+      right: 12.5%;
+      left: 12.5%;
+      height: 1px;
+      background: rgba(255, 255, 255, .2);
+    }
+
+    .career-item {
+      position: relative;
+      padding: 0 26px;
+    }
+
+    .career-item::before {
+      content: "";
+      display: block;
+      width: 13px;
+      height: 13px;
+      margin: 7px 0 28px;
+      background: #f2c879;
+      border: 6px solid var(--ink-deep);
+      border-radius: 50%;
+      outline: 1px solid rgba(242, 200, 121, .5);
+    }
+
+    .career-time {
+      display: block;
+      margin-bottom: 7px;
+      color: #f2c879;
+      font-size: 12px;
+      font-weight: 750;
+      letter-spacing: .08em;
+    }
+
+    .career-item h3 {
+      margin-bottom: 5px;
+      font-size: 17px;
+    }
+
+    .career-role {
+      display: block;
+      margin-bottom: 14px;
+      color: rgba(255, 255, 255, .7);
+      font-size: 13px;
+      font-weight: 650;
+    }
+
+    .career-item p {
+      margin: 0;
+      color: rgba(255, 255, 255, .62);
+      font-size: 13px;
+    }
+
+    .trust-band {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 48px;
+      margin-top: 52px;
+      padding-top: 42px;
+      border-top: 1px solid rgba(255, 255, 255, .13);
+    }
+
+    .trust-block h3 {
+      margin-bottom: 16px;
+      color: #f2c879;
+      font-size: 14px;
+      letter-spacing: .08em;
+    }
+
+    .trust-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 9px;
+    }
+
+    .trust-tags span {
+      padding: 7px 11px;
+      color: rgba(255, 255, 255, .74);
+      border: 1px solid rgba(255, 255, 255, .13);
+      border-radius: 999px;
+      font-size: 12px;
+    }
+
+    .process {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+      counter-reset: process;
+    }
+
+    .process-step {
+      position: relative;
+      padding: 28px 24px;
+      background: var(--white);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      counter-increment: process;
+    }
+
+    .process-step::before {
+      content: "0" counter(process);
+      display: block;
+      margin-bottom: 28px;
+      color: var(--gold);
+      font-size: 13px;
+      font-weight: 850;
+      letter-spacing: .08em;
+    }
+
+    .process-step h3 {
+      margin-bottom: 8px;
+      font-size: 17px;
+    }
+
+    .process-step p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .final-cta {
+      position: relative;
+      overflow: hidden;
+      padding: 74px 58px;
+      color: var(--white);
+      background: var(--teal);
+    }
+
+    .final-cta::after {
+      content: "BYF";
+      position: absolute;
+      right: -22px;
+      bottom: -96px;
+      color: rgba(255, 255, 255, .07);
+      font-size: 240px;
+      font-weight: 900;
+      line-height: 1;
+      letter-spacing: -.08em;
       pointer-events: none;
     }
 
+    .cta-layout {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: minmax(0, 1.25fr) minmax(280px, .75fr);
+      gap: 54px;
+      align-items: end;
+    }
+
+    .final-cta .eyebrow {
+      color: #f7d391;
+    }
+
+    .final-cta h2 {
+      max-width: 690px;
+      margin-bottom: 18px;
+      font-size: clamp(34px, 5vw, 55px);
+      line-height: 1.18;
+      letter-spacing: -.04em;
+    }
+
+    .final-cta p {
+      max-width: 650px;
+      margin-bottom: 0;
+      color: rgba(255, 255, 255, .8);
+    }
+
+    .cta-contact {
+      display: grid;
+      gap: 10px;
+    }
+
+    .cta-contact a,
+    .cta-contact span {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 13px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, .26);
+      font-size: 14px;
+    }
+
+    .cta-contact b {
+      color: #f7d391;
+      font-size: 12px;
+      letter-spacing: .08em;
+    }
+
+    .footer {
+      display: flex;
+      justify-content: space-between;
+      gap: 24px;
+      padding: 20px 58px;
+      color: rgba(255, 255, 255, .56);
+      background: var(--ink-deep);
+      font-size: 12px;
+    }
+
+    .print-dock {
+      position: fixed;
+      right: 24px;
+      bottom: 24px;
+      z-index: 10;
+    }
+
     .print-button {
-      pointer-events: auto;
-      appearance: none;
-      border: 0;
-      background: var(--navy);
-      color: #ffffff;
-      padding: 12px 18px;
-      border-radius: var(--radius);
-      box-shadow: 0 12px 30px rgba(22, 35, 54, .25);
-      font: 800 14px/1 "Inter", "Segoe UI", "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
+      padding: 11px 16px;
+      color: var(--white);
+      background: var(--ink-deep);
+      border: 1px solid rgba(255, 255, 255, .18);
+      border-radius: 999px;
+      box-shadow: 0 12px 30px rgba(7, 28, 32, .2);
       cursor: pointer;
     }
 
-    .print-button:hover {
-      background: #0f1927;
-    }
-
-    @media (max-width: 900px) {
-      .resume {
-        width: min(100% - 22px, 760px);
-        margin-top: 12px;
+    @media (max-width: 980px) {
+      .topbar {
+        padding-inline: 28px;
       }
 
-      .hero,
-      .body {
+      .hero {
         grid-template-columns: 1fr;
       }
 
       .hero-main {
-        padding: 34px 26px 28px;
+        padding: 64px 38px 46px;
       }
 
-      .title {
-        font-size: 20px;
-        line-height: 1.5;
+      .hero-panel {
+        margin: 0 38px 48px;
       }
 
-      .hero-side {
-        padding: 26px;
-        border-left: 0;
-        border-top: 1px solid rgba(255, 255, 255, .16);
+      .partner-signal {
+        grid-template-columns: repeat(2, 1fr);
+        margin-top: 0;
+        padding-top: 42px;
       }
 
-      .identity {
-        flex-direction: column;
-        gap: 18px;
+      .signal-item:nth-child(2) {
+        border-right: 1px solid var(--line);
+        border-radius: 0 var(--radius) var(--radius) 0;
       }
 
-      .sidebar,
-      .main {
-        padding: 30px 24px;
+      .signal-item:nth-child(3) {
+        border-top: 0;
+        border-radius: var(--radius) 0 0 var(--radius);
       }
 
-      .project-grid {
+      .signal-item:nth-child(4) {
+        border-top: 0;
+      }
+
+      .section-head,
+      .cta-layout {
         grid-template-columns: 1fr;
+        gap: 22px;
       }
 
-      .role-head {
-        display: grid;
+      .career-track {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 34px 0;
       }
 
-      .role-head span {
-        justify-self: start;
-      }
-    }
-
-    @media (max-width: 620px) {
-      body {
-        background-size: 30px 30px;
-      }
-
-      .resume {
-        width: 100%;
-        margin: 0;
-        border: 0;
-        overflow: hidden;
-      }
-
-      h1 {
-        font-size: 54px;
-      }
-
-      .title {
-        font-size: 18px;
-        max-width: calc(100vw - 52px);
-      }
-
-      .thesis {
-        font-size: 15.5px;
-        max-width: calc(100vw - 52px);
-        word-break: break-all;
-      }
-
-      .thesis span {
-        display: block;
-      }
-
-      .hero-stats {
-        grid-template-columns: 1fr;
-      }
-
-      .hero-main,
-      .hero-side {
-        width: 100%;
-        max-width: 100vw;
-      }
-
-      .contact li {
-        grid-template-columns: 70px 1fr;
-      }
-
-      .timeline::before,
-      .role::before {
+      .career-track::before {
         display: none;
       }
 
-      .role {
+      .process {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    @media (max-width: 720px) {
+      .page-shell {
+        width: 100%;
+        margin: 0;
+        border: 0;
+      }
+
+      .topbar {
+        padding: 14px 20px;
+      }
+
+      .topnav a:not(:last-child) {
+        display: none;
+      }
+
+      .hero-main,
+      .content-section,
+      .final-cta {
+        padding: 52px 22px;
+      }
+
+      .hero-panel {
+        margin: 0 22px 32px;
+        padding: 27px;
+      }
+
+      h1 {
+        font-size: 44px;
+      }
+
+      .partner-signal {
+        grid-template-columns: 1fr 1fr;
+        padding: 26px 22px 42px;
+      }
+
+      .signal-item {
+        padding: 18px;
+      }
+
+      .signal-item strong {
+        font-size: 23px;
+      }
+
+      .value-grid,
+      .cooperation-grid,
+      .proof-grid,
+      .fit-list,
+      .career-track,
+      .process,
+      .trust-band {
         grid-template-columns: 1fr;
-        gap: 8px;
       }
 
-      .date {
-        color: var(--teal);
+      .cooperation-card {
+        grid-template-columns: 54px minmax(0, 1fr);
       }
 
-      .print-bar {
+      .cooperation-card .card-icon {
+        width: 54px;
+        height: 54px;
+      }
+
+      .career-item {
+        padding: 0;
+      }
+
+      .career-item::before {
+        margin-bottom: 18px;
+      }
+
+      .trust-band {
+        gap: 24px;
+      }
+
+      .footer {
+        flex-direction: column;
+        padding: 20px 22px;
+      }
+
+      .print-dock {
         display: none;
       }
     }
@@ -685,448 +993,336 @@
       }
 
       body {
-        background: #ffffff;
+        background: #fff;
+        print-color-adjust: exact;
+        -webkit-print-color-adjust: exact;
       }
 
-      .resume {
+      .page-shell {
         width: 100%;
         margin: 0;
         border: 0;
         box-shadow: none;
       }
 
+      .topbar,
+      .print-dock {
+        display: none;
+      }
+
       .hero {
-        min-height: 260px;
-        print-color-adjust: exact;
-        -webkit-print-color-adjust: exact;
+        min-height: auto;
       }
 
       .hero-main {
-        padding: 34px 38px;
+        padding: 12mm 10mm;
       }
 
-      .hero-side {
-        padding: 32px 34px;
+      .hero-panel {
+        margin: 8mm 8mm 8mm 0;
+        padding: 8mm;
       }
 
-      h1 {
-        font-size: 50px;
+      .content-section,
+      .final-cta {
+        padding: 12mm 10mm;
       }
 
-      .title {
-        font-size: 20px;
+      .partner-signal {
+        margin: 0;
+        padding: 8mm 10mm;
       }
 
-      .thesis,
-      .contact,
-      .summary,
-      .clean-list {
-        font-size: 12px;
-      }
-
-      .body {
-        grid-template-columns: 265px 1fr;
-      }
-
-      .sidebar,
-      .main {
-        padding: 24px 22px;
-      }
-
-      section + section {
-        margin-top: 22px;
-      }
-
-      .section-title {
-        font-size: 16px;
-        margin-bottom: 11px;
-      }
-
-      .timeline {
-        gap: 14px;
-      }
-
-      .role {
-        grid-template-columns: 76px 1fr;
-        gap: 32px;
+      .value-card,
+      .cooperation-card,
+      .proof-card,
+      .process-step,
+      .career-item,
+      .trust-block {
         break-inside: avoid;
-      }
-
-      .timeline::before {
-        left: 91px;
-      }
-
-      .role::before {
-        left: 85px;
-      }
-
-      .role-card {
-        padding-bottom: 14px;
-      }
-
-      .role-head h3 {
-        font-size: 15px;
-      }
-
-      .project-grid {
-        gap: 10px;
-      }
-
-      .project {
-        padding: 12px;
-        break-inside: avoid;
-      }
-
-      .print-bar {
-        display: none;
       }
     }
   </style>
 </head>
 <body>
-  <article class="resume">
-    <header class="hero">
-      <div class="hero-main">
-        <div class="identity">
-          <div class="mark" aria-hidden="true">BYF</div>
-          <div>
-            <h1>白云飞</h1>
-            <p class="title"><span>AI 技术总监</span><span>AI 应用架构师</span><span>企业智能化解决方案专家</span></p>
-          </div>
-        </div>
-        <p class="thesis">
-          <span>聚焦企业 AI 平台与 ToB 解决方案，覆盖大模型资源整合、</span>
-          <span>知识库/RAG、Agent 工作流、工业视觉与云原生工程，</span>
-          <span>具备全栈研发、10 人团队管理、方案设计、项目交付及生态协同经验。</span>
-        </p>
+  <a class="skip-link" href="#main">跳到主要内容</a>
+
+  <div class="page-shell">
+    <nav class="topbar" aria-label="页面导航">
+      <a class="brand" href="#top"><span class="brand-mark">BYF</span><span>白云飞 · 商业合作介绍</span></a>
+      <div class="topnav">
+        <a href="#value">合作价值</a>
+        <a href="#cooperation">合作方向</a>
+        <a href="#proof">成果验证</a>
+        <a href="#contact">联系合作</a>
       </div>
-      <aside class="hero-side" aria-label="联系方式与亮点">
-        <ul class="contact">
-          <li><span>所在地</span>徐州</li>
-          <li><span>电话</span><a href="tel:17327057075">17327057075</a></li>
-          <li><span>邮箱</span><a href="mailto:616169394@qq.com">616169394@qq.com</a></li>
-          <li><span>微信</span>stupid-bai</li>
-          <li><span>公众号</span>白哥非白</li>
-        </ul>
-        <div class="hero-stats">
-          <div class="stat"><strong>100W+</strong><small>AI 社群矩阵覆盖用户</small></div>
-          <div class="stat"><strong>50%+</strong><small>知识库项目效率提升</small></div>
-          <div class="stat"><strong>60%</strong><small>华为云产线交付周期缩短</small></div>
-          <div class="stat"><strong>3W+</strong><small>AI 账号业务月销售量</small></div>
+    </nav>
+
+    <header class="hero" id="top">
+      <div class="hero-main">
+        <p class="eyebrow">Commercial Partnership Profile</p>
+        <h1><span>企业 AI 落地与资源整合合作伙伴</span>让 AI 项目从机会，走到交付</h1>
+        <p class="hero-thesis">
+          我是白云飞。擅长把<strong>业务场景、模型能力、厂商资源和研发团队</strong>组织成可实施的解决方案，覆盖方案设计、技术架构、产品共创、项目交付与生态协同。
+        </p>
+        <div class="credibility-row" aria-label="核心背书">
+          <span>华为研发与交付背景</span>
+          <span>京东云 AI 创新中心技术总监</span>
+          <span>10 人研发团队管理</span>
+          <span>AI 全栈与产业生态经验</span>
         </div>
+        <div class="hero-actions">
+          <a class="button button-primary" href="#contact">发起一次合作沟通</a>
+          <a class="button button-secondary" href="#cooperation">查看合作方向</a>
+        </div>
+      </div>
+
+      <aside class="hero-panel" aria-label="个人信息">
+        <div class="profile-monogram" aria-hidden="true">BYF</div>
+        <h2>白云飞</h2>
+        <p class="role-label">AI 技术负责人 · 解决方案架构师 · 生态连接者</p>
+        <ul class="contact-list">
+          <li><b>城市</b><span>徐州，可跨区域合作</span></li>
+          <li><b>电话</b><a href="tel:17327057075">17327057075</a></li>
+          <li><b>邮箱</b><a href="mailto:616169394@qq.com">616169394@qq.com</a></li>
+          <li><b>微信</b><span>stupid-bai</span></li>
+          <li><b>内容</b><span>公众号「白哥非白」</span></li>
+        </ul>
       </aside>
     </header>
 
-    <div class="body">
-      <aside class="sidebar">
-        <section>
-          <h2 class="section-title">个人简介</h2>
-          <div class="summary">
-            <p>职业经历覆盖华为云研发与项目管理、10 人开发团队管理、企业 AI 全栈开发及 AI 技术管理，兼具技术架构、研发管理和客户交付能力。</p>
-            <p>擅长整合国内外主流模型、头部云厂商及产业合作伙伴资源，推动多模型统一接入、企业知识库、Agent 工作流和工业 AI 场景落地。</p>
-          </div>
-          <div class="tag-grid" aria-label="关键词">
-            <span class="tag">AI ToB</span>
-            <span class="tag">RAG</span>
-            <span class="tag">Agent</span>
-            <span class="tag">工业视觉</span>
-            <span class="tag">云原生</span>
-            <span class="tag">DevOps</span>
-            <span class="tag">研发管理</span>
-            <span class="tag">多模型治理</span>
-          </div>
-        </section>
-
-        <section>
-          <h2 class="section-title">核心能力</h2>
-          <div class="capability">
-            <div class="capability-block">
-              <h3>企业 AI 解决方案</h3>
-              <ul class="clean-list">
-                <li>国内外大模型选型、集成与统一调度</li>
-                <li>企业 AI 知识库/RAG 系统设计与落地</li>
-                <li>AI Agent 与智能工作流设计</li>
-                <li>企业 Copilot 与 AI 办公提效方案</li>
-                <li>AI API 平台与 Token 中转体系建设</li>
-                <li>多模型统一调度与 AI 服务治理</li>
-                <li>企业 AI 应用场景规划与实施</li>
-              </ul>
-            </div>
-            <div class="capability-block">
-              <h3>AI 工程化与架构</h3>
-              <ul class="clean-list">
-                <li>Java / Python / JavaScript 全栈开发</li>
-                <li>Docker / Kubernetes / Jenkins / CI/CD</li>
-                <li>企业级 DevOps 与云原生架构</li>
-                <li>LLM / RAG / Agent 工程实践</li>
-                <li>OpenAI API / Claude / Midjourney 等生态整合</li>
-                <li>向量数据库与企业知识检索系统建设</li>
-              </ul>
-            </div>
-            <div class="capability-block">
-              <h3>研发管理与产业生态</h3>
-              <ul class="clean-list">
-                <li>10 人开发团队管理与跨部门项目交付</li>
-                <li>需求拆解、技术评审、迭代与质量管理</li>
-                <li>YOLO 工业视觉方案部署</li>
-                <li>OpenCV / TensorRT 边缘推理优化</li>
-                <li>WayToAGI 徐州负责人</li>
-                <li>模型厂商、云厂商与产业资源协同</li>
-              </ul>
-            </div>
-          </div>
-        </section>
-
-        <section>
-          <h2 class="section-title">技术能力</h2>
-          <div class="skill-table">
-            <div class="skill-row"><b>AI 能力</b><span>LLM / RAG / Agent / OpenAI API</span></div>
-            <div class="skill-row"><b>AI 框架</b><span>PyTorch / OpenCV / TensorRT</span></div>
-            <div class="skill-row"><b>编程语言</b><span>Java / Python / C/C++ / JavaScript</span></div>
-            <div class="skill-row"><b>云原生</b><span>Docker / Kubernetes / Jenkins / CI/CD</span></div>
-            <div class="skill-row"><b>后端框架</b><span>Spring / Flask / MyBatis</span></div>
-            <div class="skill-row"><b>数据库</b><span>MySQL / MongoDB / GaussDB</span></div>
-            <div class="skill-row"><b>工业 AI</b><span>YOLO / 边缘部署 / 工业视觉</span></div>
-            <div class="skill-row"><b>运维系统</b><span>Linux / Windows</span></div>
-            <div class="skill-row"><b>工具链</b><span>Git / Maven</span></div>
-          </div>
-        </section>
-
-        <section>
-          <h2 class="section-title">教育背景</h2>
-          <div class="edu">
-            <strong>南京邮电大学｜自动化学院｜本科</strong>
-            <span>2013.09 - 2017.06</span>
-          </div>
-        </section>
-
-        <section>
-          <h2 class="section-title">荣誉竞赛</h2>
-          <ul class="honors clean-list">
-            <li>华为“明日之星”</li>
-            <li>华为优秀新员工</li>
-            <li>专业前 3%</li>
-            <li>两次国家奖学金</li>
-            <li>全国大学生电子设计竞赛国家二等奖</li>
-            <li>飞思卡尔智能车华东赛区二等奖</li>
-            <li>江苏省高数竞赛一等奖</li>
-          </ul>
-        </section>
-      </aside>
-
-      <main class="main">
-        <section>
-          <h2 class="section-title">工作经历</h2>
-          <div class="timeline">
-            <article class="role">
-              <div class="date">2025<br>至今</div>
-              <div class="role-card">
-                <div class="role-head">
-                  <h3>京东云（徐州）AI 创新中心</h3>
-                  <span>技术总监</span>
-                </div>
-                <div class="subgroup">
-                  <h4>技术规划与企业 AI 落地</h4>
-                  <ul class="clean-list">
-                    <li>负责 AI 技术路线与 ToB 解决方案规划，围绕工业、医疗、具身智能等场景推进需求分析、方案设计与项目落地。</li>
-                    <li>协同客户、研发团队和生态伙伴，将业务需求转化为可交付的企业智能化升级方案。</li>
-                  </ul>
-                </div>
-                <div class="subgroup">
-                  <h4>多模型平台与资源整合</h4>
-                  <ul class="clean-list">
-                    <li>统筹接入国内外主流大模型及头部厂商 AI、云服务资源，建立模型选型、能力评估、统一接入与服务治理机制。</li>
-                    <li>搭建多模型 API / Token 服务平台，为企业知识库、AI Agent 与智能工作流提供统一技术底座。</li>
-                    <li>推动数据标注、训练数据管理及模型应用流程建设，提升 AI 能力复用与交付效率。</li>
-                  </ul>
-                </div>
-                <div class="subgroup">
-                  <h4>AI 生态与产业协同</h4>
-                  <ul class="clean-list">
-                    <li>担任 WayToAGI 徐州负责人，组织 AI 行业交流与技术活动。</li>
-                    <li>整合模型厂商、云厂商、开发者、企业及政府资源，推动 AI 技术商业化与跨生态合作。</li>
-                  </ul>
-                </div>
-              </div>
-            </article>
-
-            <article class="role">
-              <div class="date">2023<br>2025</div>
-              <div class="role-card">
-                <div class="role-head">
-                  <h3>江苏追光智能科技有限公司</h3>
-                  <span>全栈工程师</span>
-                </div>
-                <div class="subgroup">
-                  <h4>企业 AI 应用全栈开发</h4>
-                  <ul class="clean-list">
-                    <li>负责需求分析、系统设计、前后端开发、部署运维全流程，交付企业 AI 知识库与 RAG 应用。</li>
-                    <li>基于 Java / Python / JavaScript、LLM 与向量数据库，实现企业文档、工艺资料和异常记录智能检索。</li>
-                    <li>构建智能客服与内部知识问答系统，提升企业客服与内部支持效率 50%+。</li>
-                  </ul>
-                </div>
-                <div class="subgroup">
-                  <h4>工业 AI 视觉系统</h4>
-                  <ul class="clean-list">
-                    <li>基于 YOLO / OpenCV / TensorRT 构建工业视觉方案。</li>
-                    <li>在 Jetson、瑞芯微等平台完成边缘部署。</li>
-                    <li>开发工业 AI 摄像机与尘源分析系统，支持工业现场目标识别与异常检测。</li>
-                  </ul>
-                </div>
-                <div class="subgroup">
-                  <h4>企业数字化与 DevOps 体系</h4>
-                  <ul class="clean-list">
-                    <li>搭建企业 Git / Wiki / ERP / AI 智能体平台，打通研发协作、知识沉淀与业务应用链路。</li>
-                    <li>推动研发流程与技术文档体系建设，负责服务器集群、云服务及应用系统的稳定运行。</li>
-                  </ul>
-                </div>
-              </div>
-            </article>
-
-            <article class="role">
-              <div class="date">2022<br>2023</div>
-              <div class="role-card">
-                <div class="role-head">
-                  <h3>自由职业</h3>
-                  <span>AI 应用开发者 / AI 生态运营</span>
-                </div>
-                <div class="subgroup">
-                  <h4>AI 应用开发与商业化</h4>
-                  <ul class="clean-list">
-                    <li>开发 ChatGPT 微信机器人与 AI 应用服务。</li>
-                    <li>基于 OpenAI API 提供 AI 对话与自动化能力。</li>
-                    <li>使用 Midjourney / Stable Diffusion 完成商业项目。</li>
-                    <li>AI 账号业务月销售量 3W+。</li>
-                  </ul>
-                </div>
-                <div class="subgroup">
-                  <h4>AI 生态运营</h4>
-                  <ul class="clean-list">
-                    <li>运营 AI 公众号“白哥非白”，组建 AI 社群联盟。</li>
-                    <li>社群矩阵覆盖用户超 100W+。</li>
-                  </ul>
-                </div>
-              </div>
-            </article>
-
-            <article class="role">
-              <div class="date">2017<br>2022</div>
-              <div class="role-card">
-                <div class="role-head">
-                  <h3>华为技术有限公司</h3>
-                  <span>云服务工程师 → 项目经理 → 开发组 Leader</span>
-                </div>
-                <div class="subgroup">
-                  <h4>云服务与企业基础设施</h4>
-                  <ul class="clean-list">
-                    <li>负责企业级云服务模块研发，使用 Java / Spring / Kubernetes 完成设计、开发、测试与上线交付。</li>
-                    <li>主导 DevOps 与 CI/CD 流程优化，支撑大规模服务器生产环境的稳定运行。</li>
-                    <li>参与企业级云平台建设，逐步承担项目管理与研发团队负责人职责。</li>
-                  </ul>
-                </div>
-                <div class="subgroup">
-                  <h4>研发团队与项目交付管理</h4>
-                  <ul class="clean-list">
-                    <li>带领 10 人开发组，负责需求拆解、技术方案评审、迭代计划、任务分配、质量控制与团队协作。</li>
-                    <li>主导产线效能优化项目，推动模块交付周期缩短 60%。</li>
-                    <li>对接软银、瑞银等国际客户需求，协调产品、研发及交付团队推进项目落地。</li>
-                  </ul>
-                </div>
-              </div>
-            </article>
-          </div>
-        </section>
-
-        <section>
-          <h2 class="section-title">核心项目经历</h2>
-          <div class="project-grid">
-            <article class="project">
-              <div>
-                <span class="year">2023 - 2025</span>
-                <h3>企业 AI 知识库与 RAG 系统</h3>
-              </div>
-              <div class="stack">
-                <span>LLM API</span><span>向量数据库</span><span>Flask</span><span>RAG</span><span>文档解析</span>
-              </div>
-              <p>构建企业智能问答系统，支持设备文档、工艺资料、异常记录智能检索，提升客服与内部支持效率 50%+。</p>
-            </article>
-
-            <article class="project">
-              <div>
-                <span class="year">2025 - 至今</span>
-                <h3>企业 AI Agent 与工作流系统</h3>
-              </div>
-              <div class="stack">
-                <span>AI Agent</span><span>工作流自动化</span><span>多模型调度</span><span>AI API 治理</span>
-              </div>
-              <p>整合国内外主流模型与头部厂商资源，建设统一模型接入、服务治理与工作流底座，支撑企业 AI 应用快速交付。</p>
-            </article>
-
-            <article class="project">
-              <div>
-                <span class="year">2023 - 2025</span>
-                <h3>工业 AI 视觉检测系统</h3>
-              </div>
-              <div class="stack">
-                <span>YOLOv8</span><span>OpenCV</span><span>TensorRT</span><span>Jetson</span><span>边缘计算</span>
-              </div>
-              <p>实现工业场景目标识别与异常检测，支持边缘设备实时推理，提升工业现场数据采集效率。</p>
-            </article>
-
-            <article class="project">
-              <div>
-                <span class="year">2017 - 2022</span>
-                <h3>华为云产线效能提升项目</h3>
-              </div>
-              <div class="stack">
-                <span>Jenkins</span><span>Docker</span><span>Kubernetes</span><span>CI/CD</span>
-              </div>
-              <p>重构企业 CI/CD 流程，缩短 60% 模块交付周期，提升构建与部署效率。</p>
-            </article>
-          </div>
-        </section>
-
-        <section>
-          <h2 class="section-title">校园项目经历</h2>
-          <div class="project-grid">
-            <article class="project">
-              <div>
-                <span class="year">本科阶段</span>
-                <h3>全国大学生电子设计竞赛</h3>
-              </div>
-              <div class="stack">
-                <span>自动化</span><span>嵌入式</span><span>电路设计</span><span>C/C++</span><span>系统调试</span>
-              </div>
-              <p>围绕电子系统设计、硬件调试与嵌入式控制完成竞赛项目实践，强化了从方案设计、原型搭建到联调验证的完整工程能力，获得国家二等奖。</p>
-            </article>
-
-            <article class="project">
-              <div>
-                <span class="year">本科阶段</span>
-                <h3>飞思卡尔智能车竞赛</h3>
-              </div>
-              <div class="stack">
-                <span>智能车</span><span>传感器</span><span>运动控制</span><span>PID</span><span>嵌入式开发</span>
-              </div>
-              <p>参与智能车感知、控制与调试相关实践，积累传感器数据采集、运动控制、现场调参和稳定性优化经验，获得华东赛区二等奖。</p>
-            </article>
-          </div>
-        </section>
-
-        <section>
-          <h2 class="section-title">核心竞争优势</h2>
-          <ul class="clean-list">
-            <li>AI 技术路线规划与 ToB 方案交付，能够将业务需求转化为可落地的技术系统。</li>
-            <li>国内外主流模型与头部厂商资源整合，多模型统一接入、评估、调度与治理。</li>
-            <li>10 人研发团队管理及跨部门协同，覆盖需求、研发、质量和客户交付全流程。</li>
-            <li>全栈研发、云原生与工业 AI 复合背景，兼顾平台架构、应用开发和边缘部署。</li>
-          </ul>
-        </section>
-      </main>
+    <div class="partner-signal" aria-label="关键成果数据">
+      <div class="signal-item"><strong>10 人</strong><span>研发团队管理经验</span></div>
+      <div class="signal-item"><strong>60%</strong><span>华为云产线交付周期缩短</span></div>
+      <div class="signal-item"><strong>50%+</strong><span>知识库项目支持效率提升</span></div>
+      <div class="signal-item"><strong>100W+</strong><span>AI 社群矩阵覆盖用户</span></div>
     </div>
-  </article>
 
-  <div class="print-bar">
+    <main id="main">
+      <section class="content-section" id="value">
+        <div class="section-head">
+          <div>
+            <p class="section-kicker">Partner Value</p>
+            <h2>不是只给建议，<br>而是一起把事做成</h2>
+          </div>
+          <p class="section-intro">合作价值不止于技术开发。我可以从商业机会识别开始，补齐方案、资源、工程与交付之间的断点，帮助合作伙伴降低 AI 项目的试错成本。</p>
+        </div>
+
+        <div class="value-grid">
+          <article class="value-card" data-number="01">
+            <div class="card-icon">商</div>
+            <h3>把客户需求变成可成交方案</h3>
+            <p>理解 ToB 决策与交付链路，能够完成需求澄清、场景拆解、技术路线、方案表达与实施边界设计，让技术语言与客户价值对齐。</p>
+          </article>
+          <article class="value-card" data-number="02">
+            <div class="card-icon">联</div>
+            <h3>把分散资源组织成解决方案</h3>
+            <p>整合国内外主流模型、头部云厂商、AI 服务与产业伙伴资源，完成选型评估、统一接入、能力编排和多模型治理。</p>
+          </article>
+          <article class="value-card" data-number="03">
+            <div class="card-icon">交</div>
+            <h3>把演示原型推进到工程交付</h3>
+            <p>具备 Java、Python、JavaScript 全栈与云原生背景，可带队交付知识库/RAG、Agent 工作流、AI 平台和工业视觉系统。</p>
+          </article>
+          <article class="value-card" data-number="04">
+            <div class="card-icon">长</div>
+            <h3>把一次项目做成长效合作</h3>
+            <p>兼顾技术、项目管理与生态运营，关注能力复用、交付标准、客户成功和后续迭代，推动单点项目沉淀为持续业务。</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="content-section section-dark" aria-labelledby="fit-title">
+        <div class="section-head">
+          <div>
+            <p class="section-kicker">Best Fit</p>
+            <h2 id="fit-title">如果你正处于这些阶段，<br>我们很适合聊一聊</h2>
+          </div>
+          <p class="section-intro">我优先寻找目标清晰、资源互补、重视长期价值的合作伙伴。可以从一次场景诊断、联合方案或小范围验证开始。</p>
+        </div>
+        <ul class="fit-list">
+          <li>手上有行业客户和真实场景，但缺少完整的 AI 方案与交付团队</li>
+          <li>拥有模型、云、算力或硬件资源，希望形成更有竞争力的行业方案</li>
+          <li>正在打造 AI 产品，需要技术合伙人补齐架构、研发与工程化能力</li>
+          <li>希望建设区域 AI 生态、创新中心或产业项目，需要资源组织与联合落地</li>
+        </ul>
+      </section>
+
+      <section class="content-section section-tint" id="cooperation">
+        <div class="section-head">
+          <div>
+            <p class="section-kicker">Ways to Collaborate</p>
+            <h2>四类优先合作方向</h2>
+          </div>
+          <p class="section-intro">合作方式可以灵活，但责任与目标必须清晰。以下方向最能发挥我的技术、交付和资源整合优势。</p>
+        </div>
+
+        <div class="cooperation-grid">
+          <article class="cooperation-card">
+            <div class="card-icon">A1</div>
+            <div>
+              <h3>企业 AI 项目联合交付</h3>
+              <p>面向已有客户或明确业务场景，共同完成售前交流、方案设计、原型验证、系统建设和上线交付。</p>
+              <ul><li>联合方案</li><li>技术架构</li><li>研发交付</li><li>项目管理</li></ul>
+            </div>
+          </article>
+          <article class="cooperation-card">
+            <div class="card-icon">A2</div>
+            <div>
+              <h3>AI 产品与平台共创</h3>
+              <p>与产品方、创业团队或产业公司共建知识库、Agent、行业 Copilot、多模型平台等可复制产品能力。</p>
+              <ul><li>产品定义</li><li>MVP</li><li>工程化</li><li>持续迭代</li></ul>
+            </div>
+          </article>
+          <article class="cooperation-card">
+            <div class="card-icon">A3</div>
+            <div>
+              <h3>模型与厂商生态协同</h3>
+              <p>为模型、云、算力、数据与硬件厂商寻找场景入口，组合多方能力，形成面向客户的联合解决方案。</p>
+              <ul><li>资源对接</li><li>能力选型</li><li>方案组合</li><li>生态活动</li></ul>
+            </div>
+          </article>
+          <article class="cooperation-card">
+            <div class="card-icon">A4</div>
+            <div>
+              <h3>技术顾问与交付体系建设</h3>
+              <p>帮助企业制定 AI 技术路线、评审关键方案、搭建研发协作与 DevOps 体系，提升团队交付确定性。</p>
+              <ul><li>路线规划</li><li>架构评审</li><li>团队机制</li><li>交付治理</li></ul>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="content-section" id="proof">
+        <div class="section-head">
+          <div>
+            <p class="section-kicker">Proof of Delivery</p>
+            <h2>用交付结果建立信任</h2>
+          </div>
+          <p class="section-intro">从企业云服务到生成式 AI，再到工业现场，我的能力来自真实项目链路，而不止于概念验证。</p>
+        </div>
+
+        <div class="proof-grid">
+          <article class="proof-card">
+            <div class="proof-meta"><span>企业知识工程</span><span>全栈交付</span></div>
+            <h3>企业 AI 知识库与 RAG 系统</h3>
+            <p>围绕设备文档、工艺资料和异常记录构建智能检索与问答系统，覆盖需求分析、系统设计、开发、部署和运维。</p>
+            <div class="result-line"><strong>50%+</strong><span>客服与内部支持效率提升</span></div>
+          </article>
+          <article class="proof-card">
+            <div class="proof-meta"><span>研发效能</span><span>团队负责人</span></div>
+            <h3>华为云产线效能提升项目</h3>
+            <p>主导 DevOps 与 CI/CD 流程优化，带领 10 人开发组推进需求拆解、技术评审、迭代计划、质量控制与跨团队协同。</p>
+            <div class="result-line"><strong>60%</strong><span>模块交付周期缩短</span></div>
+          </article>
+          <article class="proof-card">
+            <div class="proof-meta"><span>AI 技术底座</span><span>方案与治理</span></div>
+            <h3>多模型 API 与 Agent 工作流平台</h3>
+            <p>统筹接入国内外主流模型和头部厂商资源，建设模型选型、统一接入、服务治理与工作流底座，支撑企业 AI 应用快速交付。</p>
+            <div class="result-line"><strong>多模型</strong><span>统一接入、评估、调度与治理</span></div>
+          </article>
+          <article class="proof-card">
+            <div class="proof-meta"><span>工业智能</span><span>边缘部署</span></div>
+            <h3>工业 AI 视觉检测系统</h3>
+            <p>基于 YOLO、OpenCV 与 TensorRT 构建工业视觉方案，在 Jetson、瑞芯微等平台完成边缘部署，支持目标识别与异常检测。</p>
+            <div class="result-line"><strong>端到端</strong><span>算法、设备与现场应用落地</span></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="content-section section-dark" aria-labelledby="career-title">
+        <div class="section-head">
+          <div>
+            <p class="section-kicker">Career Credibility</p>
+            <h2 id="career-title">跨越技术、管理与商业化的完整经历</h2>
+          </div>
+          <p class="section-intro">从大厂工程体系，到 AI 产品商业验证，再到企业 AI 全栈交付与技术管理，形成了面向合作的复合能力。</p>
+        </div>
+
+        <div class="career-track">
+          <article class="career-item">
+            <span class="career-time">2017 — 2022</span>
+            <h3>华为技术有限公司</h3>
+            <span class="career-role">云服务工程师 → 项目经理 → 开发组 Leader</span>
+            <p>企业云服务研发、国际客户交付、DevOps 效能优化与 10 人开发组管理。</p>
+          </article>
+          <article class="career-item">
+            <span class="career-time">2022 — 2023</span>
+            <h3>AI 应用开发与生态运营</h3>
+            <span class="career-role">独立开发者 / AI 生态运营</span>
+            <p>开发 AI 应用并完成商业验证，运营「白哥非白」及 AI 社群联盟。</p>
+          </article>
+          <article class="career-item">
+            <span class="career-time">2023 — 2025</span>
+            <h3>江苏追光智能科技有限公司</h3>
+            <span class="career-role">全栈工程师</span>
+            <p>交付企业知识库、工业视觉、企业协作平台及云服务运维体系。</p>
+          </article>
+          <article class="career-item">
+            <span class="career-time">2025 — 至今</span>
+            <h3>京东云（徐州）AI 创新中心</h3>
+            <span class="career-role">技术总监</span>
+            <p>负责 AI 技术路线、ToB 解决方案、多模型平台与产业生态协同。</p>
+          </article>
+        </div>
+
+        <div class="trust-band">
+          <div class="trust-block">
+            <h3>技术与交付能力</h3>
+            <div class="trust-tags">
+              <span>LLM / RAG / Agent</span><span>Java / Python / JavaScript</span><span>Docker / Kubernetes</span><span>YOLO / OpenCV / TensorRT</span><span>DevOps / CI/CD</span><span>多模型治理</span>
+            </div>
+          </div>
+          <div class="trust-block">
+            <h3>专业与组织背书</h3>
+            <div class="trust-tags">
+              <span>WayToAGI 徐州负责人</span><span>华为「明日之星」</span><span>华为优秀新员工</span><span>两次国家奖学金</span><span>电子设计竞赛国家二等奖</span><span>南京邮电大学本科</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="content-section section-tint" aria-labelledby="process-title">
+        <div class="section-head">
+          <div>
+            <p class="section-kicker">Working Model</p>
+            <h2 id="process-title">从第一次沟通开始，快速建立合作确定性</h2>
+          </div>
+          <p class="section-intro">先对目标、资源与边界形成共识，再逐步投入。用清晰里程碑和可验证结果降低双方合作风险。</p>
+        </div>
+
+        <div class="process">
+          <article class="process-step"><h3>目标对齐</h3><p>明确客户、业务场景、成功标准以及双方能够投入的资源。</p></article>
+          <article class="process-step"><h3>方案共创</h3><p>完成需求拆解、技术路线、合作分工、成本与风险评估。</p></article>
+          <article class="process-step"><h3>小步验证</h3><p>从关键场景或最小可行方案开始，用真实反馈验证价值。</p></article>
+          <article class="process-step"><h3>交付放大</h3><p>推进工程实施、上线运营与能力复用，沉淀长期合作资产。</p></article>
+        </div>
+      </section>
+    </main>
+
+    <section class="final-cta" id="contact" aria-labelledby="contact-title">
+      <div class="cta-layout">
+        <div>
+          <p class="eyebrow">Start a Conversation</p>
+          <h2 id="contact-title">如果你有真实场景或互补资源，我们可以从一次具体问题开始</h2>
+          <p>欢迎企业客户、行业方案商、模型与云厂商、AI 产品团队及产业生态伙伴联系。请简单说明合作背景、目标和当前阶段，我会基于实际条件判断最合适的切入方式。</p>
+        </div>
+        <div class="cta-contact">
+          <a href="tel:17327057075"><b>电话</b><span>17327057075</span></a>
+          <a href="mailto:616169394@qq.com"><b>邮箱</b><span>616169394@qq.com</span></a>
+          <span><b>微信</b><span>stupid-bai</span></span>
+          <span><b>公众号</b><span>白哥非白</span></span>
+        </div>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <span>白云飞 · 企业 AI 商业合作介绍</span>
+      <span>目标清晰 · 资源互补 · 重视交付 · 长期共赢</span>
+    </footer>
+  </div>
+
+  <div class="print-dock">
     <button class="print-button" type="button" onclick="window.print()">打印 / 导出 PDF</button>
   </div>
 </body>
