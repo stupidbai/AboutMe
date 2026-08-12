@@ -1,6 +1,6 @@
 {
   "canonical": "../index.html",
-  "currentVersion": "2.0.0",
+  "currentVersion": "2.0.1",
   "snapshots": [
     {
       "version": "1.1.0",
@@ -15,6 +15,13 @@
       "title": "企业 AI 商业合作伙伴介绍",
       "gitTag": "v2.0.0",
       "sha256": "4ACF1F598ACC49A232B646956D5E676129EDCF3534160E0BC4649AF94F7B1207"
+    },
+    {
+      "version": "2.0.1",
+      "file": "index-v2.0.1-商业合作版.html",
+      "title": "企业 AI 商业合作伙伴介绍（精简背书标签）",
+      "gitTag": "v2.0.1",
+      "sha256": "C7AA83EF279431207E8134D9C884361FEFCDC19BC253857606E7EB35FAE7933B"
     }
   ]
 }
