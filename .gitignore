@@ -1,0 +1,13 @@
+# Local editor and operating-system files
+.DS_Store
+Thumbs.db
+Desktop.ini
+.vscode/
+.idea/
+
+# Local server and temporary files
+*.log
+*.tmp
+*.bak
+*.swp
+
