@@ -1,6 +1,6 @@
 {
   "canonical": "../index.html",
-  "currentVersion": "2.0.1",
+  "currentVersion": "2.1.0",
   "snapshots": [
     {
       "version": "1.1.0",
@@ -22,6 +22,15 @@
       "title": "企业 AI 商业合作伙伴介绍（精简背书标签）",
       "gitTag": "v2.0.1",
       "sha256": "C7AA83EF279431207E8134D9C884361FEFCDC19BC253857606E7EB35FAE7933B"
+    },
+    {
+      "version": "2.1.0",
+      "file": "index-v2.1.0-CIO商业合作版.html",
+      "title": "上海莲证科技 CIO 商业合作介绍",
+      "gitTag": "v2.1.0",
+      "sha256": "D4FFC1A37683F11D5F79939229C601B6EA28DDBC650D6D4CE9AF1E0A7A417278",
+      "asset": "assets/wechat-qr-v2.1.0.png",
+      "assetSha256": "5F6994E1B9EF32F98F212DA87DF823B19F1AF23A8DBB7CCFD2D6D5985A775428"
     }
   ]
 }

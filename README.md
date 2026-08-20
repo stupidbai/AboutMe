@@ -22,6 +22,7 @@ npm start
 ## 文件约定
 
 - `index.html`：当前商业合作介绍页的唯一维护入口。
+- `assets/wechat-qr.png`：当前版本的微信联系二维码。
 - `server.mjs`：零第三方依赖的本地静态文件服务器。
 - `白云飞_AI_ToB_解决方案负责人_简历.html`：与当前 `index.html` 同步的命名交付副本。
 - `白云飞_AI_ToB_解决方案负责人_简历 - 副本.html`：与当前 `index.html` 同步的备用交付副本。
@@ -43,7 +44,8 @@ npm start
 | --- | --- | --- | --- |
 | 上一版 | AI 技术总监 / AI 应用架构师求职简历 | `versions/index-v1.1.0-求职简历.html` | `v1.1.0` |
 | 商业合作初版 | 企业 AI 商业合作伙伴介绍 | `versions/index-v2.0.0-商业合作版.html` | `v2.0.0` |
-| 当前版 | 企业 AI 商业合作伙伴介绍（精简背书标签） | `versions/index-v2.0.1-商业合作版.html` | `v2.0.1` |
+| 精简版 | 企业 AI 商业合作伙伴介绍（精简背书标签） | `versions/index-v2.0.1-商业合作版.html` | `v2.0.1` |
+| 当前版 | 上海莲证科技 CIO 商业合作介绍 | `versions/index-v2.1.0-CIO商业合作版.html` | `v2.1.0` |
 
 `v1.0.0` 与 `v1.1.0` 的 `index.html` 内容相同，因此只保留一份物理快照；两个 Git 标签仍完整存在。
 
