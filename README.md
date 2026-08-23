@@ -57,7 +57,7 @@ npm start
 | 商业合作初版 | 企业 AI 商业合作伙伴介绍 | `versions/index-v2.0.0-商业合作版.html` | `v2.0.0` |
 | 精简版 | 企业 AI 商业合作伙伴介绍（精简背书标签） | `versions/index-v2.0.1-商业合作版.html` | `v2.0.1` |
 | 单页归档版 | 上海莲证科技 CIO 商业合作介绍 | `versions/index-v2.1.0-CIO商业合作版.html` | `v2.1.0` |
-| 当前工作版 | 九案例图文商业合作主页 | `index.html` + `pages/` | 待发布 `v2.3.0` |
+| 当前工作版 | 九案例图文商业合作主页 | `index.html` + `pages/` | 待发布 `v2.3.1` |
 
 `v1.0.0` 与 `v1.1.0` 的 `index.html` 内容相同，因此只保留一份物理快照；两个 Git 标签仍完整存在。
 
@@ -67,7 +67,7 @@ npm start
 git status
 git add index.html pages assets CHANGELOG.md README.md package.json 爱好
 git commit -m "更新简历内容"
-git tag -a v2.3.0 -m "发布 v2.3.0"
+git tag -a v2.3.1 -m "发布 v2.3.1"
 ```
 
 查看已有版本：

@@ -29,11 +29,13 @@ for (const htmlFile of htmlFiles) {
 const casesHtml = readFileSync(join(projectRoot, 'pages', 'cases.html'), 'utf8');
 const caseCount = (casesHtml.match(/class="case-index"/g) ?? []).length;
 const imageCount = (casesHtml.match(/<img\s/g) ?? []).length;
+const partnerLogoCount = (casesHtml.match(/class="partner-logo(?:\s|\")/g) ?? []).length;
 
 console.log(`HTML files: ${htmlFiles.length}`);
 console.log(`Missing local references: ${missing.length}`);
 console.log(`Case entries: ${caseCount}`);
 console.log(`Case images: ${imageCount}`);
+console.log(`Partner logos: ${partnerLogoCount}`);
 
 if (missing.length > 0) console.error(missing.join('\n'));
-if (missing.length > 0 || caseCount !== 9 || imageCount !== 7) process.exitCode = 1;
+if (missing.length > 0 || caseCount !== 9 || imageCount !== 13 || partnerLogoCount !== 5) process.exitCode = 1;
