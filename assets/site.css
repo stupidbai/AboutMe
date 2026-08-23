@@ -246,6 +246,25 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .route-tags { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 22px; }
 .route-tags span, .tag { padding: 5px 9px; border-radius: 999px; color: var(--teal-dark); background: rgba(29,182,165,.1); font-size: 12px; font-weight: 700; }
 
+.route-card-contact { min-height: 300px; }
+.route-contact-preview {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 96px;
+  align-items: center;
+  gap: 20px;
+}
+.route-contact-preview p { max-width: none; }
+.route-qr {
+  width: 96px;
+  aspect-ratio: 1;
+  object-fit: contain;
+  padding: 5px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: white;
+  box-shadow: 0 10px 25px rgba(13, 38, 54, 0.1);
+}
+
 .principles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
 .principle { padding: 26px; border-left: 3px solid var(--teal); background: rgba(255,255,255,.07); }
 .principle b { display: block; margin-bottom: 7px; font-size: 18px; }
@@ -360,6 +379,9 @@ button, a { -webkit-tap-highlight-color: transparent; }
   .section { padding-block: 58px; }
   .directory-grid, .content-grid, .case-grid, .principles { grid-template-columns: 1fr; }
   .route-card { min-height: 235px; }
+  .route-card-contact { min-height: 300px; }
+  .route-contact-preview { grid-template-columns: minmax(0, 1fr) 88px; gap: 14px; }
+  .route-qr { width: 88px; }
   .page-hero { padding-block: 58px 48px; }
   .timeline::before { left: 8px; }
   .timeline-item { grid-template-columns: 1fr; gap: 6px; padding-left: 28px; }
