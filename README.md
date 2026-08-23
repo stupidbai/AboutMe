@@ -12,6 +12,12 @@ npm start
 
 然后访问 <http://127.0.0.1:8000/>。
 
+检查全部 HTML 本地引用、案例数量与脚本语法：
+
+```powershell
+npm run check
+```
+
 如需使用其他端口：
 
 ```powershell
@@ -24,10 +30,11 @@ npm start
 - `index.html`：合作主页，只呈现核心定位、数据和目录大纲。
 - `pages/profile.html`：职业时间线、能力底座和专业背书。
 - `pages/cooperation.html`：合作匹配、四类方向与推进方式。
-- `pages/cases.html`：代表性项目和结果证明。
+- `pages/cases.html`：九个产品交付、人才、渠道与生态案例。
 - `pages/life.html`：户外影像、兴趣和内容账号。
 - `pages/contact.html`：电话、邮箱、微信二维码与沟通建议。
 - `assets/site.css`、`assets/site.js`：全部页面共用的样式和导航逻辑。
+- `assets/cases/`：案例页使用的本地项目图片、产品截图与生成配图。
 - `docs/`：既有 PDF 与 HTML 历史交付物，仅保留在项目档案中，不在当前网站导航展示。
 - `爱好/`：户外照片与公众号、视频号二维码原始素材。
 - `versions/`：不可覆盖的已发布 HTML 版本快照和校验清单。
@@ -50,7 +57,7 @@ npm start
 | 商业合作初版 | 企业 AI 商业合作伙伴介绍 | `versions/index-v2.0.0-商业合作版.html` | `v2.0.0` |
 | 精简版 | 企业 AI 商业合作伙伴介绍（精简背书标签） | `versions/index-v2.0.1-商业合作版.html` | `v2.0.1` |
 | 单页归档版 | 上海莲证科技 CIO 商业合作介绍 | `versions/index-v2.1.0-CIO商业合作版.html` | `v2.1.0` |
-| 当前工作版 | 多页面商业合作主页 | `index.html` + `pages/` | 待发布 `v2.2.0` |
+| 当前工作版 | 九案例图文商业合作主页 | `index.html` + `pages/` | 待发布 `v2.3.1` |
 
 `v1.0.0` 与 `v1.1.0` 的 `index.html` 内容相同，因此只保留一份物理快照；两个 Git 标签仍完整存在。
 
@@ -58,9 +65,9 @@ npm start
 
 ```powershell
 git status
-git add index.html pages assets/site.css assets/site.js CHANGELOG.md README.md package.json
+git add index.html pages assets CHANGELOG.md README.md package.json 爱好
 git commit -m "更新简历内容"
-git tag -a v2.2.0 -m "发布 v2.2.0"
+git tag -a v2.3.1 -m "发布 v2.3.1"
 ```
 
 查看已有版本：
