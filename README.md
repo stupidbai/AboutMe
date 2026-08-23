@@ -26,10 +26,9 @@ npm start
 - `pages/cooperation.html`：合作匹配、四类方向与推进方式。
 - `pages/cases.html`：代表性项目和结果证明。
 - `pages/life.html`：户外影像、兴趣和内容账号。
-- `pages/resources.html`：PDF、命名版 HTML 和历史版本入口。
 - `pages/contact.html`：电话、邮箱、微信二维码与沟通建议。
 - `assets/site.css`、`assets/site.js`：全部页面共用的样式和导航逻辑。
-- `docs/`：既有 PDF 与 HTML 历史交付物。
+- `docs/`：既有 PDF 与 HTML 历史交付物，仅保留在项目档案中，不在当前网站导航展示。
 - `爱好/`：户外照片与公众号、视频号二维码原始素材。
 - `versions/`：不可覆盖的已发布 HTML 版本快照和校验清单。
 - `server.mjs`：零第三方依赖的本地静态文件服务器。
