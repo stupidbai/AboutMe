@@ -1,11 +1,12 @@
 {
   "name": "bai-yunfei-resume",
-  "version": "2.2.0",
+  "version": "2.3.1",
   "private": true,
   "description": "白云飞企业 AI 商业合作介绍静态站点",
   "type": "module",
   "scripts": {
-    "start": "node server.mjs"
+    "start": "node server.mjs",
+    "check": "node --check assets/site.js && node --check server.mjs && node scripts/verify-site.mjs"
   },
   "engines": {
     "node": ">=18"
