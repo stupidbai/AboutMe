@@ -2,20 +2,22 @@ import { backup, DatabaseSync } from 'node:sqlite'
 import { existsSync, mkdirSync, readFileSync, readdirSync, unlinkSync } from 'node:fs'
 import { basename, join, resolve } from 'node:path'
 import { validateCases } from './case-schema.mjs'
+import { validateSiteConfig } from './site-config-schema.mjs'
 
-const SCHEMA_VERSION = 1
+const SCHEMA_VERSION = 2
 
 export class DatabaseConflictError extends Error {
-  constructor(message = '案例配置已被其他管理员更新，请刷新后重试。') {
+  constructor(message = '配置已被其他管理员更新，请刷新后重试。') {
     super(message)
     this.name = 'DatabaseConflictError'
   }
 }
 
 export class PortalDatabase {
-  constructor({ dataDir, seedFile, backupLimit = 10 }) {
+  constructor({ dataDir, seedFile, siteConfigSeedFile, backupLimit = 10 }) {
     this.dataDir = resolve(dataDir)
     this.seedFile = resolve(seedFile)
+    this.siteConfigSeedFile = resolve(siteConfigSeedFile)
     this.backupLimit = Math.max(1, Math.min(Number(backupLimit) || 10, 50))
     this.backupDir = join(this.dataDir, 'backups')
     this.databaseFile = join(this.dataDir, 'portal.sqlite')
@@ -25,6 +27,7 @@ export class PortalDatabase {
     this.configure()
     this.migrate()
     this.seedIfEmpty()
+    this.seedSiteConfigIfEmpty()
   }
 
   configure() {
@@ -90,6 +93,27 @@ export class PortalDatabase {
         COMMIT;
       `)
     }
+    if (currentVersion < 2) {
+      this.database.exec(`
+        BEGIN IMMEDIATE;
+        CREATE TABLE IF NOT EXISTS site_config (
+          id INTEGER PRIMARY KEY CHECK (id = 1),
+          json_value TEXT NOT NULL,
+          revision INTEGER NOT NULL CHECK (revision > 0),
+          updated_at TEXT NOT NULL,
+          updated_by TEXT NOT NULL
+        ) STRICT;
+        CREATE TABLE IF NOT EXISTS site_config_changes (
+          id INTEGER PRIMARY KEY,
+          revision INTEGER NOT NULL,
+          changed_at TEXT NOT NULL,
+          actor TEXT NOT NULL
+        ) STRICT;
+        CREATE INDEX IF NOT EXISTS idx_site_config_changes_revision ON site_config_changes(revision DESC);
+        PRAGMA user_version = 2;
+        COMMIT;
+      `)
+    }
   }
 
   seedIfEmpty() {
@@ -98,6 +122,20 @@ export class PortalDatabase {
     if (!existsSync(this.seedFile)) throw new Error(`缺少案例种子文件：${this.seedFile}`)
     const seedCases = validateCases(JSON.parse(readFileSync(this.seedFile, 'utf8')))
     this.replaceInsideTransaction(seedCases, 1, 'json-seed')
+  }
+
+  seedSiteConfigIfEmpty() {
+    const initialized = this.database.prepare('SELECT revision FROM site_config WHERE id = 1').get()
+    if (initialized) return
+    if (!existsSync(this.siteConfigSeedFile)) throw new Error(`缺少站点配置种子文件：${this.siteConfigSeedFile}`)
+    const config = validateSiteConfig(JSON.parse(readFileSync(this.siteConfigSeedFile, 'utf8')))
+    const now = new Date().toISOString()
+    this.database.prepare(`
+      INSERT INTO site_config (id, json_value, revision, updated_at, updated_by)
+      VALUES (1, ?, 1, ?, 'json-seed')
+    `).run(JSON.stringify(config), now)
+    this.database.prepare('INSERT INTO site_config_changes (revision, changed_at, actor) VALUES (1, ?, ?)')
+      .run(now, 'json-seed')
   }
 
   getRevision() {
@@ -142,6 +180,12 @@ export class PortalDatabase {
     return { cases: this.getCases(), revision: this.getRevision() }
   }
 
+  getSiteConfigSnapshot() {
+    const row = this.database.prepare('SELECT json_value, revision FROM site_config WHERE id = 1').get()
+    if (!row) throw new Error('站点配置尚未初始化。')
+    return { config: validateSiteConfig(JSON.parse(row.json_value)), revision: Number(row.revision) }
+  }
+
   getHealth() {
     this.database.prepare('SELECT 1 AS ok').get()
     return {
@@ -149,6 +193,7 @@ export class PortalDatabase {
       schemaVersion: Number(this.database.prepare('PRAGMA user_version').get().user_version),
       caseCount: Number(this.database.prepare('SELECT COUNT(*) AS count FROM cases').get().count),
       revision: this.getRevision(),
+      siteConfigRevision: Number(this.database.prepare('SELECT revision FROM site_config WHERE id = 1').get()?.revision || 0),
       journalMode: this.database.prepare('PRAGMA journal_mode').get().journal_mode
     }
   }
@@ -172,12 +217,43 @@ export class PortalDatabase {
       const cases = validateCases(payload)
       const currentRevision = this.getRevision()
       if (expectedRevision !== undefined && Number(expectedRevision) !== currentRevision) {
-        throw new DatabaseConflictError()
+        throw new DatabaseConflictError('案例配置已被其他管理员更新，请刷新后重试。')
       }
       await this.createBackup()
       const nextRevision = currentRevision + 1
       this.replaceInsideTransaction(cases, nextRevision, actor)
       return this.getSnapshot()
+    }
+    const result = this.writeQueue.then(operation, operation)
+    this.writeQueue = result.catch(() => undefined)
+    return result
+  }
+
+  async replaceSiteConfig(payload, { expectedRevision, actor = 'admin' } = {}) {
+    const operation = async () => {
+      const config = validateSiteConfig(payload)
+      const current = this.getSiteConfigSnapshot()
+      if (expectedRevision !== undefined && Number(expectedRevision) !== current.revision) {
+        throw new DatabaseConflictError('站点配置已被其他管理员更新，请刷新后重试。')
+      }
+      await this.createBackup()
+      const nextRevision = current.revision + 1
+      const now = new Date().toISOString()
+      this.database.exec('BEGIN IMMEDIATE')
+      try {
+        this.database.prepare(`
+          UPDATE site_config
+          SET json_value = ?, revision = ?, updated_at = ?, updated_by = ?
+          WHERE id = 1
+        `).run(JSON.stringify(config), nextRevision, now, String(actor).slice(0, 100))
+        this.database.prepare('INSERT INTO site_config_changes (revision, changed_at, actor) VALUES (?, ?, ?)')
+          .run(nextRevision, now, String(actor).slice(0, 100))
+        this.database.exec('COMMIT')
+      } catch (error) {
+        this.database.exec('ROLLBACK')
+        throw error
+      }
+      return this.getSiteConfigSnapshot()
     }
     const result = this.writeQueue.then(operation, operation)
     this.writeQueue = result.catch(() => undefined)

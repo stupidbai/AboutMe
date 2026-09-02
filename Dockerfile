@@ -12,7 +12,7 @@ RUN npm run build
 FROM node:24-bookworm-slim AS runtime
 
 LABEL org.opencontainers.image.title="白云飞个人知识与合作门户" \
-      org.opencontainers.image.version="3.6.0"
+      org.opencontainers.image.version="3.7.0"
 
 ENV NODE_ENV=production \
     CASE_ADMIN_HOST=0.0.0.0 \
@@ -24,9 +24,11 @@ ENV NODE_ENV=production \
 WORKDIR /app
 COPY --from=build --chown=node:node /app/dist ./dist
 COPY --from=build --chown=node:node /app/config/cases.json ./config/cases.json
+COPY --from=build --chown=node:node /app/config/site-config.json ./config/site-config.json
 COPY --from=build --chown=node:node /app/scripts/serve-with-admin.mjs ./scripts/serve-with-admin.mjs
 COPY --from=build --chown=node:node /app/scripts/database.mjs ./scripts/database.mjs
 COPY --from=build --chown=node:node /app/scripts/case-schema.mjs ./scripts/case-schema.mjs
+COPY --from=build --chown=node:node /app/scripts/site-config-schema.mjs ./scripts/site-config-schema.mjs
 
 RUN mkdir -p /data/backups && chown -R node:node /data
 USER node

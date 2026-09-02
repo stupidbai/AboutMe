@@ -8,6 +8,7 @@ const root = resolve(import.meta.dirname, '..')
 const distRoot = resolve(root, 'dist')
 const envFile = resolve(root, '.env.local')
 const seedFile = resolve(root, 'config/cases.json')
+const siteConfigSeedFile = resolve(root, 'config/site-config.json')
 const sessionCookieName = 'case_admin_session'
 const sessions = new Map()
 const loginAttempts = new Map()
@@ -35,10 +36,11 @@ const sessionLifetimeMs = sessionHours * 60 * 60 * 1000
 
 if (!existsSync(distRoot)) throw new Error('缺少 dist 构建目录，请先运行 npm run build。')
 if (!existsSync(seedFile)) throw new Error('缺少 config/cases.json。')
+if (!existsSync(siteConfigSeedFile)) throw new Error('缺少 config/site-config.json。')
 if (adminPassword.length < 8) throw new Error('请设置至少 8 位的 CASE_ADMIN_PASSWORD。')
 if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('CASE_ADMIN_PORT 必须是 1-65535 的端口号。')
 
-const portalDatabase = new PortalDatabase({ dataDir, seedFile, backupLimit })
+const portalDatabase = new PortalDatabase({ dataDir, seedFile, siteConfigSeedFile, backupLimit })
 
 const mimeTypes = {
   '.css': 'text/css; charset=utf-8',
@@ -101,9 +103,9 @@ const readJsonBody = (request, limit = 1024 * 1024) => new Promise((resolveBody,
 
 const hashText = value => createHash('sha256').update(String(value)).digest()
 const safeEqual = (left, right) => timingSafeEqual(hashText(left), hashText(right))
-const revisionTag = revision => '"cases-' + revision + '"'
-const parseRevisionTag = value => {
-  const match = String(value || '').match(/^(?:W\/)?"cases-(\d+)"$/)
+const revisionTag = (kind, revision) => `"${kind}-${revision}"`
+const parseRevisionTag = (value, kind) => {
+  const match = String(value || '').match(new RegExp(`^(?:W\\/)?"${kind}-(\\d+)"$`))
   return match ? Number(match[1]) : undefined
 }
 
@@ -215,12 +217,23 @@ const handleRequest = async (request, response) => {
 
   if (pathname === '/api/cases' && request.method === 'GET') {
     const snapshot = portalDatabase.getSnapshot()
-    const etag = revisionTag(snapshot.revision)
+    const etag = revisionTag('cases', snapshot.revision)
     if (request.headers['if-none-match'] === etag) {
       sendJson(response, 304, null, { etag })
       return
     }
     sendJson(response, 200, snapshot.cases, { etag })
+    return
+  }
+
+  if (pathname === '/api/site-config' && request.method === 'GET') {
+    const snapshot = portalDatabase.getSiteConfigSnapshot()
+    const etag = revisionTag('site-config', snapshot.revision)
+    if (request.headers['if-none-match'] === etag) {
+      sendJson(response, 304, null, { etag })
+      return
+    }
+    sendJson(response, 200, snapshot.config, { etag })
     return
   }
 
@@ -275,7 +288,7 @@ const handleRequest = async (request, response) => {
     }
     if (request.method === 'GET') {
       const snapshot = portalDatabase.getSnapshot()
-      sendJson(response, 200, snapshot.cases, { etag: revisionTag(snapshot.revision) })
+      sendJson(response, 200, snapshot.cases, { etag: revisionTag('cases', snapshot.revision) })
       return
     }
     if (request.method === 'PUT') {
@@ -283,7 +296,7 @@ const handleRequest = async (request, response) => {
         sendJson(response, 403, { error: '请求来源无效。' })
         return
       }
-      const expectedRevision = parseRevisionTag(request.headers['if-match'])
+      const expectedRevision = parseRevisionTag(request.headers['if-match'], 'cases')
       if (expectedRevision === undefined) {
         sendJson(response, 428, { error: '缺少有效的配置版本，请刷新管理页后重试。' })
         return
@@ -293,7 +306,44 @@ const handleRequest = async (request, response) => {
           expectedRevision,
           actor: session.username
         })
-        sendJson(response, 200, snapshot.cases, { etag: revisionTag(snapshot.revision) })
+        sendJson(response, 200, snapshot.cases, { etag: revisionTag('cases', snapshot.revision) })
+      } catch (error) {
+        const status = error instanceof DatabaseConflictError ? 409 : 400
+        sendJson(response, status, { error: error.message })
+      }
+      return
+    }
+    sendJson(response, 405, { error: '请求方法不支持。' }, { allow: 'GET, PUT' })
+    return
+  }
+
+  if (pathname === '/api/admin/site-config') {
+    const session = getSession(request)
+    if (!session) {
+      sendJson(response, 401, { error: '请先登录。' })
+      return
+    }
+    if (request.method === 'GET') {
+      const snapshot = portalDatabase.getSiteConfigSnapshot()
+      sendJson(response, 200, snapshot.config, { etag: revisionTag('site-config', snapshot.revision) })
+      return
+    }
+    if (request.method === 'PUT') {
+      if (!sameOrigin(request)) {
+        sendJson(response, 403, { error: '请求来源无效。' })
+        return
+      }
+      const expectedRevision = parseRevisionTag(request.headers['if-match'], 'site-config')
+      if (expectedRevision === undefined) {
+        sendJson(response, 428, { error: '缺少有效的配置版本，请刷新管理页后重试。' })
+        return
+      }
+      try {
+        const snapshot = await portalDatabase.replaceSiteConfig(await readJsonBody(request), {
+          expectedRevision,
+          actor: session.username
+        })
+        sendJson(response, 200, snapshot.config, { etag: revisionTag('site-config', snapshot.revision) })
       } catch (error) {
         const status = error instanceof DatabaseConflictError ? 409 : 400
         sendJson(response, status, { error: error.message })
@@ -343,5 +393,6 @@ server.listen(port, host, () => {
   const health = portalDatabase.getHealth()
   console.log('Public site: http://' + host + ':' + port + '/cases')
   console.log('Case admin: http://' + host + ':' + port + '/admin/cases')
-  console.log('SQLite ready: ' + health.caseCount + ' cases, revision ' + health.revision + ', ' + health.journalMode + ' mode.')
+  console.log('Site admin: http://' + host + ':' + port + '/admin/site')
+  console.log('SQLite ready: ' + health.caseCount + ' cases, revisions cases=' + health.revision + '/site=' + health.siteConfigRevision + ', ' + health.journalMode + ' mode.')
 })

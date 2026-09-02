@@ -13,15 +13,20 @@ const staging = resolve(releaseRoot, packageName)
 if (!releaseRoot.startsWith(root + sep) || !staging.startsWith(releaseRoot + sep)) {
   throw new Error('发布目录解析结果超出项目范围。')
 }
-rmSync(releaseRoot, { recursive: true, force: true })
+mkdirSync(releaseRoot, { recursive: true })
+rmSync(staging, { recursive: true, force: true })
+rmSync(resolve(releaseRoot, packageName + '.tar.gz'), { force: true })
+rmSync(resolve(releaseRoot, packageName + '.zip'), { force: true })
 mkdirSync(staging, { recursive: true })
 
 const copyEntries = [
   ['dist', 'dist'],
   ['config/cases.json', 'config/cases.json'],
+  ['config/site-config.json', 'config/site-config.json'],
   ['scripts/serve-with-admin.mjs', 'scripts/serve-with-admin.mjs'],
   ['scripts/database.mjs', 'scripts/database.mjs'],
   ['scripts/case-schema.mjs', 'scripts/case-schema.mjs'],
+  ['scripts/site-config-schema.mjs', 'scripts/site-config-schema.mjs'],
   ['install', 'install'],
   ['bin', 'bin'],
   ['.env.example', '.env.example'],

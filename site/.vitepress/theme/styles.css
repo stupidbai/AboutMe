@@ -186,7 +186,8 @@
 .case-admin__hero > div > span { color: var(--portal-teal); font-size: 11px; font-weight: 900; letter-spacing: .16em; }
 .case-admin__hero h1 { margin: 7px 0 10px; color: white; font-size: clamp(34px, 5vw, 54px); line-height: 1.08; }
 .case-admin__hero p { max-width: 650px; margin: 0 !important; color: rgba(255,255,255,.7); }
-.case-admin__hero > a { flex: 0 0 auto; padding: 9px 14px; border: 1px solid rgba(255,255,255,.24); border-radius: 999px; color: white; text-decoration: none; }
+.case-admin__hero > a, .site-admin__links a { flex: 0 0 auto; padding: 9px 14px; border: 1px solid rgba(255,255,255,.24); border-radius: 999px; color: white; text-decoration: none; }
+.site-admin__links { display: flex; flex: 0 0 auto; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 .case-admin-state, .case-admin-login { max-width: 620px; margin: 56px auto; padding: 30px; border: 1px solid var(--portal-line); border-radius: 20px; background: var(--vp-c-bg-soft); }
 .case-admin-state h2, .case-admin-login h2 { margin-top: 0; }
 .case-admin-state--warning { border-color: color-mix(in srgb, var(--vp-c-warning-1) 45%, var(--portal-line)); }
@@ -219,6 +220,17 @@
 .case-admin-fields label.wide { grid-column: 1 / -1; }
 .case-admin-fields .case-admin-check { display: flex; grid-column: 1 / -1; align-items: center; flex-direction: row; }
 .case-admin-fields .case-admin-check input { width: 18px; height: 18px; }
+.site-admin-section { margin: 18px 0; border: 1px solid var(--portal-line); border-radius: 18px; background: var(--vp-c-bg-soft); }
+.site-admin-section > summary { padding: 20px 22px; cursor: pointer; color: var(--vp-c-text-1); font-size: 18px; font-weight: 850; }
+.site-admin-section[open] > summary { border-bottom: 1px solid var(--portal-line); }
+.site-admin-section > .case-admin-fields, .site-admin-overview { padding: 22px; }
+.site-admin-section > h3 { margin: 26px 22px 12px; }
+.site-admin-repeat { display: grid; gap: 14px; padding: 18px 22px 22px; }
+.site-admin-repeat .case-admin-card { padding: 18px; background: var(--vp-c-bg); }
+.site-admin-repeat .case-admin-card > header { margin-bottom: 14px; }
+.site-admin-add { justify-self: start; min-height: 38px; padding: 0 16px; border: 1px dashed var(--vp-c-brand-1); border-radius: 999px; color: var(--vp-c-brand-1); background: transparent; font-weight: 800; cursor: pointer; }
+.cooperation-direction { margin: 22px 0; padding: 22px 24px; border-left: 3px solid var(--portal-teal); background: var(--vp-c-bg-soft); }
+.cooperation-direction h3 { margin-top: 0; }
 
 .insight-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin: 32px 0 58px; }
 .insight-card { display: flex; flex-direction: column; min-height: 240px; padding: 24px; border: 1px solid var(--portal-line); border-radius: 18px; color: var(--vp-c-text-1) !important; background: var(--vp-c-bg-soft); text-decoration: none !important; transition: .2s ease; }
@@ -326,7 +338,8 @@
   .metric-grid article:nth-child(4) { border-top: 1px solid var(--portal-line); }
   .portal-section__head, .route-grid, .case-grid, .insight-grid, .capability-grid, .cooperation-grid { grid-template-columns: 1fr; }
   .case-admin__hero, .case-admin-toolbar, .case-admin-card > header { align-items: stretch; flex-direction: column; }
-  .case-admin__hero > a { align-self: flex-start; }
+  .case-admin__hero > a, .site-admin__links { align-self: flex-start; }
+  .site-admin__links { justify-content: flex-start; }
   .case-admin-toolbar { position: static; }
   .case-admin-toolbar > div:last-child { justify-content: flex-start; }
   .case-admin-fields { grid-template-columns: 1fr; }

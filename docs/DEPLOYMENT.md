@@ -1,17 +1,18 @@
 # 安装与部署
 
-本系统从 v3.6.0 起使用 Node.js 内置 SQLite。运行时不需要额外数据库服务，Windows、Linux 与 Docker 使用相同的数据结构和管理 API。
+本系统使用 Node.js 内置 SQLite。运行时不需要额外数据库服务，Windows、Linux 与 Docker 使用相同的数据结构和管理 API。v3.7.0 起，案例和站点内容均可通过独立管理页维护。
 
 ## 系统要求
 
 - Node.js 22.16 或更高版本。
 - 默认端口 4173。
 - 首次启动会将 config/cases.json 中的 9 个案例无损迁移到 data/portal.sqlite。
-- 管理地址：http://127.0.0.1:4173/admin/cases
+- 案例管理：http://127.0.0.1:4173/admin/cases
+- 站点管理：http://127.0.0.1:4173/admin/site
 
 ## Windows 安装包
 
-1. 解压 bai-yunfei-portal-v3.6.0.zip。
+1. 解压 bai-yunfei-portal-v3.7.0.zip。
 2. 在 PowerShell 中运行：
 
 ~~~powershell
@@ -35,8 +36,8 @@ powershell -ExecutionPolicy Bypass -File .\install\windows\install.ps1
 ## Linux 安装包
 
 ~~~bash
-tar -xzf bai-yunfei-portal-v3.6.0.tar.gz
-cd bai-yunfei-portal-v3.6.0
+tar -xzf bai-yunfei-portal-v3.7.0.tar.gz
+cd bai-yunfei-portal-v3.7.0
 chmod +x install/linux/install.sh
 ./install/linux/install.sh
 ~/.local/share/bai-yunfei-portal/bin/start-linux.sh
@@ -69,7 +70,7 @@ docker compose restart portal
 docker compose down
 ~~~
 
-数据库保存在命名卷 bai-yunfei-portal-data 中，重新构建镜像或删除容器不会丢失案例。除非明确要删除所有业务数据，不要执行 docker compose down -v。
+数据库保存在命名卷 bai-yunfei-portal-data 中，重新构建镜像或删除容器不会丢失案例和站点配置。除非明确要删除所有业务数据，不要执行 docker compose down -v。
 
 默认端口只绑定本机。需要供局域网访问时，将 compose.yaml 的端口绑定由 127.0.0.1 改为 0.0.0.0，并在防火墙中仅放行可信网段。面向公网时应放在 HTTPS 反向代理之后，并把 CASE_ADMIN_PASSWORD 改为强随机密码。
 
@@ -80,7 +81,7 @@ docker compose down
 - 自动备份：data/backups/
 - 默认保留最近 10 份备份，可通过 CASE_BACKUP_LIMIT 调整。
 - 数据库启用 WAL、外键、事务、唯一约束与查询索引。
-- 每次管理端保存前先创建 SQLite 一致性备份，再在单一事务中更新案例、标签和合作伙伴。
+- 每次管理端保存前先创建 SQLite 一致性备份，再在单一事务中更新案例或站点配置。
 - 管理 API 使用 ETag/If-Match 防止两个管理页面互相覆盖。
 
 健康检查：

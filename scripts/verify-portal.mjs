@@ -8,6 +8,7 @@ const requiredFiles = [
   'site/cooperation.md',
   'site/cases.md',
   'site/admin/cases.md',
+  'site/admin/site.md',
   'site/insights.md',
   'site/knowledge.md',
   'site/life.md',
@@ -17,9 +18,14 @@ const requiredFiles = [
   'site/.vitepress/theme/styles.css',
   'site/.vitepress/theme/components/CaseGrid.vue',
   'site/.vitepress/theme/components/CaseAdmin.vue',
+  'site/.vitepress/theme/components/SiteAdmin.vue',
+  'site/.vitepress/theme/components/CooperationContent.vue',
+  'site/.vitepress/theme/useSiteConfig.ts',
+  'site/data/siteConfig.ts',
   'site/data/portal.ts',
   'site/data/cases.ts',
   'config/cases.json',
+  'config/site-config.json',
   'site/data/life.ts',
   'site/data/knowledge.ts',
   'site/data/importedKnowledge.ts',
@@ -28,6 +34,7 @@ const requiredFiles = [
   'scripts/serve-with-admin.mjs',
   'scripts/database.mjs',
   'scripts/case-schema.mjs',
+  'scripts/site-config-schema.mjs',
   'scripts/test-database.mjs',
   'scripts/test-admin-api.mjs',
   'scripts/build-release.mjs',
@@ -52,11 +59,13 @@ if (missingFiles.length) {
 const cases = JSON.parse(readFileSync(resolve(root, 'config/cases.json'), 'utf8'))
 const caseComponentSource = readFileSync(resolve(root, 'site/.vitepress/theme/components/CaseGrid.vue'), 'utf8')
 const caseAdminSource = readFileSync(resolve(root, 'site/.vitepress/theme/components/CaseAdmin.vue'), 'utf8')
+const siteAdminSource = readFileSync(resolve(root, 'site/.vitepress/theme/components/SiteAdmin.vue'), 'utf8')
 const adminServerSource = readFileSync(resolve(root, 'scripts/serve-with-admin.mjs'), 'utf8')
 const databaseSource = readFileSync(resolve(root, 'scripts/database.mjs'), 'utf8')
 const dockerfileSource = readFileSync(resolve(root, 'Dockerfile'), 'utf8')
 const composeSource = readFileSync(resolve(root, 'compose.yaml'), 'utf8')
 const packageMetadata = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'))
+const siteConfig = JSON.parse(readFileSync(resolve(root, 'config/site-config.json'), 'utf8'))
 const knowledgeSource = readFileSync(resolve(root, 'site/data/knowledge.ts'), 'utf8')
 const importedKnowledgeSource = readFileSync(resolve(root, 'site/data/importedKnowledge.ts'), 'utf8')
 const importedKnowledgeComponent = readFileSync(
@@ -66,6 +75,7 @@ const importedKnowledgeComponent = readFileSync(
 const portalSource = readFileSync(resolve(root, 'site/data/portal.ts'), 'utf8')
 const contentSource = [
   portalSource,
+  JSON.stringify(siteConfig),
   readFileSync(resolve(root, 'site/profile.md'), 'utf8'),
   readFileSync(resolve(root, 'site/cooperation.md'), 'utf8'),
   readFileSync(resolve(root, 'site/contact.md'), 'utf8'),
@@ -121,6 +131,13 @@ if (missingAdminAnchors.length) {
 if (caseAdminSource.includes('localStorage')) {
   throw new Error('Case admin must use server persistence, not browser localStorage')
 }
+const requiredSiteAdminAnchors = ['/api/admin/site-config', '首页目录与版块显隐', '职业时间线', '保存全部修改', "'if-match': revision.value"]
+const missingSiteAdminAnchors = requiredSiteAdminAnchors.filter(anchor => !siteAdminSource.includes(anchor))
+if (missingSiteAdminAnchors.length) throw new Error(`Missing site admin behavior: ${missingSiteAdminAnchors.join(', ')}`)
+if (siteAdminSource.includes('localStorage')) throw new Error('Site admin must use server persistence, not browser localStorage')
+if (!Array.isArray(siteConfig.routes) || !Array.isArray(siteConfig.timeline) || !Array.isArray(siteConfig.cooperation?.directions)) {
+  throw new Error('Site configuration seed is incomplete')
+}
 
 const requiredServerAnchors = [
   'CASE_ADMIN_PASSWORD',
@@ -128,6 +145,8 @@ const requiredServerAnchors = [
   'SameSite=Strict',
   '/api/admin/login',
   '/api/admin/cases',
+  '/api/admin/site-config',
+  '/api/site-config',
   'config/cases.json',
   '/api/health',
   'PortalDatabase',
@@ -150,6 +169,8 @@ const requiredDatabaseAnchors = [
   'CREATE TABLE IF NOT EXISTS case_tags',
   'CREATE TABLE IF NOT EXISTS case_partners',
   'CREATE TABLE IF NOT EXISTS case_changes',
+  'CREATE TABLE IF NOT EXISTS site_config',
+  'CREATE TABLE IF NOT EXISTS site_config_changes',
   'CREATE INDEX IF NOT EXISTS',
   'await backup',
   'DatabaseConflictError'
@@ -165,7 +186,7 @@ if (missingDockerAnchors.length) throw new Error(`Missing Docker behavior: ${mis
 if (!composeSource.includes('portal-data:/data') || !composeSource.includes('read_only: true') || !composeSource.includes('no-new-privileges:true')) {
   throw new Error('Compose must keep SQLite in a volume and apply container hardening')
 }
-if (packageMetadata.version !== '3.6.0' || packageMetadata.engines?.node !== '>=22.16') {
+if (packageMetadata.version !== '3.7.0' || packageMetadata.engines?.node !== '>=22.16') {
   throw new Error('Package version or Node.js SQLite runtime requirement is incorrect')
 }
 
@@ -277,6 +298,8 @@ console.log(`Content pages: ${pageCount}`)
 console.log(`Case entries: ${cases.length}`)
 console.log(`Configured NAS case links: ${cases.filter(item => item.nasUrl.trim()).length}`)
 console.log('Case management mode: protected server admin')
+console.log(`Configurable homepage routes: ${siteConfig.routes.length}`)
+console.log(`Configurable timeline entries: ${siteConfig.timeline.length}`)
 console.log(`Knowledge entries: ${knowledgeCount}`)
 console.log(`Imported knowledge entries: ${importedKnowledgeCount} (${referenceKnowledgeCount} reference-only)`)
 console.log(`Imported knowledge pages without external navigation/media: ${importedMarkdownFiles.length}`)

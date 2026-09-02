@@ -90,7 +90,7 @@ const save = (payload, match = revision) => adminFetch('/api/admin/cases', {
 
 try {
   const health = await waitForHealth()
-  if (health.status !== 'ok' || health.database.schemaVersion !== 1 || health.database.journalMode !== 'wal') {
+  if (health.status !== 'ok' || health.database.schemaVersion !== 2 || health.database.siteConfigRevision !== 1 || health.database.journalMode !== 'wal') {
     throw new Error('SQLite 健康状态不符合预期。')
   }
 
@@ -104,7 +104,14 @@ try {
     headers: { 'if-none-match': publicEtag }
   }), 304, '公开读取缓存协商')
 
+  const publicSiteResponse = await expectStatus(await fetch(baseUrl + '/api/site-config'), 200, '公开读取站点配置')
+  const publicSiteConfig = await publicSiteResponse.json()
+  const publicSiteEtag = publicSiteResponse.headers.get('etag')
+  if (publicSiteConfig.identity?.name !== '白云飞' || !publicSiteEtag) throw new Error('公开站点配置或 ETag 缺失。')
+  await expectStatus(await fetch(baseUrl + '/api/site-config', { headers: { 'if-none-match': publicSiteEtag } }), 304, '站点配置缓存协商')
+
   await expectStatus(await adminFetch('/api/admin/cases'), 401, '未登录访问管理 API')
+  await expectStatus(await adminFetch('/api/admin/site-config'), 401, '未登录访问站点配置 API')
   await expectStatus(await adminFetch('/api/admin/login', {
     method: 'POST',
     headers: { origin: 'https://invalid.example' },
@@ -125,6 +132,24 @@ try {
   const originalCases = await managedResponse.json()
   revision = managedResponse.headers.get('etag') || ''
   if (!revision || originalCases.length !== 9) throw new Error('管理 API 未返回数据库版本或完整案例。')
+
+  const managedSiteResponse = await expectStatus(await adminFetch('/api/admin/site-config'), 200, '登录后读取站点配置')
+  const originalSiteConfig = await managedSiteResponse.json()
+  let siteRevision = managedSiteResponse.headers.get('etag') || ''
+  if (!siteRevision || originalSiteConfig.timeline.length !== 5) throw new Error('管理 API 未返回站点配置版本或完整时间线。')
+  const saveSite = (payload, match = siteRevision) => adminFetch('/api/admin/site-config', {
+    method: 'PUT', headers: match ? { 'if-match': match } : {}, body: JSON.stringify(payload)
+  })
+  await expectStatus(await saveSite(originalSiteConfig, ''), 428, '站点配置缺少并发版本保护')
+  const changedSiteConfig = structuredClone(originalSiteConfig)
+  changedSiteConfig.identity.city = '上海 / 徐州 / API 验收'
+  const siteWrite = await expectStatus(await saveSite(changedSiteConfig), 200, '更新站点配置')
+  siteRevision = siteWrite.headers.get('etag') || ''
+  const publicChangedSite = await (await expectStatus(await fetch(baseUrl + '/api/site-config'), 200, '更新后公开读取站点配置')).json()
+  if (publicChangedSite.identity.city !== changedSiteConfig.identity.city) throw new Error('站点配置更新未公开生效。')
+  await expectStatus(await saveSite(originalSiteConfig, publicSiteEtag), 409, '站点配置旧版本写入冲突')
+  const siteRestore = await expectStatus(await saveSite(originalSiteConfig), 200, '恢复站点配置')
+  siteRevision = siteRestore.headers.get('etag') || ''
 
   await expectStatus(await save(originalCases, ''), 428, '缺少并发版本保护')
 
@@ -165,6 +190,7 @@ try {
   await expectStatus(await adminFetch('/api/admin/logout', { method: 'POST' }), 200, '退出登录')
   cookie = ''
   await expectStatus(await adminFetch('/api/admin/cases'), 401, '退出后访问管理 API')
+  await expectStatus(await adminFetch('/api/admin/site-config'), 401, '退出后访问站点配置 API')
 
   const databaseFile = join(testDataDir, 'portal.sqlite')
   const backups = readdirSync(join(testDataDir, 'backups')).filter(file => file.endsWith('.sqlite'))
@@ -175,10 +201,12 @@ try {
   console.log('SQLite migration: 9 seed cases')
   console.log('SQLite WAL/schema/health: verified')
   console.log('Public API ETag/304: verified')
+  console.log('Public site configuration ETag/304: verified')
   console.log('Unauthenticated admin API: 401')
   console.log('Cross-origin login: 403')
   console.log('Protected session cookie: verified')
   console.log('Optimistic concurrency and serialized writes: 428/409 verified')
+  console.log('Site configuration update/restore: verified')
   console.log('Transactional create/delete: verified (9 -> 10 -> 9)')
   console.log('Rotating database backups: verified')
   console.log('Logout invalidation: verified')

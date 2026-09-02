@@ -6,6 +6,8 @@ import HomePortal from './components/HomePortal.vue'
 import ProfileTimeline from './components/ProfileTimeline.vue'
 import CaseGrid from './components/CaseGrid.vue'
 import CaseAdmin from './components/CaseAdmin.vue'
+import SiteAdmin from './components/SiteAdmin.vue'
+import CooperationContent from './components/CooperationContent.vue'
 import InsightGrid from './components/InsightGrid.vue'
 import LifeGallery from './components/LifeGallery.vue'
 import ContactPanel from './components/ContactPanel.vue'
@@ -24,6 +26,8 @@ export default {
     app.component('ProfileTimeline', ProfileTimeline)
     app.component('CaseGrid', CaseGrid)
     app.component('CaseAdmin', CaseAdmin)
+    app.component('SiteAdmin', SiteAdmin)
+    app.component('CooperationContent', CooperationContent)
     app.component('InsightGrid', InsightGrid)
     app.component('LifeGallery', LifeGallery)
     app.component('ContactPanel', ContactPanel)

@@ -1,10 +1,14 @@
 <script setup lang="ts">
-import { timeline } from '../../../data/portal'
+import { onMounted } from 'vue'
+import { useSiteConfig } from '../useSiteConfig'
+
+const { config, load } = useSiteConfig()
+onMounted(load)
 </script>
 
 <template>
   <div class="timeline-list">
-    <article v-for="item in timeline" :key="item.period" class="timeline-card" :class="{ 'timeline-card--current': item.current }">
+    <article v-for="item in config.timeline" :key="`${item.period}-${item.organization}`" class="timeline-card" :class="{ 'timeline-card--current': item.current }">
       <time>{{ item.period }}</time>
       <div>
         <span v-if="item.current" class="current-badge">CURRENT</span>
