@@ -62,7 +62,7 @@ npm run build
 | 精简版 | 企业 AI 商业合作伙伴介绍（精简背书标签） | `versions/index-v2.0.1-商业合作版.html` | `v2.0.1` |
 | 单页归档版 | 上海莲证科技 CIO 商业合作介绍 | `versions/index-v2.1.0-CIO商业合作版.html` | `v2.1.0` |
 | 多页面静态版 | 九案例图文商业合作主页 | `index.html` + `pages/` | `v2.3.2` |
-| 当前工作版 | VitePress 个人知识、合作与本地知识归档门户 | `site/` | 待发布 `v3.2.2` |
+| 当前工作版 | VitePress 个人知识、合作与本地知识归档门户 | `site/` | 待发布 `v3.3.0` |
 
 `v1.0.0` 与 `v1.1.0` 的 `index.html` 内容相同，因此只保留一份物理快照；两个 Git 标签仍完整存在。
 
@@ -72,8 +72,16 @@ npm run build
 git status
 git add site scripts .github package.json package-lock.json CHANGELOG.md README.md
 git commit -m "重构个人知识与合作门户"
-git tag -a v3.2.2 -m "发布 v3.2.2"
+git tag -a v3.3.0 -m "发布 v3.3.0"
 ```
+
+配置案例 NAS 链接：
+
+1. 打开 `config/case-links.json`。
+2. 按案例编号 `01` 至 `09` 填入完整的 `http://` 或 `https://` 地址；没有地址时保持空字符串。
+3. 运行 `npm run check`，然后重新构建或启动项目。
+
+配置后的案例卡片可整体点击，并在新标签页打开对应 NAS 资料；未配置的卡片会显示“NAS 链接待配置”。
 
 重新生成 Arch3rPro 历史知识归档：
 

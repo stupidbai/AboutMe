@@ -16,6 +16,7 @@ const requiredFiles = [
   'site/.vitepress/theme/styles.css',
   'site/data/portal.ts',
   'site/data/cases.ts',
+  'config/case-links.json',
   'site/data/life.ts',
   'site/data/knowledge.ts',
   'site/data/importedKnowledge.ts',
@@ -31,6 +32,8 @@ if (missingFiles.length) {
 }
 
 const caseSource = readFileSync(resolve(root, 'site/data/cases.ts'), 'utf8')
+const caseComponentSource = readFileSync(resolve(root, 'site/.vitepress/theme/components/CaseGrid.vue'), 'utf8')
+const caseLinks = JSON.parse(readFileSync(resolve(root, 'config/case-links.json'), 'utf8'))
 const knowledgeSource = readFileSync(resolve(root, 'site/data/knowledge.ts'), 'utf8')
 const importedKnowledgeSource = readFileSync(resolve(root, 'site/data/importedKnowledge.ts'), 'utf8')
 const importedKnowledgeComponent = readFileSync(
@@ -49,6 +52,21 @@ const contentSource = [
 
 const caseCount = (caseSource.match(/\n\s*id:\s*'\d{2}'/g) || []).length
 if (caseCount !== 9) throw new Error(`Expected 9 cases, found ${caseCount}`)
+
+const expectedCaseIds = Array.from({ length: 9 }, (_, index) => String(index + 1).padStart(2, '0'))
+const configuredCaseIds = Object.keys(caseLinks).sort()
+if (JSON.stringify(configuredCaseIds) !== JSON.stringify(expectedCaseIds)) {
+  throw new Error(`Case link config must contain exactly IDs 01-09, found: ${configuredCaseIds.join(', ')}`)
+}
+const invalidCaseLinks = Object.entries(caseLinks)
+  .filter(([, url]) => typeof url !== 'string' || (url.trim() && !/^https?:\/\//i.test(url.trim())))
+  .map(([id]) => id)
+if (invalidCaseLinks.length) {
+  throw new Error(`Case NAS links must be empty or use http/https: ${invalidCaseLinks.join(', ')}`)
+}
+if (!caseComponentSource.includes(':href="item.nasUrl || undefined"') || !caseComponentSource.includes('noopener noreferrer')) {
+  throw new Error('Case cards must use configurable NAS links with safe new-tab navigation')
+}
 
 const knowledgeCount = (knowledgeSource.match(/\n\s*id:\s*'k\d{2}'/g) || []).length
 if (knowledgeCount !== 12) throw new Error(`Expected 12 knowledge entries, found ${knowledgeCount}`)
@@ -153,6 +171,7 @@ if (missingAssets.length) throw new Error(`Missing local assets:\n${missingAsset
 const pageCount = ['index', 'profile', 'cooperation', 'cases', 'insights', 'knowledge', 'life', 'contact'].length
 console.log(`Content pages: ${pageCount}`)
 console.log(`Case entries: ${caseCount}`)
+console.log(`Configured NAS case links: ${Object.values(caseLinks).filter(url => url.trim()).length}`)
 console.log(`Knowledge entries: ${knowledgeCount}`)
 console.log(`Imported knowledge entries: ${importedKnowledgeCount} (${referenceKnowledgeCount} reference-only)`)
 console.log(`Imported knowledge pages without external navigation/media: ${importedMarkdownFiles.length}`)

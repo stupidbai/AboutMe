@@ -30,7 +30,18 @@ const visibleCases = computed(() => selected.value === 'all'
       </button>
     </div>
     <div class="case-grid">
-      <article v-for="item in visibleCases" :key="item.id" class="case-card">
+      <component
+        :is="item.nasUrl ? 'a' : 'article'"
+        v-for="item in visibleCases"
+        :key="item.id"
+        class="case-card"
+        :class="{ 'case-card--linked': item.nasUrl, 'case-card--pending': !item.nasUrl }"
+        :href="item.nasUrl || undefined"
+        :target="item.nasUrl ? '_blank' : undefined"
+        :rel="item.nasUrl ? 'noopener noreferrer' : undefined"
+        :aria-label="item.nasUrl ? `${item.title}：打开 NAS 资料` : undefined"
+        :data-nas-link="item.nasUrl ? 'configured' : 'pending'"
+      >
         <div class="case-card__media" :class="{ 'case-card__media--contain': item.contain }">
           <div v-if="item.partners" class="partner-grid" aria-label="合作伙伴">
             <div v-for="partner in item.partners" :key="partner.name">
@@ -47,8 +58,12 @@ const visibleCases = computed(() => selected.value === 'all'
           <p>{{ item.description }}</p>
           <div v-if="item.outcome" class="case-outcome"><strong>{{ item.outcome }}</strong><span>{{ item.outcomeLabel }}</span></div>
           <div class="tag-row"><span v-for="tag in item.tags" :key="tag">{{ tag }}</span></div>
+          <div class="case-card__link">
+            <span>{{ item.nasUrl ? '查看 NAS 项目资料' : 'NAS 链接待配置' }}</span>
+            <span aria-hidden="true">{{ item.nasUrl ? '↗' : '—' }}</span>
+          </div>
         </div>
-      </article>
+      </component>
     </div>
   </div>
 </template>

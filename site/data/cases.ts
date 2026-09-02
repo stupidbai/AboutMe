@@ -1,3 +1,5 @@
+import caseLinks from '../../config/case-links.json'
+
 export interface CaseItem {
   id: string
   title: string
@@ -10,9 +12,10 @@ export interface CaseItem {
   outcomeLabel?: string
   contain?: boolean
   partners?: Array<{ name: string; logo: string }>
+  nasUrl: string
 }
 
-export const cases: CaseItem[] = [
+const caseItems: Array<Omit<CaseItem, 'nasUrl'>> = [
   {
     id: '01',
     title: '企业 AI 知识库与 RAG 系统',
@@ -109,3 +112,10 @@ export const cases: CaseItem[] = [
     tags: ['生态社群', '需求连接', '复制交付']
   }
 ]
+
+const configuredCaseLinks = caseLinks as Record<string, string>
+
+export const cases: CaseItem[] = caseItems.map(item => ({
+  ...item,
+  nasUrl: (configuredCaseLinks[item.id] || '').trim()
+}))
