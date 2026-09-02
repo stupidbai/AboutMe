@@ -1,6 +1,6 @@
-# 白云飞商业合作介绍
+# 白云飞个人知识与合作门户
 
-这是一个无需构建工具和第三方运行依赖的多页面商业合作介绍站点，面向企业客户、方案商、AI 产品团队及产业生态伙伴。
+这是一个基于 VitePress、Vue 3 和 TypeScript 的数据驱动个人网站，面向企业客户、方案商、AI 产品团队及产业生态伙伴。网站将职业履历、合作方向、项目案例、主题方法、个人侧面和联系方式拆分为独立入口，并提供站内搜索、页面目录、明暗主题和 GitHub Pages 自动部署。
 
 ## 本地启动
 
@@ -12,35 +12,35 @@ npm start
 
 然后访问 <http://127.0.0.1:8000/>。
 
-检查全部 HTML 本地引用、案例数量与脚本语法：
+检查内容数据、关键事实、本地素材引用并执行生产构建：
 
 ```powershell
 npm run check
 ```
 
-如需使用其他端口：
+生成生产站点：
 
 ```powershell
-$env:PORT = 4173
-npm start
+npm run build
 ```
 
 ## 网站结构
 
-- `index.html`：合作主页，只呈现核心定位、数据和目录大纲。
-- `pages/profile.html`：职业时间线、能力底座和专业背书。
-- `pages/cooperation.html`：合作匹配、四类方向与推进方式。
-- `pages/cases.html`：九个产品交付、人才、渠道与生态案例。
-- `pages/life.html`：户外影像、兴趣和内容账号。
-- `pages/contact.html`：电话、邮箱、微信二维码与沟通建议。
-- `assets/site.css`、`assets/site.js`：全部页面共用的样式和导航逻辑。
-- `assets/cases/`：案例页使用的本地项目图片、产品截图与生成配图。
-- `docs/`：既有 PDF 与 HTML 历史交付物，仅保留在项目档案中，不在当前网站导航展示。
-- `爱好/`：户外照片与公众号、视频号二维码原始素材。
-- `versions/`：不可覆盖的已发布 HTML 版本快照和校验清单。
-- `server.mjs`：零第三方依赖的本地静态文件服务器。
+- `site/index.md`：个人门户首页与目录。
+- `site/profile.md`：职业时间线、能力底座与专业背书。
+- `site/cooperation.md`：合作匹配、四类方向与推进方式。
+- `site/cases.md`：九个产品交付、人才、渠道与生态案例。
+- `site/insights.md`：企业 AI、可信数字化、FDE 与生态建设主题地图。
+- `site/life.md`：户外影像、兴趣与内容账号。
+- `site/contact.md`：电话、邮箱、微信二维码与沟通建议。
+- `site/data/`：首页、案例、时间线和生活内容的数据源。
+- `site/.vitepress/theme/`：Vue 组件与响应式主题。
+- `site/public/`：部署使用的本地图片、二维码和品牌素材。
+- `.github/workflows/deploy.yml`：GitHub Pages 自动构建与发布。
+- `index.html`、`pages/`、`assets/`：v2.3.2 静态站原始文件，继续保留用于历史追溯。
+- `versions/`：不可覆盖的早期版本快照和校验清单。
 
-更新公共视觉或导航时修改 `assets/` 中的共用文件；更新具体内容时修改对应的 `pages/` 页面。PDF 文件是既有历史交付物，不会随网页自动更新。
+更新文字与卡片时优先修改 `site/data/` 和对应 Markdown 页面；更新公共视觉时修改 `site/.vitepress/theme/styles.css`。旧版静态站和既有 PDF / HTML 档案不会随新版构建自动改变。
 
 ## 版本管理
 
@@ -57,7 +57,8 @@ npm start
 | 商业合作初版 | 企业 AI 商业合作伙伴介绍 | `versions/index-v2.0.0-商业合作版.html` | `v2.0.0` |
 | 精简版 | 企业 AI 商业合作伙伴介绍（精简背书标签） | `versions/index-v2.0.1-商业合作版.html` | `v2.0.1` |
 | 单页归档版 | 上海莲证科技 CIO 商业合作介绍 | `versions/index-v2.1.0-CIO商业合作版.html` | `v2.1.0` |
-| 当前工作版 | 九案例图文商业合作主页 | `index.html` + `pages/` | 待发布 `v2.3.2` |
+| 多页面静态版 | 九案例图文商业合作主页 | `index.html` + `pages/` | `v2.3.2` |
+| 当前工作版 | VitePress 个人知识与合作门户 | `site/` | 待发布 `v3.0.0` |
 
 `v1.0.0` 与 `v1.1.0` 的 `index.html` 内容相同，因此只保留一份物理快照；两个 Git 标签仍完整存在。
 
@@ -65,9 +66,9 @@ npm start
 
 ```powershell
 git status
-git add index.html pages assets CHANGELOG.md README.md package.json 爱好
-git commit -m "更新简历内容"
-git tag -a v2.3.2 -m "发布 v2.3.2"
+git add site scripts .github package.json package-lock.json CHANGELOG.md README.md
+git commit -m "重构个人知识与合作门户"
+git tag -a v3.0.0 -m "发布 v3.0.0"
 ```
 
 查看已有版本：

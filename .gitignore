@@ -5,6 +5,9 @@ Desktop.ini
 .vscode/
 .idea/
 node_modules/
+dist/
+site/.vitepress/cache/
+site/.vitepress/dist/
 
 # Local server and temporary files
 *.log

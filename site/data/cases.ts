@@ -1,0 +1,111 @@
+export interface CaseItem {
+  id: string
+  title: string
+  kicker: string
+  description: string
+  image: string
+  imageAlt: string
+  tags: string[]
+  outcome?: string
+  outcomeLabel?: string
+  contain?: boolean
+  partners?: Array<{ name: string; logo: string }>
+}
+
+export const cases: CaseItem[] = [
+  {
+    id: '01',
+    title: '企业 AI 知识库与 RAG 系统',
+    kicker: '企业知识工程 · 全栈交付',
+    description: '围绕设备文档、工艺资料和异常记录构建智能检索与问答系统，覆盖需求分析、系统设计、开发、部署与运维。',
+    image: '/assets/cases/rag-knowledge-system.png',
+    imageAlt: '企业文档经检索、知识网络与答案验证形成 RAG 系统的示意图',
+    tags: ['知识工程', 'RAG', '全栈交付'],
+    outcome: '50%+',
+    outcomeLabel: '客服与内部支持效率提升'
+  },
+  {
+    id: '02',
+    title: '华为云产线效能提升',
+    kicker: '研发效能 · 团队负责人',
+    description: '主导 DevOps 与 CI/CD 流程优化，带领数十人研发团队推进需求拆解、技术评审、质量控制与跨团队协同。',
+    image: '/assets/cases/huawei-cloud-v2.jpg',
+    imageAlt: '华为全联接大会现场照片',
+    tags: ['DevOps', 'CI/CD', '团队管理'],
+    outcome: '60%',
+    outcomeLabel: '模块交付周期缩短'
+  },
+  {
+    id: '03',
+    title: '多模型 API 与 Agent 工作流平台',
+    kicker: 'AI 技术底座 · 方案治理',
+    description: '统筹接入国内外主流模型和头部厂商资源，建设模型选型、统一接入、成本可视化、服务治理与 Agent 工作流底座。',
+    image: '/assets/cases/multi-model-agent.jpg',
+    imageAlt: '多模型 API 平台的模型消耗与统一治理界面',
+    tags: ['模型路由', '用量治理', 'Agent 编排'],
+    contain: true
+  },
+  {
+    id: '04',
+    title: '工业 AI 视觉检测系统',
+    kicker: '工业智能 · 边缘部署',
+    description: '基于 YOLO、OpenCV 与 TensorRT 构建工业视觉方案，在 Jetson、瑞芯微等平台完成算法优化、边缘部署与现场联调。',
+    image: '/assets/cases/industrial-vision-system.png',
+    imageAlt: '生产线相机与边缘计算设备进行工业视觉缺陷检测的示意图',
+    tags: ['视觉算法', '边缘推理', '现场落地']
+  },
+  {
+    id: '05',
+    title: 'WaytoAGI 徐州负责人',
+    kicker: '本地 AI 社群 · 组织连接',
+    description: '推进本地活动、内容交流、资源协同和项目对接，连接开发者、学者与 AI 实践者。',
+    image: '/assets/cases/waytoagi-xuzhou.jpg',
+    imageAlt: 'WaytoAGI 社群线下活动集体合影',
+    tags: ['共学共建', '本地活动', '资源连接']
+  },
+  {
+    id: '06',
+    title: '中国矿业大学校外实训导师',
+    kicker: '产教融合 · 工程实践',
+    description: '面向高校学生开展数智化能力提升实训，把真实产业问题、AI 工具链和工程交付方法带入课堂。',
+    image: '/assets/cases/cumt-mentor.jpg',
+    imageAlt: '中国矿业大学数智化能力提升实训现场',
+    tags: ['案例教学', '项目辅导', '产教协同']
+  },
+  {
+    id: '07',
+    title: '电商视频图片生成平台',
+    kicker: '生成式内容 · 产品平台',
+    description: '整合商品图生成、视频复刻、AI 模特试穿和营销素材变体能力，形成内容批量生产工作台。',
+    image: '/assets/cases/ecommerce-content-platform.png',
+    imageAlt: '电商视频与图片生成平台功能界面',
+    tags: ['图像生成', '视频生成', '内容提效'],
+    contain: true
+  },
+  {
+    id: '08',
+    title: '渠道与厂商资源整合',
+    kicker: '伙伴网络 · 方案协同',
+    description: '与华为、字节跳动、阿里巴巴、京东、英伟达等企业协同云、模型、算力硬件、行业方案和市场机会。',
+    image: '/assets/cases/partners/huawei.svg',
+    imageAlt: '合作企业伙伴网络标识',
+    tags: ['伙伴资源', '联合方案', '市场协同'],
+    contain: true,
+    partners: [
+      { name: '华为', logo: '/assets/cases/partners/huawei.svg' },
+      { name: '字节跳动', logo: '/assets/cases/partners/bytedance.svg' },
+      { name: '阿里巴巴', logo: '/assets/cases/partners/alibabadotcom.svg' },
+      { name: '京东', logo: '/assets/cases/partners/jdcloud.svg' },
+      { name: '英伟达', logo: '/assets/cases/partners/nvidia.svg' }
+    ]
+  },
+  {
+    id: '09',
+    title: 'AI 生态建设',
+    kicker: '生态社群 · 长期建设',
+    description: '持续汇聚开发者、高校、厂商与企业需求，形成发现需求、组织能力、联合验证和复制交付的闭环。',
+    image: '/assets/cases/ecosystem-community.jpg',
+    imageAlt: 'AI 生态伙伴共创交流活动现场',
+    tags: ['生态社群', '需求连接', '复制交付']
+  }
+]

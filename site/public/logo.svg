@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title id="title">白云飞 BYF</title>
+  <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2bd4bd"/><stop offset="1" stop-color="#6ca8ff"/></linearGradient></defs>
+  <rect width="64" height="64" rx="18" fill="#071f2b"/>
+  <path d="M14 15h18c8 0 13 4 13 10 0 4-2 7-6 8 5 1 8 5 8 10 0 8-6 12-16 12H14V15Zm15 16c5 0 7-2 7-5s-2-4-7-4h-6v9h6Zm1 17c5 0 8-2 8-6s-3-5-8-5h-7v11h7Z" fill="url(#g)"/>
+</svg>
