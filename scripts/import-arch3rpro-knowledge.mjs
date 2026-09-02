@@ -137,6 +137,57 @@ function normalizeTrailingWhitespace(text) {
   }).join('\n')
 }
 
+function localizeExternalContent(text) {
+  const lines = text.split('\n')
+  const output = []
+  let fence = null
+  for (let index = 0; index < lines.length; index += 1) {
+    let line = lines[index]
+    const fenceMatch = line.trim().match(/^(`{3,}|~{3,})/)
+    if (fenceMatch) {
+      if (!fence) fence = fenceMatch[1][0]
+      else if (fence === fenceMatch[1][0]) fence = null
+      output.push(line)
+      continue
+    }
+    if (fence) {
+      output.push(line)
+      continue
+    }
+    if (/^\s*<iframe\b/i.test(line)) {
+      while (index + 1 < lines.length && !line.toLowerCase().includes('</iframe>')) {
+        index += 1
+        line += `\n${lines[index]}`
+        if (lines[index].toLowerCase().includes('</iframe>')) break
+      }
+      output.push('> 外部视频演示未在本站加载，地址已记录在本地迁移清单中。')
+      continue
+    }
+    if (/<img\b[^>]*src=["']https?:\/\//i.test(line)) {
+      const alt = line.match(/alt=["']([^"']+)["']/i)?.[1] || '外部图片'
+      output.push(`\`${alt}\`（外部图片地址已记录在本地迁移清单中）`)
+      continue
+    }
+    line = line.replace(/!\[([^\]]*)\]\((https?:\/\/[^)\s]+)\)/g, (_match, alt) => `\`${alt || '外部图片'}\`（外部图片地址已留档）`)
+    line = line.replace(/(?<!!)\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, (_match, label, url) => (
+      label === url ? `\`${url}\`` : `${label}（\`${url}\`）`
+    ))
+    const codeParts = line.split(/(`[^`]*`)/g)
+    line = codeParts.map((part, partIndex) => {
+      if (partIndex % 2 === 1) return part
+      return part.replace(/https?:\/\/[^\s<>"'()[\]{}（）]+/g, (url) => `\`${url}\``)
+    }).join('')
+    output.push(line)
+  }
+  return output.join('\n')
+}
+
+function extractExternalReferences(text) {
+  return [...new Set(text.match(/https?:\/\/[^\s<>"')\]]+/g) || [])]
+    .map((url) => url.replace(/[.,;，。；]+$/g, ''))
+    .sort()
+}
+
 function sourceUrl(sourcePath) {
   return `https://github.com/arch3rPro/arch3rpro.github.io/blob/${sourceCommit}/posts/${sourcePath}`
 }
@@ -226,7 +277,7 @@ const imported = articleDefinitions.map(([sourcePath, category], index) => {
     body = [
       `# ${title}`,
       '',
-      '> 此条目在原知识库中明确标注为转载或参考资料。本站不复制第三方正文，仅保留摘要、原作者和原文入口。',
+      '> 此条目在原知识库中明确标注为转载或参考资料。本站不复制第三方正文，仅保留本地摘要、原作者和来源记录。',
       '',
       '## 内容概述',
       '',
@@ -235,14 +286,17 @@ const imported = articleDefinitions.map(([sourcePath, category], index) => {
       '## 原始来源',
       '',
       `- 原作者：${meta.author || '原文作者'}`,
-      `- 原文链接：[打开原文](${originalLink || sourceUrl(sourcePath)})`,
-      `- 历史归档：[查看原知识库中的条目](${sourceUrl(sourcePath)})`,
+      `- 原文地址（本地留档）：\`${originalLink || sourceUrl(sourcePath)}\``,
+      `- 历史源路径：\`posts/${sourcePath}\``,
+      '- 本页已经包含可公开展示的摘要，不会跳转到外部网站。',
       ''
     ].join('\n')
   } else {
     const normalizedBody = normalizeTrailingWhitespace(
-      neutralizeExecutableExamples(meta.body)
-        .replaceAll('../2024/vitepress-blog-2', '../vitepress-blog-2/')
+      localizeExternalContent(
+        neutralizeExecutableExamples(meta.body)
+          .replaceAll('../2024/vitepress-blog-2', '../vitepress-blog-2/')
+      )
     )
     const heading = /^\s*#\s+/m.test(normalizedBody) ? '' : `# ${title}\n\n`
     body = [
@@ -252,7 +306,7 @@ const imported = articleDefinitions.map(([sourcePath, category], index) => {
       '',
       `---`,
       '',
-      `原始版本：[GitHub 源文件](${sourceUrl(sourcePath)}) · 源提交：\`${sourceCommit.slice(0, 12)}\``,
+      `本地迁移记录：\`posts/${sourcePath}\` · 源提交：\`${sourceCommit.slice(0, 12)}\` · [查看本地迁移说明](/knowledge#内容与来源边界)`,
       ''
     ].join('\n')
   }
@@ -270,12 +324,13 @@ const imported = articleDefinitions.map(([sourcePath, category], index) => {
     isReference,
     originalAuthor: isReference ? meta.author : '白云飞',
     originalLink: isReference ? originalLink : sourceUrl(sourcePath),
+    externalReferences: extractExternalReferences(meta.body),
     sourceSha256: sourceHash(sourceFile),
     destination: relative(projectRoot, destination).split(sep).join('/')
   }
 })
 
-const dataFile = `export interface ImportedKnowledgeEntry {\n  id: string\n  category: string\n  title: string\n  description: string\n  date: string\n  route: string\n  sourcePath: string\n  sourceUrl: string\n  isReference: boolean\n  originalAuthor: string\n  originalLink: string\n}\n\nexport const importedKnowledgeEntries: ImportedKnowledgeEntry[] = ${JSON.stringify(imported.map(({ sourceSha256, destination, ...entry }) => entry), null, 2)}\n`
+const dataFile = `export interface ImportedKnowledgeEntry {\n  id: string\n  category: string\n  title: string\n  description: string\n  date: string\n  route: string\n  sourcePath: string\n  sourceUrl: string\n  isReference: boolean\n  originalAuthor: string\n  originalLink: string\n}\n\nexport const importedKnowledgeEntries: ImportedKnowledgeEntry[] = ${JSON.stringify(imported.map(({ sourceSha256, destination, externalReferences, ...entry }) => entry), null, 2)}\n`
 writeFileSync(dataTarget, dataFile, 'utf8')
 
 const manifest = {

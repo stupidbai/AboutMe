@@ -19,7 +19,7 @@ outline: deep
 
 ### 安装Oh-My-Posh
 
-下载地址：[oh-my-posh/releases](https://github.com/JanDeDobbeleer/oh-my-posh/releases)
+下载地址：oh-my-posh/releases（`https://github.com/JanDeDobbeleer/oh-my-posh/releases`）
 
 如图：
 ![img](./1716720627.png)
@@ -65,7 +65,7 @@ cls
 如图：
 ![img](./1716720629.png)
 
-这里需要使用`Nerd字体`，下载地址 [nerdfonts-downloads](https://www.nerdfonts.com/font-downloads)
+这里需要使用`Nerd字体`，下载地址 nerdfonts-downloads（`https://www.nerdfonts.com/font-downloads`）
 
 找到`JetBrainsMono`字体，下载之后解压安装，打开终端的设置里配置字体，然后重启终端
 
@@ -84,7 +84,7 @@ cls
 
 ### 安装Zsh
 
-下载地址：[zsh-download](https://packages.msys2.org/package/zsh?repo=msys&variant=x86_64)
+下载地址：zsh-download（`https://packages.msys2.org/package/zsh?repo=msys&variant=x86_64`）
 
 如图：
 ![img](./1716816023.png)
@@ -182,4 +182,4 @@ Windows Registry Editor Version 5.00
 
 ---
 
-原始版本：[GitHub 源文件](https://github.com/arch3rPro/arch3rpro.github.io/blob/acf58fa03821905916b0fc605ec893eadf6063fe/posts/efficiency/windows/terminal/README.md) · 源提交：`acf58fa03821`
+本地迁移记录：`posts/efficiency/windows/terminal/README.md` · 源提交：`acf58fa03821` · [查看本地迁移说明](/knowledge#内容与来源边界)

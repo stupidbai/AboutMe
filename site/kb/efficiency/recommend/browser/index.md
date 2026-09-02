@@ -60,4 +60,4 @@ outline: deep
 
 ---
 
-原始版本：[GitHub 源文件](https://github.com/arch3rPro/arch3rpro.github.io/blob/acf58fa03821905916b0fc605ec893eadf6063fe/posts/efficiency/recommend/browser/README.md) · 源提交：`acf58fa03821`
+本地迁移记录：`posts/efficiency/recommend/browser/README.md` · 源提交：`acf58fa03821` · [查看本地迁移说明](/knowledge#内容与来源边界)

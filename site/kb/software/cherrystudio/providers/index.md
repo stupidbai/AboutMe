@@ -34,7 +34,7 @@ sk-xxxx1,sk-xxxx2,sk-xxxx3,sk-xxxx4
 
 在使用内置服务商时一般不需要填写API地址，如果需要修改请严格按照对应的官方文档给的地址填写。
 
-> 如果服务商给的地址为<font color=red>https://xxx.xxx.com</font><font color=green>/v1/chat/completions</font>这种格式，只需要填写根地址部分（<font color=red>https://xxx.xxx.com</font>）即可。
+> 如果服务商给的地址为<font color=red>`https://xxx.xxx.com`</font><font color=green>/v1/chat/completions</font>这种格式，只需要填写根地址部分（<font color=red>`https://xxx.xxx.com`</font>）即可。
 >
 > CherryStudio客户端会自动拼接剩余的路径（<font color=green>/v1/chat/completions</font>），未按要求填写可能会导致无法正常使用。
 
@@ -73,4 +73,4 @@ sk-xxxx1,sk-xxxx2,sk-xxxx3,sk-xxxx4
 
 ---
 
-原始版本：[GitHub 源文件](https://github.com/arch3rPro/arch3rpro.github.io/blob/acf58fa03821905916b0fc605ec893eadf6063fe/posts/software/cherrystudio/providers/README.md) · 源提交：`acf58fa03821`
+本地迁移记录：`posts/software/cherrystudio/providers/README.md` · 源提交：`acf58fa03821` · [查看本地迁移说明](/knowledge#内容与来源边界)

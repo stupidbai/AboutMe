@@ -19,12 +19,12 @@ outline: deep
 > VitePress 中的链接可以直接渲染
 
 
-&lt;Linkcard url="https://yiov.top/computer/markdown.html" title="Markdown的简单用法" description="https://yiov.top/computer/markdown.html" logo="/markdown.png"/&gt;
+&lt;Linkcard url="`https://yiov.top/computer/markdown.html`" title="Markdown的简单用法" description="`https://yiov.top/computer/markdown.html`" logo="/markdown.png"/&gt;
 
 
 ## 基础功能
 
-VitePress 使用 [markdown-it](https://github.com/markdown-it/markdown-it) 作为解析器，并使用 [Shiki](https://shiki.matsu.io/) 来突出显示语言语法
+VitePress 使用 markdown-it（`https://github.com/markdown-it/markdown-it`） 作为解析器，并使用 Shiki（`https://shiki.matsu.io/`） 来突出显示语言语法
 
 
 ### 基本配置
@@ -168,9 +168,9 @@ export default defineConfig({
 
 输出：
 
-* [vuejs.org](https://vuejs.org/)
+* vuejs.org（`https://vuejs.org/`）
 
-* [GitHub 上的 VitePress](https://github.com/vuejs/vitepress)
+* GitHub 上的 VitePress（`https://github.com/vuejs/vitepress`）
 
 
 
@@ -193,7 +193,7 @@ export default defineConfig({
 那在线视频呢，我们可以用 `<iframe>` 标签实现
 
 ::: tip 说明
-本次仅演示 [Youtube](https://www.youtube.com/) 和 [B站](https://www.bilibili.com/) ，在视频分享中选择 `嵌入视频` 即可获取链接
+本次仅演示 Youtube（`https://www.youtube.com/`） 和 B站（`https://www.bilibili.com/`） ，在视频分享中选择 `嵌入视频` 即可获取链接
 
 其他的请自测
 :::
@@ -222,22 +222,10 @@ allowfullscreen>
 
 输出：
 
-<iframe
-style="width:100%; aspect-ratio:16/9; margin-top: 2em;"
-src="https://www.youtube.com/embed/bzyMLoSwYvk"
-frameborder="0"
-allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-allowfullscreen>
-</iframe>
+> 外部视频演示未在本站加载，地址已记录在本地迁移清单中。
 
 
-<iframe
-style="width:100%; aspect-ratio:16/9; margin-top: 2em;"
-src="//player.bilibili.com/player.html?bvid=BV1YptMeMEcV"
-frameborder="0"
-allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-allowfullscreen>
-</iframe>
+> 外部视频演示未在本站加载，地址已记录在本地迁移清单中。
 
 
 ### 表格
@@ -263,9 +251,9 @@ allowfullscreen>
 
 
 ::: tip 说明
-更详细的使用方式，我在 [Markdown教程](https://yiov.top/computer/markdown.html#%E8%A1%A8%E6%A0%BC) 里也说到过
+更详细的使用方式，我在 Markdown教程（`https://yiov.top/computer/markdown.html#%E8%A1%A8%E6%A0%BC`） 里也说到过
 
-也可使用 Execl 生成 Markdwon：https://tableconvert.com/zh-cn/
+也可使用 Execl 生成 Markdwon：`https://tableconvert.com/zh-cn/`
 :::
 
 
@@ -283,7 +271,7 @@ allowfullscreen>
 :tada: :100:
 
 
-Emoji大全：https://www.emojiall.com/zh-hans/
+Emoji大全：`https://www.emojiall.com/zh-hans/`
 
 
 
@@ -306,7 +294,7 @@ Emoji大全：https://www.emojiall.com/zh-hans/
 
 默认显示2-3级标题，如果想显示一级标题
 
-在查阅 [mdit-vue/plugin-toc#level](https://github.com/mdit-vue/mdit-vue/tree/main/packages/plugin-toc#level) 后，只需要在 `config.ts` 中配置
+在查阅 mdit-vue/plugin-toc#level（`https://github.com/mdit-vue/mdit-vue/tree/main/packages/plugin-toc#level`） 后，只需要在 `config.ts` 中配置
 
 ```ts{4-5}
 export default defineConfig({
@@ -431,7 +419,7 @@ export default defineConfig({
 
 ### GitHub风格警报
 
-你也可以使用 [GitHub 风格的警报](https://docs.github.com/en/get-started/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax#alerts)，只是书写方式不同，使用上是一样的
+你也可以使用 GitHub 风格的警报（`https://docs.github.com/en/get-started/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax#alerts`），只是书写方式不同，使用上是一样的
 
 
 输入：
@@ -475,7 +463,7 @@ export default defineConfig({
 
 ::: details 如果你是 Typora 的用户，本地不生效
 
-使用下面代码进行配置，本代码由 [Aurorxa](https://github.com/Aurorxa) 提供
+使用下面代码进行配置，本代码由 Aurorxa（`https://github.com/Aurorxa`） 提供
 
 ```ts{4-25}
 // .vitepress/config.mts
@@ -604,7 +592,7 @@ var的值都改程颜色代码即可
 
 ### 语法突出
 
-VitePress有着 [Shiki](https://shiki.tmrs.site/) 插件的加持，在前反引号后可以写入代码的语法，渲染后会显示在代码块右上方
+VitePress有着 Shiki（`https://shiki.tmrs.site/`） 插件的加持，在前反引号后可以写入代码的语法，渲染后会显示在代码块右上方
 
 输入：
 
@@ -1002,7 +990,7 @@ yarn -v
 那么我们就用4个反引号 ```` ，以此类推即可
 
 ::: tip 说明
-这个使用方法，其实我在 [Markdown教程](https://yiov.top/computer/markdown.html#%E4%BB%A3%E7%A0%81%E5%9D%97%E5%B5%8C%E5%A5%97) 里已经说过了
+这个使用方法，其实我在 Markdown教程（`https://yiov.top/computer/markdown.html#%E4%BB%A3%E7%A0%81%E5%9D%97%E5%B5%8C%E5%A5%97`） 里已经说过了
 :::
 
 输入：
@@ -1340,4 +1328,4 @@ const coreMembers = [],
 
 ---
 
-原始版本：[GitHub 源文件](https://github.com/arch3rPro/arch3rpro.github.io/blob/acf58fa03821905916b0fc605ec893eadf6063fe/posts/blog/2025/vitepress-markdown/README.md) · 源提交：`acf58fa03821`
+本地迁移记录：`posts/blog/2025/vitepress-markdown/README.md` · 源提交：`acf58fa03821` · [查看本地迁移说明](/knowledge#内容与来源边界)

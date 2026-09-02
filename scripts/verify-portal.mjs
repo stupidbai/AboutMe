@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 const root = resolve(import.meta.dirname, '..')
@@ -33,6 +33,10 @@ if (missingFiles.length) {
 const caseSource = readFileSync(resolve(root, 'site/data/cases.ts'), 'utf8')
 const knowledgeSource = readFileSync(resolve(root, 'site/data/knowledge.ts'), 'utf8')
 const importedKnowledgeSource = readFileSync(resolve(root, 'site/data/importedKnowledge.ts'), 'utf8')
+const importedKnowledgeComponent = readFileSync(
+  resolve(root, 'site/.vitepress/theme/components/ImportedKnowledge.vue'),
+  'utf8'
+)
 const portalSource = readFileSync(resolve(root, 'site/data/portal.ts'), 'utf8')
 const contentSource = [
   portalSource,
@@ -75,6 +79,50 @@ const knowledgePage = readFileSync(resolve(root, 'site/knowledge.md'), 'utf8')
 if (!knowledgePage.includes('以下 12 条内容均为原创整理')) {
   throw new Error('Knowledge page must keep its original-content statement')
 }
+if (knowledgePage.includes('](http')) {
+  throw new Error('Knowledge index must not link to external sites')
+}
+if (/原文入口|原文链接/.test(`${knowledgePage}\n${importedKnowledgeComponent}`)) {
+  throw new Error('Knowledge index must describe sources as local records, not outbound links')
+}
+
+const importedMarkdownFiles = []
+const collectMarkdownFiles = directory => {
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    const target = resolve(directory, entry.name)
+    if (entry.isDirectory()) collectMarkdownFiles(target)
+    if (entry.isFile() && entry.name.endsWith('.md')) importedMarkdownFiles.push(target)
+  }
+}
+collectMarkdownFiles(resolve(root, 'site/kb'))
+
+const removeNonRenderedExamples = markdown => markdown
+  .replace(/^(?:`{3,}|~{3,})[^\n]*\n[\s\S]*?^(?:`{3,}|~{3,})\s*$/gm, '')
+  .replace(/`[^`\n]*`/g, '')
+
+const externalNavigation = []
+const externalMedia = []
+for (const file of importedMarkdownFiles) {
+  const renderedMarkdown = removeNonRenderedExamples(readFileSync(file, 'utf8'))
+  if (/\]\(https?:\/\//i.test(renderedMarkdown)) externalNavigation.push(file)
+  if (/<(?:img|iframe|video|audio|source)\b[^>]*(?:src|poster)=["'](?:https?:)?\/\//i.test(renderedMarkdown)) {
+    externalMedia.push(file)
+  }
+}
+if (externalNavigation.length) {
+  throw new Error(`Imported knowledge must not render external links:\n${externalNavigation.join('\n')}`)
+}
+if (externalMedia.length) {
+  throw new Error(`Imported knowledge must not load external media:\n${externalMedia.join('\n')}`)
+}
+
+const missingReferenceNotices = migrationManifest.articles
+  .filter(article => article.isReference)
+  .map(article => resolve(root, article.destination))
+  .filter(file => !readFileSync(file, 'utf8').includes('不会跳转到外部网站'))
+if (missingReferenceNotices.length) {
+  throw new Error(`Reference pages must state the local-only boundary:\n${missingReferenceNotices.join('\n')}`)
+}
 
 const facts = [
   '上海莲证科技有限公司',
@@ -104,6 +152,7 @@ console.log(`Content pages: ${pageCount}`)
 console.log(`Case entries: ${caseCount}`)
 console.log(`Knowledge entries: ${knowledgeCount}`)
 console.log(`Imported knowledge entries: ${importedKnowledgeCount} (${referenceKnowledgeCount} reference-only)`)
+console.log(`Imported knowledge pages without external navigation/media: ${importedMarkdownFiles.length}`)
 console.log(`Local asset references: ${localRefs.length}`)
 console.log(`Missing local assets: ${missingAssets.length}`)
 console.log('Critical career and contact facts: verified')

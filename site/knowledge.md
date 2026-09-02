@@ -18,8 +18,9 @@ description: 白云飞围绕企业 AI、知识工程、可信系统、交付与�
 ## 内容与来源边界
 
 - Arch3rPro 原站账号与白云飞为同一作者，本次由本人授权迁移。
-- 本人原创文章保留正文、原始日期、图片和源文件链接。
-- 原库中明确标注为非原创的 3 个条目只保留摘要、原作者和原文链接，不复制第三方正文。
-- 完整来源映射、源提交和文件哈希保存在 `docs/knowledge-migration-manifest.json`。
+- 本人原创文章保留正文、原始日期、图片和源文件追溯信息。
+- 原库中明确标注为非原创的 3 个条目只保留本地摘要、原作者和来源记录，不复制第三方正文。
+- 完整来源映射、外部资料地址、源提交和文件哈希均保存在本地 `docs/knowledge-migration-manifest.json`。
+- 知识库索引、正文和来源说明全部在本站完成，不通过文章入口跳转到原站或 GitHub。
 
-原知识库：[Arch3rPro 个人博客](https://arch3rpro.github.io/) · [GitHub 仓库](https://github.com/arch3rPro/arch3rpro.github.io)。
+原知识库名称：Arch3rPro 个人博客；固定源提交：`acf58fa03821`。

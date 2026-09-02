@@ -11,7 +11,7 @@ outline: deep
 ---
 # 2-LobeChat设置
 
-> 此条目在原知识库中明确标注为转载或参考资料。本站不复制第三方正文，仅保留摘要、原作者和原文入口。
+> 此条目在原知识库中明确标注为转载或参考资料。本站不复制第三方正文，仅保留本地摘要、原作者和来源记录。
 
 ## 内容概述
 
@@ -20,5 +20,6 @@ outline: deep
 ## 原始来源
 
 - 原作者：TinyChen
-- 原文链接：[打开原文](https://tinychen.com/20250126-lobechat_user_db_mode_deploy/)
-- 历史归档：[查看原知识库中的条目](https://github.com/arch3rPro/arch3rpro.github.io/blob/acf58fa03821905916b0fc605ec893eadf6063fe/posts/software/lobechat/setting/README.md)
+- 原文地址（本地留档）：`https://tinychen.com/20250126-lobechat_user_db_mode_deploy/`
+- 历史源路径：`posts/software/lobechat/setting/README.md`
+- 本页已经包含可公开展示的摘要，不会跳转到外部网站。

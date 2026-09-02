@@ -14,10 +14,10 @@ outline: deep
 # MKeymap - 键盘映射神器
 
 ::: tip 絮叨
-关于键位映射，从工作以来一直使用，从`capslock+`免费版开始用到收费。随后由自己使用`karabiner`配置了一套MacOS端的配置 [capslox-karabiner](https://github.com/yqchilde/capslox-karabiner)，于年前购入一台Win电脑，为了近乎无适应成本又研究了Win端的键位映射，于是发现了`MKeyMap`这款神器
+关于键位映射，从工作以来一直使用，从`capslock+`免费版开始用到收费。随后由自己使用`karabiner`配置了一套MacOS端的配置 capslox-karabiner（`https://github.com/yqchilde/capslox-karabiner`），于年前购入一台Win电脑，为了近乎无适应成本又研究了Win端的键位映射，于是发现了`MKeyMap`这款神器
 :::
 
-产品描述我不多数了，根据产品文档了解一下，文档地址：[MyKeymap-Doc](https://xianyukang.com/MyKeymap.html)
+产品描述我不多数了，根据产品文档了解一下，文档地址：MyKeymap-Doc（`https://xianyukang.com/MyKeymap.html`）
 
 ## 我的配置
 
@@ -1422,4 +1422,4 @@ outline: deep
 
 ---
 
-原始版本：[GitHub 源文件](https://github.com/arch3rPro/arch3rpro.github.io/blob/acf58fa03821905916b0fc605ec893eadf6063fe/posts/efficiency/windows/keymap/README.md) · 源提交：`acf58fa03821`
+本地迁移记录：`posts/efficiency/windows/keymap/README.md` · 源提交：`acf58fa03821` · [查看本地迁移说明](/knowledge#内容与来源边界)

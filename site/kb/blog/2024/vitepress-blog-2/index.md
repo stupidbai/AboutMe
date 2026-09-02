@@ -352,8 +352,8 @@ fs.writeFileSync('heatmap.json', JSON.stringify(filteredData))
 
 有看不懂的地方评论区问吧
 ## 5. 参考
-* [cal-heatmap文档](https://cal-heatmap.com)
+* cal-heatmap文档（`https://cal-heatmap.com`）
 
 ---
 
-原始版本：[GitHub 源文件](https://github.com/arch3rPro/arch3rpro.github.io/blob/acf58fa03821905916b0fc605ec893eadf6063fe/posts/blog/2024/vitepress-blog-2/README.md) · 源提交：`acf58fa03821`
+本地迁移记录：`posts/blog/2024/vitepress-blog-2/README.md` · 源提交：`acf58fa03821` · [查看本地迁移说明](/knowledge#内容与来源边界)

@@ -23,7 +23,7 @@ const filteredEntries = computed(() => {
       <div>
         <span>ARCH3RPRO ARCHIVE · 2025</span>
         <h2>历史知识归档</h2>
-        <p>14 篇本人原创文章完整迁移，3 篇转载资料转为保留作者与原文入口的引用页。</p>
+        <p>14 篇本人原创文章完整迁移，3 篇转载资料转为保留作者与来源记录的本地摘要页。</p>
       </div>
       <dl>
         <div><dt>17</dt><dd>知识条目</dd></div>

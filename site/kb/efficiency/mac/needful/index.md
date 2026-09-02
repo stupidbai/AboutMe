@@ -22,7 +22,7 @@ Z
 
 :::info 推荐级别：🌟🌟🌟🌟🌟
 推荐理由：Mac上的鼠标滚动方向总是反人类，使用这款软件丝滑解决该问题<br>
-下载地址：https://mos.caldis.me
+下载地址：`https://mos.caldis.me`
 :::
 
 ![img](./1742102138.png)
@@ -64,7 +64,7 @@ Z
 
 :::info 推荐级别：🌟🌟🌟🌟
 推荐理由：一款很好用的截图软件，从win过来的不陌生<br>
-下载地址：https://zh.snipaste.com
+下载地址：`https://zh.snipaste.com`
 :::
 
 ![img](./1742102264.png)
@@ -73,7 +73,7 @@ Z
 
 :::info 推荐级别：🌟🌟🌟🌟
 推荐理由：清理文件垃圾，卸载软件的软件，很轻量，算是腾讯在Mac上的良心作品<br>
-下载地址：https://lemon.qq.com
+下载地址：`https://lemon.qq.com`
 :::
 
 ![img](./1742102301.png)
@@ -82,7 +82,7 @@ Z
 
 :::info 推荐级别：🌟🌟🌟🌟🌟
 推荐理由：本地docker desktop类工具，强烈安利给搞开发的朋友，比docker官方的好用，还轻量<br>
-下载地址：https://orbstack.dev
+下载地址：`https://orbstack.dev`
 :::
 
 ![img](./1742102392.png)
@@ -91,7 +91,7 @@ Z
 
 :::info 推荐级别：🌟🌟🌟🌟
 推荐理由：一款播放器，十分强大且好用
-下载地址：https://www.iina.io
+下载地址：`https://www.iina.io`
 :::
 
 ![img](./1742102456.png)
@@ -100,7 +100,7 @@ Z
 
 :::info 推荐级别：🌟🌟🌟🌟
 推荐理由：适用于macOS的强大且稳定的键盘定制器，我个人是使用它定制了一套键位快捷键方案，使得我在mac/win直接无缝切换<br>
-下载地址：https://karabiner-elements.pqrs.org
+下载地址：`https://karabiner-elements.pqrs.org`
 :::
 
 ![img](./1742102491.png)
@@ -109,7 +109,7 @@ Z
 
 :::info 推荐级别：🌟🌟🌟🌟
 推荐理由：一款免费的Git GUI工具，懂得都懂<br>
-下载地址：https://www.sourcetreeapp.com
+下载地址：`https://www.sourcetreeapp.com`
 :::
 
 ![img](./1742102523.png)
@@ -118,7 +118,7 @@ Z
 
 :::info 推荐级别：🌟🌟🌟🌟🌟
 推荐理由：一款三方终端软件，强烈安利给搞开发的朋友，十分强大，可以配置跳板堡垒机等操作<br>
-下载地址：https://github.com/Eugeny/tabby
+下载地址：`https://github.com/Eugeny/tabby`
 :::
 
 ![img](./1742102586.png)
@@ -143,4 +143,4 @@ Z
 
 ---
 
-原始版本：[GitHub 源文件](https://github.com/arch3rPro/arch3rpro.github.io/blob/acf58fa03821905916b0fc605ec893eadf6063fe/posts/efficiency/mac/needful/README.md) · 源提交：`acf58fa03821`
+本地迁移记录：`posts/efficiency/mac/needful/README.md` · 源提交：`acf58fa03821` · [查看本地迁移说明](/knowledge#内容与来源边界)
