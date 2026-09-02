@@ -8,6 +8,7 @@ import CaseGrid from './components/CaseGrid.vue'
 import InsightGrid from './components/InsightGrid.vue'
 import LifeGallery from './components/LifeGallery.vue'
 import ContactPanel from './components/ContactPanel.vue'
+import KnowledgeLibrary from './components/KnowledgeLibrary.vue'
 import './styles.css'
 
 export default {
@@ -23,5 +24,6 @@ export default {
     app.component('InsightGrid', InsightGrid)
     app.component('LifeGallery', LifeGallery)
     app.component('ContactPanel', ContactPanel)
+    app.component('KnowledgeLibrary', KnowledgeLibrary)
   }
 } satisfies Theme

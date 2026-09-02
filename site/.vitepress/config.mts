@@ -6,7 +6,7 @@ export default defineConfig({
   lang: 'zh-CN',
   title: '白云飞 · 企业 AI 合作与知识主页',
   titleTemplate: ':title｜白云飞',
-  description: '白云飞个人网站：企业 AI、可信数字化、解决方案交付、生态合作、项目案例与长期思考。',
+  description: '白云飞个人网站：企业 AI、可信数字化、解决方案交付、知识库、生态合作、项目案例与长期思考。',
   base: isGitHubPages ? '/AboutMe/' : '/',
   cleanUrls: true,
   lastUpdated: true,
@@ -33,6 +33,7 @@ export default defineConfig({
       { text: '合作', link: '/cooperation' },
       { text: '案例', link: '/cases' },
       { text: '主题地图', link: '/insights' },
+      { text: '知识库', link: '/knowledge' },
       { text: '生活', link: '/life' },
       { text: '联系', link: '/contact' }
     ],

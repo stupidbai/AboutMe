@@ -7,6 +7,8 @@ description: 白云飞长期关注的企业 AI、知识工程、可信数字化�
 
 这里不是资讯堆积，而是围绕企业 AI 落地持续整理的主题入口。每个主题都连接业务判断、技术架构、工程交付和组织机制。
 
+如果希望按分类查找具体条目，可以继续进入[知识库](/knowledge)。
+
 <InsightGrid />
 
 <section class="knowledge-section" id="enterprise-ai">

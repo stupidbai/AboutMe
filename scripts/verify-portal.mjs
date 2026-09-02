@@ -8,6 +8,7 @@ const requiredFiles = [
   'site/cooperation.md',
   'site/cases.md',
   'site/insights.md',
+  'site/knowledge.md',
   'site/life.md',
   'site/contact.md',
   'site/.vitepress/config.mts',
@@ -16,6 +17,7 @@ const requiredFiles = [
   'site/data/portal.ts',
   'site/data/cases.ts',
   'site/data/life.ts',
+  'site/data/knowledge.ts',
   'site/public/assets/wechat-qr.png'
 ]
 
@@ -25,6 +27,7 @@ if (missingFiles.length) {
 }
 
 const caseSource = readFileSync(resolve(root, 'site/data/cases.ts'), 'utf8')
+const knowledgeSource = readFileSync(resolve(root, 'site/data/knowledge.ts'), 'utf8')
 const portalSource = readFileSync(resolve(root, 'site/data/portal.ts'), 'utf8')
 const contentSource = [
   portalSource,
@@ -37,6 +40,14 @@ const contentSource = [
 
 const caseCount = (caseSource.match(/\n\s*id:\s*'\d{2}'/g) || []).length
 if (caseCount !== 9) throw new Error(`Expected 9 cases, found ${caseCount}`)
+
+const knowledgeCount = (knowledgeSource.match(/\n\s*id:\s*'k\d{2}'/g) || []).length
+if (knowledgeCount !== 12) throw new Error(`Expected 12 knowledge entries, found ${knowledgeCount}`)
+
+const knowledgePage = readFileSync(resolve(root, 'site/knowledge.md'), 'utf8')
+if (!knowledgePage.includes('全部内容均为原创整理')) {
+  throw new Error('Knowledge page must keep its original-content statement')
+}
 
 const facts = [
   '上海莲证科技有限公司',
@@ -61,9 +72,10 @@ const localRefs = sourceFiles.flatMap(file => {
 const missingAssets = localRefs.filter(ref => !existsSync(resolve(root, 'site/public', ref.slice(1))))
 if (missingAssets.length) throw new Error(`Missing local assets:\n${missingAssets.join('\n')}`)
 
-const pageCount = ['index', 'profile', 'cooperation', 'cases', 'insights', 'life', 'contact'].length
+const pageCount = ['index', 'profile', 'cooperation', 'cases', 'insights', 'knowledge', 'life', 'contact'].length
 console.log(`Content pages: ${pageCount}`)
 console.log(`Case entries: ${caseCount}`)
+console.log(`Knowledge entries: ${knowledgeCount}`)
 console.log(`Local asset references: ${localRefs.length}`)
 console.log(`Missing local assets: ${missingAssets.length}`)
 console.log('Critical career and contact facts: verified')

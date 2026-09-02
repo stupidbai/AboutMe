@@ -69,7 +69,15 @@ export const portalRoutes: PortalRoute[] = [
     accent: 'orange'
   },
   {
-    code: '05 · LIFE',
+    code: '05 · KNOWLEDGE',
+    title: '知识库与实践笔记',
+    description: '围绕企业 AI、知识工程、可信系统、交付管理和生态协同沉淀原创知识条目。',
+    link: '/knowledge',
+    tags: ['原创条目', '分类检索', '持续更新'],
+    accent: 'blue'
+  },
+  {
+    code: '06 · LIFE',
     title: '工作之外的个人侧面',
     description: '户外、骑行、摄影、口琴，以及持续表达与内容创作。',
     link: '/life',
@@ -77,7 +85,7 @@ export const portalRoutes: PortalRoute[] = [
     accent: 'green'
   },
   {
-    code: '06 · CONTACT',
+    code: '07 · CONTACT',
     title: '联系方式与合作入口',
     description: '从一个具体问题开始，说明场景、资源、目标和希望共同承担的角色。',
     link: '/contact',

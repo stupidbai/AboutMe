@@ -1,6 +1,6 @@
 # 白云飞个人知识与合作门户
 
-这是一个基于 VitePress、Vue 3 和 TypeScript 的数据驱动个人网站，面向企业客户、方案商、AI 产品团队及产业生态伙伴。网站将职业履历、合作方向、项目案例、主题方法、个人侧面和联系方式拆分为独立入口，并提供站内搜索、页面目录、明暗主题和 GitHub Pages 自动部署。
+这是一个基于 VitePress、Vue 3 和 TypeScript 的数据驱动个人网站，面向企业客户、方案商、AI 产品团队及产业生态伙伴。网站将职业履历、合作方向、项目案例、主题方法、原创知识库、个人侧面和联系方式拆分为独立入口，并提供站内搜索、页面目录、明暗主题和 GitHub Pages 自动部署。
 
 ## 本地启动
 
@@ -31,9 +31,10 @@ npm run build
 - `site/cooperation.md`：合作匹配、四类方向与推进方式。
 - `site/cases.md`：九个产品交付、人才、渠道与生态案例。
 - `site/insights.md`：企业 AI、可信数字化、FDE 与生态建设主题地图。
+- `site/knowledge.md`：原创知识库入口，支持关键词搜索与分类筛选。
 - `site/life.md`：户外影像、兴趣与内容账号。
 - `site/contact.md`：电话、邮箱、微信二维码与沟通建议。
-- `site/data/`：首页、案例、时间线和生活内容的数据源。
+- `site/data/`：首页、案例、时间线、知识库和生活内容的数据源。
 - `site/.vitepress/theme/`：Vue 组件与响应式主题。
 - `site/public/`：部署使用的本地图片、二维码和品牌素材。
 - `.github/workflows/deploy.yml`：GitHub Pages 自动构建与发布。
@@ -58,7 +59,7 @@ npm run build
 | 精简版 | 企业 AI 商业合作伙伴介绍（精简背书标签） | `versions/index-v2.0.1-商业合作版.html` | `v2.0.1` |
 | 单页归档版 | 上海莲证科技 CIO 商业合作介绍 | `versions/index-v2.1.0-CIO商业合作版.html` | `v2.1.0` |
 | 多页面静态版 | 九案例图文商业合作主页 | `index.html` + `pages/` | `v2.3.2` |
-| 当前工作版 | VitePress 个人知识与合作门户 | `site/` | 待发布 `v3.0.0` |
+| 当前工作版 | VitePress 个人知识、合作与原创知识库门户 | `site/` | 待发布 `v3.1.0` |
 
 `v1.0.0` 与 `v1.1.0` 的 `index.html` 内容相同，因此只保留一份物理快照；两个 Git 标签仍完整存在。
 
