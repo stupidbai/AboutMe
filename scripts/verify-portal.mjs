@@ -7,6 +7,7 @@ const requiredFiles = [
   'site/profile.md',
   'site/cooperation.md',
   'site/cases.md',
+  'site/admin/cases.md',
   'site/insights.md',
   'site/knowledge.md',
   'site/life.md',
@@ -14,16 +15,21 @@ const requiredFiles = [
   'site/.vitepress/config.mts',
   'site/.vitepress/theme/index.ts',
   'site/.vitepress/theme/styles.css',
+  'site/.vitepress/theme/components/CaseGrid.vue',
+  'site/.vitepress/theme/components/CaseAdmin.vue',
   'site/data/portal.ts',
   'site/data/cases.ts',
-  'config/case-links.json',
+  'config/cases.json',
   'site/data/life.ts',
   'site/data/knowledge.ts',
   'site/data/importedKnowledge.ts',
   'site/.vitepress/theme/components/ImportedKnowledge.vue',
   'scripts/import-arch3rpro-knowledge.mjs',
+  'scripts/serve-with-admin.mjs',
+  'scripts/test-admin-api.mjs',
   'docs/knowledge-migration-manifest.json',
-  'site/public/assets/wechat-qr.png'
+  'site/public/assets/wechat-qr.png',
+  '.env.example'
 ]
 
 const missingFiles = requiredFiles.filter(file => !existsSync(resolve(root, file)))
@@ -31,9 +37,10 @@ if (missingFiles.length) {
   throw new Error(`Missing required files:\n${missingFiles.join('\n')}`)
 }
 
-const caseSource = readFileSync(resolve(root, 'site/data/cases.ts'), 'utf8')
+const cases = JSON.parse(readFileSync(resolve(root, 'config/cases.json'), 'utf8'))
 const caseComponentSource = readFileSync(resolve(root, 'site/.vitepress/theme/components/CaseGrid.vue'), 'utf8')
-const caseLinks = JSON.parse(readFileSync(resolve(root, 'config/case-links.json'), 'utf8'))
+const caseAdminSource = readFileSync(resolve(root, 'site/.vitepress/theme/components/CaseAdmin.vue'), 'utf8')
+const adminServerSource = readFileSync(resolve(root, 'scripts/serve-with-admin.mjs'), 'utf8')
 const knowledgeSource = readFileSync(resolve(root, 'site/data/knowledge.ts'), 'utf8')
 const importedKnowledgeSource = readFileSync(resolve(root, 'site/data/importedKnowledge.ts'), 'utf8')
 const importedKnowledgeComponent = readFileSync(
@@ -50,33 +57,66 @@ const contentSource = [
   readFileSync(resolve(root, 'site/.vitepress/theme/components/ContactPanel.vue'), 'utf8')
 ].join('\n')
 
-const caseCount = (caseSource.match(/\n\s*id:\s*'\d{2}'/g) || []).length
-if (caseCount !== 9) throw new Error(`Expected 9 cases, found ${caseCount}`)
+if (!Array.isArray(cases) || cases.length > 99) {
+  throw new Error(`Case config must contain 0-99 entries, found ${Array.isArray(cases) ? cases.length : 'non-array'}`)
+}
 
-const expectedCaseIds = Array.from({ length: 9 }, (_, index) => String(index + 1).padStart(2, '0'))
-const configuredCaseIds = Object.keys(caseLinks).sort()
-if (JSON.stringify(configuredCaseIds) !== JSON.stringify(expectedCaseIds)) {
-  throw new Error(`Case link config must contain exactly IDs 01-09, found: ${configuredCaseIds.join(', ')}`)
+const caseIds = cases.map(item => item.id)
+if (new Set(caseIds).size !== caseIds.length) throw new Error('Case IDs must be unique')
+
+const allowedCategories = new Set(['delivery', 'community', 'ecosystem'])
+const invalidCases = cases.filter(item => (
+  !/^[a-zA-Z0-9_-]{1,8}$/.test(item.id ?? '') ||
+  !allowedCategories.has(item.category) ||
+  typeof item.title !== 'string' || !item.title.trim() ||
+  typeof item.kicker !== 'string' || !item.kicker.trim() ||
+  typeof item.description !== 'string' || !item.description.trim() ||
+  typeof item.image !== 'string' || !item.image.trim() ||
+  typeof item.imageAlt !== 'string' ||
+  !Array.isArray(item.tags) || item.tags.some(tag => typeof tag !== 'string' || !tag.trim()) ||
+  typeof item.nasUrl !== 'string' || (item.nasUrl.trim() && !/^https?:\/\//i.test(item.nasUrl.trim()))
+))
+if (invalidCases.length) {
+  throw new Error(`Invalid case entries: ${invalidCases.map(item => item.id || '(missing id)').join(', ')}`)
 }
-const invalidCaseLinks = Object.entries(caseLinks)
-  .filter(([, url]) => typeof url !== 'string' || (url.trim() && !/^https?:\/\//i.test(url.trim())))
-  .map(([id]) => id)
-if (invalidCaseLinks.length) {
-  throw new Error(`Case NAS links must be empty or use http/https: ${invalidCaseLinks.join(', ')}`)
+
+if (!caseComponentSource.includes("fetch('/api/cases'") || !caseComponentSource.includes('noopener noreferrer')) {
+  throw new Error('Public case cards must read the case API and use safe new-tab navigation')
 }
-if (!caseComponentSource.includes(':href="item.nasUrl || undefined"') || !caseComponentSource.includes('noopener noreferrer')) {
-  throw new Error('Case cards must use configurable NAS links with safe new-tab navigation')
+const forbiddenPublicEditorAnchors = ['localStorage', '保存网页配置', '配置 NAS 链接', '/api/admin/']
+const exposedEditorAnchors = forbiddenPublicEditorAnchors.filter(anchor => caseComponentSource.includes(anchor))
+if (exposedEditorAnchors.length) {
+  throw new Error(`Public case page must not expose editing behavior: ${exposedEditorAnchors.join(', ')}`)
 }
-const webConfigAnchors = [
-  'bai-yunfei-case-nas-links-v1',
-  'window.localStorage.setItem',
-  'window.localStorage.getItem',
-  '保存网页配置',
-  '恢复文件默认值'
+
+const requiredAdminAnchors = [
+  '/api/admin/login',
+  '/api/admin/cases',
+  '新增案例',
+  '删除',
+  '保存全部修改'
 ]
-const missingWebConfigAnchors = webConfigAnchors.filter(anchor => !caseComponentSource.includes(anchor))
-if (missingWebConfigAnchors.length) {
-  throw new Error(`Missing browser case-link configuration behavior: ${missingWebConfigAnchors.join(', ')}`)
+const missingAdminAnchors = requiredAdminAnchors.filter(anchor => !caseAdminSource.includes(anchor))
+if (missingAdminAnchors.length) {
+  throw new Error(`Missing case admin behavior: ${missingAdminAnchors.join(', ')}`)
+}
+if (caseAdminSource.includes('localStorage')) {
+  throw new Error('Case admin must use server persistence, not browser localStorage')
+}
+
+const requiredServerAnchors = [
+  'CASE_ADMIN_PASSWORD',
+  'HttpOnly',
+  'SameSite=Strict',
+  '/api/admin/login',
+  '/api/admin/cases',
+  'config/cases.json',
+  'loginAttempts',
+  'attempt.count >= 5'
+]
+const missingServerAnchors = requiredServerAnchors.filter(anchor => !adminServerSource.includes(anchor))
+if (missingServerAnchors.length) {
+  throw new Error(`Missing protected admin server behavior: ${missingServerAnchors.join(', ')}`)
 }
 
 const knowledgeCount = (knowledgeSource.match(/\n\s*id:\s*'k\d{2}'/g) || []).length
@@ -170,19 +210,23 @@ const facts = [
 const missingFacts = facts.filter(fact => !contentSource.includes(fact))
 if (missingFacts.length) throw new Error(`Missing factual anchors: ${missingFacts.join(', ')}`)
 
-const sourceFiles = ['site/data/cases.ts', 'site/data/life.ts']
-const localRefs = sourceFiles.flatMap(file => {
-  const text = readFileSync(resolve(root, file), 'utf8')
-  return [...text.matchAll(/(?:image|logo|src):\s*'(\/[^']+)'/g)].map(match => match[1])
-})
+const localRefs = [
+  ...cases.flatMap(item => [
+    item.image,
+    ...(Array.isArray(item.partners) ? item.partners.map(partner => partner.logo) : [])
+  ]),
+  ...[...readFileSync(resolve(root, 'site/data/life.ts'), 'utf8').matchAll(/(?:image|logo|src):\s*'(\/[^']+)'/g)]
+    .map(match => match[1])
+].filter(ref => typeof ref === 'string' && ref.startsWith('/'))
 
 const missingAssets = localRefs.filter(ref => !existsSync(resolve(root, 'site/public', ref.slice(1))))
 if (missingAssets.length) throw new Error(`Missing local assets:\n${missingAssets.join('\n')}`)
 
 const pageCount = ['index', 'profile', 'cooperation', 'cases', 'insights', 'knowledge', 'life', 'contact'].length
 console.log(`Content pages: ${pageCount}`)
-console.log(`Case entries: ${caseCount}`)
-console.log(`Configured NAS case links: ${Object.values(caseLinks).filter(url => url.trim()).length}`)
+console.log(`Case entries: ${cases.length}`)
+console.log(`Configured NAS case links: ${cases.filter(item => item.nasUrl.trim()).length}`)
+console.log('Case management mode: protected server admin')
 console.log(`Knowledge entries: ${knowledgeCount}`)
 console.log(`Imported knowledge entries: ${importedKnowledgeCount} (${referenceKnowledgeCount} reference-only)`)
 console.log(`Imported knowledge pages without external navigation/media: ${importedMarkdownFiles.length}`)

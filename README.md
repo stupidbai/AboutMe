@@ -30,6 +30,7 @@ npm run build
 - `site/profile.md`：职业时间线、能力底座与专业背书。
 - `site/cooperation.md`：合作匹配、四类方向与推进方式。
 - `site/cases.md`：九个产品交付、人才、渠道与生态案例。
+- `site/admin/cases.md`：受账号保护的案例配置管理页，不出现在公开导航和搜索中。
 - `site/insights.md`：企业 AI、可信数字化、FDE 与生态建设主题地图。
 - `site/knowledge.md`：知识库总入口，包含 12 条当前原创方法卡和 17 条历史知识归档。
 - `site/kb/`：从 Arch3rPro 原知识库迁入的 14 篇本人原创全文及 3 个第三方引用页。
@@ -38,6 +39,8 @@ npm run build
 - `site/data/`：首页、案例、时间线、知识库和生活内容的数据源。
 - `docs/knowledge-migration-manifest.json`：源仓库提交、迁移边界、路径映射和 SHA-256 清单。
 - `scripts/import-arch3rpro-knowledge.mjs`：从指定源仓库快照重新生成历史知识归档。
+- `scripts/serve-with-admin.mjs`：提供静态站点、案例公开读取 API 与受保护的管理 API。
+- `config/cases.json`：案例内容、图片与 NAS 链接的服务端持久化配置。
 - `site/.vitepress/theme/`：Vue 组件与响应式主题。
 - `site/public/`：部署使用的本地图片、二维码和品牌素材。
 - `.github/workflows/deploy.yml`：GitHub Pages 自动构建与发布。
@@ -62,7 +65,7 @@ npm run build
 | 精简版 | 企业 AI 商业合作伙伴介绍（精简背书标签） | `versions/index-v2.0.1-商业合作版.html` | `v2.0.1` |
 | 单页归档版 | 上海莲证科技 CIO 商业合作介绍 | `versions/index-v2.1.0-CIO商业合作版.html` | `v2.1.0` |
 | 多页面静态版 | 九案例图文商业合作主页 | `index.html` + `pages/` | `v2.3.2` |
-| 当前工作版 | VitePress 个人知识、合作与本地知识归档门户 | `site/` | 待发布 `v3.4.0` |
+| 当前工作版 | VitePress 个人知识、合作与案例管理门户 | `site/` | 待发布 `v3.5.0` |
 
 `v1.0.0` 与 `v1.1.0` 的 `index.html` 内容相同，因此只保留一份物理快照；两个 Git 标签仍完整存在。
 
@@ -70,18 +73,27 @@ npm run build
 
 ```powershell
 git status
-git add site scripts .github package.json package-lock.json CHANGELOG.md README.md
+git add site scripts config .env.example .gitignore .github package.json package-lock.json CHANGELOG.md README.md
 git commit -m "重构个人知识与合作门户"
-git tag -a v3.4.0 -m "发布 v3.4.0"
+git tag -a v3.5.0 -m "发布 v3.5.0"
 ```
 
-在网页配置案例 NAS 链接：
+## 案例配置管理
 
-1. 打开案例页，点击“配置 NAS 链接”。
-2. 按案例编号填入完整的 `http://` 或 `https://` 地址并保存。
-3. 配置立即生效，并保存在当前浏览器中；刷新页面后仍然有效。
+案例页对公众只读，不提供任何修改入口。管理员可在独立管理页新增、删除、排序和编辑案例，并配置完整的 `http://` 或 `https://` NAS 地址。
 
-网页配置只影响当前浏览器。若需为所有访问者设置统一默认值，可编辑 `config/case-links.json` 并重新发布。配置后的案例卡片可整体点击，并在新标签页打开对应 NAS 资料；未配置的卡片会显示“NAS 链接待配置”。
+首次使用时，将 `.env.example` 复制为 `.env.local`，设置至少 12 位的管理员密码，然后运行：
+
+```powershell
+npm run admin
+```
+
+- 公开案例页：<http://127.0.0.1:4173/cases>
+- 独立管理页：<http://127.0.0.1:4173/admin/cases>
+- 管理端使用服务端会话认证，登录 Cookie 设置为 `HttpOnly` 与 `SameSite=Strict`，并限制连续登录失败次数。
+- 保存后写入 `config/cases.json`，同时生成忽略提交的 `config/cases.json.bak` 作为最近一次备份。
+- 默认仅监听本机 `127.0.0.1`。如需在 NAS 或局域网部署，可在 `.env.local` 将 `CASE_ADMIN_HOST` 改为 `0.0.0.0`，并建议通过 HTTPS 反向代理开放管理端。
+- GitHub Pages 是纯静态部署，只会展示构建时的案例快照，不提供在线管理 API。
 
 重新生成 Arch3rPro 历史知识归档：
 

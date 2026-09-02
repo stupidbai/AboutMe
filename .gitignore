@@ -4,6 +4,7 @@ Thumbs.db
 Desktop.ini
 .vscode/
 .idea/
+.env.local
 node_modules/
 dist/
 site/.vitepress/cache/
