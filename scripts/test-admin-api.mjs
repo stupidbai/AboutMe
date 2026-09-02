@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process'
-import { createServer } from 'node:net'
+import { createServer as createHttpServer } from 'node:http'
+import { createServer as createNetServer } from 'node:net'
 import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -21,7 +22,7 @@ const env = Object.fromEntries(
 const username = env.CASE_ADMIN_USERNAME || 'admin'
 const password = env.CASE_ADMIN_PASSWORD || ''
 
-const portProbe = createServer()
+const portProbe = createNetServer()
 await new Promise((resolveListen, rejectListen) => {
   portProbe.once('error', rejectListen)
   portProbe.listen(0, '127.0.0.1', resolveListen)
@@ -31,6 +32,22 @@ await new Promise(resolveClose => portProbe.close(resolveClose))
 
 const testDataDir = mkdtempSync(join(tmpdir(), 'byf-portal-test-'))
 const baseUrl = 'http://127.0.0.1:' + port
+let mockRequests = 0
+const mockAiServer = createHttpServer((request, response) => {
+  const chunks = []
+  request.on('data', chunk => chunks.push(chunk))
+  request.on('end', () => {
+    mockRequests += 1
+    const payload = JSON.parse(Buffer.concat(chunks).toString('utf8'))
+    response.writeHead(200, { 'content-type': 'application/json' })
+    response.end(JSON.stringify({ choices: [{ message: { content: `模拟 AI 回答：${payload.model}` } }] }))
+  })
+})
+await new Promise((resolveListen, rejectListen) => {
+  mockAiServer.once('error', rejectListen)
+  mockAiServer.listen(0, '127.0.0.1', resolveListen)
+})
+const mockAiUrl = `http://127.0.0.1:${mockAiServer.address().port}/v1/chat/completions`
 let stdout = ''
 let stderr = ''
 const child = spawn(process.execPath, ['scripts/serve-with-admin.mjs'], {
@@ -42,6 +59,7 @@ const child = spawn(process.execPath, ['scripts/serve-with-admin.mjs'], {
     CASE_ADMIN_USERNAME: username,
     CASE_ADMIN_PASSWORD: password,
     CASE_DATA_DIR: testDataDir,
+    PORTAL_ENCRYPTION_KEY: 'api-test-encryption-key',
     CASE_BACKUP_LIMIT: '3'
   },
   stdio: ['ignore', 'pipe', 'pipe']
@@ -90,7 +108,7 @@ const save = (payload, match = revision) => adminFetch('/api/admin/cases', {
 
 try {
   const health = await waitForHealth()
-  if (health.status !== 'ok' || health.database.schemaVersion !== 2 || health.database.siteConfigRevision !== 1 || health.database.journalMode !== 'wal') {
+  if (health.status !== 'ok' || health.database.schemaVersion !== 3 || health.database.siteConfigRevision !== 1 || health.database.knowledgeCount !== 12 || health.database.journalMode !== 'wal') {
     throw new Error('SQLite 健康状态不符合预期。')
   }
 
@@ -110,8 +128,22 @@ try {
   if (publicSiteConfig.identity?.name !== '白云飞' || !publicSiteEtag) throw new Error('公开站点配置或 ETag 缺失。')
   await expectStatus(await fetch(baseUrl + '/api/site-config', { headers: { 'if-none-match': publicSiteEtag } }), 304, '站点配置缓存协商')
 
+  const publicKnowledgeResponse = await expectStatus(await fetch(baseUrl + '/api/knowledge'), 200, '公开读取知识库')
+  const publicKnowledge = await publicKnowledgeResponse.json()
+  const publicKnowledgeEtag = publicKnowledgeResponse.headers.get('etag')
+  if (publicKnowledge.length !== 12 || !publicKnowledgeEtag) throw new Error('公开知识库未返回 12 条种子数据或 ETag。')
+  await expectStatus(await fetch(baseUrl + '/api/knowledge', { headers: { 'if-none-match': publicKnowledgeEtag } }), 304, '知识库缓存协商')
+  const aiStatus = await (await expectStatus(await fetch(baseUrl + '/api/ai/status'), 200, '公开读取 AI 状态')).json()
+  if (aiStatus.enabled || aiStatus.knowledgeEntries !== 12 || aiStatus.localDocuments < 10) throw new Error('AI 初始状态或本地文档索引无效。')
+  const searchOnlyResult = await (await expectStatus(await fetch(baseUrl + '/api/rag/query', {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ question: 'RAG 项目如何做知识治理？' })
+  }), 200, '本地 RAG 检索')).json()
+  if (searchOnlyResult.mode !== 'search' || !searchOnlyResult.sources.length) throw new Error('未启用 AI 时应返回本地检索结果。')
+
   await expectStatus(await adminFetch('/api/admin/cases'), 401, '未登录访问管理 API')
   await expectStatus(await adminFetch('/api/admin/site-config'), 401, '未登录访问站点配置 API')
+  await expectStatus(await adminFetch('/api/admin/knowledge'), 401, '未登录访问知识管理 API')
+  await expectStatus(await adminFetch('/api/admin/ai-settings'), 401, '未登录访问 AI 配置 API')
   await expectStatus(await adminFetch('/api/admin/login', {
     method: 'POST',
     headers: { origin: 'https://invalid.example' },
@@ -150,6 +182,48 @@ try {
   await expectStatus(await saveSite(originalSiteConfig, publicSiteEtag), 409, '站点配置旧版本写入冲突')
   const siteRestore = await expectStatus(await saveSite(originalSiteConfig), 200, '恢复站点配置')
   siteRevision = siteRestore.headers.get('etag') || ''
+
+  const managedKnowledgeResponse = await expectStatus(await adminFetch('/api/admin/knowledge'), 200, '登录后读取知识库')
+  const originalKnowledge = await managedKnowledgeResponse.json()
+  let knowledgeRevision = managedKnowledgeResponse.headers.get('etag') || ''
+  const saveKnowledge = (payload, match = knowledgeRevision) => adminFetch('/api/admin/knowledge', {
+    method: 'PUT', headers: match ? { 'if-match': match } : {}, body: JSON.stringify(payload)
+  })
+  await expectStatus(await saveKnowledge(originalKnowledge, ''), 428, '知识库缺少并发版本保护')
+  const temporaryKnowledge = {
+    id: 'qa-knowledge', category: '自动化验收', title: 'RAG 验收知识', summary: '用于验证知识库配置与检索。',
+    body: '星河验收词只存在于这条临时知识中，用于验证新增内容立即进入 RAG。', takeaways: ['配置生效'],
+    stage: '测试', updated: '2026-09', published: true
+  }
+  const addKnowledge = await expectStatus(await saveKnowledge([...originalKnowledge, temporaryKnowledge]), 200, '新增知识条目')
+  knowledgeRevision = addKnowledge.headers.get('etag') || ''
+  const ragAfterAdd = await (await expectStatus(await fetch(baseUrl + '/api/rag/query', {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ question: '星河验收词是什么？' })
+  }), 200, '新增知识后 RAG 检索')).json()
+  if (!ragAfterAdd.sources.some(source => source.id === 'qa-knowledge')) throw new Error('新增知识未进入 RAG 检索。')
+  await expectStatus(await saveKnowledge(originalKnowledge, publicKnowledgeEtag), 409, '知识库旧版本写入冲突')
+  const restoreKnowledge = await expectStatus(await saveKnowledge(originalKnowledge), 200, '恢复知识库')
+  knowledgeRevision = restoreKnowledge.headers.get('etag') || ''
+
+  const managedAiResponse = await expectStatus(await adminFetch('/api/admin/ai-settings'), 200, '登录后读取 AI 配置')
+  const originalAi = await managedAiResponse.json()
+  let aiRevision = managedAiResponse.headers.get('etag') || ''
+  const saveAi = (payload, match = aiRevision) => adminFetch('/api/admin/ai-settings', {
+    method: 'PUT', headers: match ? { 'if-match': match } : {}, body: JSON.stringify(payload)
+  })
+  await expectStatus(await saveAi(originalAi, ''), 428, 'AI 配置缺少并发版本保护')
+  const configuredAi = { ...originalAi, enabled: true, provider: 'Mock AI', apiUrl: mockAiUrl, model: 'mock-rag-model', apiKey: 'encrypted-api-test-key', clearApiKey: false }
+  const aiWrite = await expectStatus(await saveAi(configuredAi), 200, '保存 AI 配置')
+  aiRevision = aiWrite.headers.get('etag') || ''
+  const savedAiPayload = await aiWrite.json()
+  if (!savedAiPayload.apiKeySet || savedAiPayload.apiKey) throw new Error('AI 配置不应向管理前端返回 API Key 明文。')
+  await expectStatus(await adminFetch('/api/admin/ai-test', { method: 'POST' }), 200, 'AI 接口连接测试')
+  const aiRagResult = await (await expectStatus(await fetch(baseUrl + '/api/rag/query', {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ question: 'RAG 项目应该先做什么？' })
+  }), 200, 'AI RAG 问答')).json()
+  if (aiRagResult.mode !== 'ai' || !aiRagResult.answer.includes('mock-rag-model') || mockRequests < 2) throw new Error('AI RAG 调用未通过模拟接口。')
+  const restoreAi = await expectStatus(await saveAi({ ...originalAi, clearApiKey: true }), 200, '恢复 AI 配置')
+  aiRevision = restoreAi.headers.get('etag') || ''
 
   await expectStatus(await save(originalCases, ''), 428, '缺少并发版本保护')
 
@@ -191,6 +265,8 @@ try {
   cookie = ''
   await expectStatus(await adminFetch('/api/admin/cases'), 401, '退出后访问管理 API')
   await expectStatus(await adminFetch('/api/admin/site-config'), 401, '退出后访问站点配置 API')
+  await expectStatus(await adminFetch('/api/admin/knowledge'), 401, '退出后访问知识管理 API')
+  await expectStatus(await adminFetch('/api/admin/ai-settings'), 401, '退出后访问 AI 配置 API')
 
   const databaseFile = join(testDataDir, 'portal.sqlite')
   const backups = readdirSync(join(testDataDir, 'backups')).filter(file => file.endsWith('.sqlite'))
@@ -207,6 +283,8 @@ try {
   console.log('Protected session cookie: verified')
   console.log('Optimistic concurrency and serialized writes: 428/409 verified')
   console.log('Site configuration update/restore: verified')
+  console.log('Knowledge CRUD and live RAG retrieval: verified')
+  console.log('Encrypted AI configuration and mock completion: verified')
   console.log('Transactional create/delete: verified (9 -> 10 -> 9)')
   console.log('Rotating database backups: verified')
   console.log('Logout invalidation: verified')
@@ -216,5 +294,6 @@ try {
     if (child.exitCode !== null) resolveExit()
     else child.once('exit', resolveExit)
   })
+  await new Promise(resolveClose => mockAiServer.close(resolveClose))
   rmSync(testDataDir, { recursive: true, force: true })
 }

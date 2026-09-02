@@ -13,6 +13,8 @@ import LifeGallery from './components/LifeGallery.vue'
 import ContactPanel from './components/ContactPanel.vue'
 import KnowledgeLibrary from './components/KnowledgeLibrary.vue'
 import ImportedKnowledge from './components/ImportedKnowledge.vue'
+import RagAssistant from './components/RagAssistant.vue'
+import KnowledgeAdmin from './components/KnowledgeAdmin.vue'
 import './styles.css'
 
 export default {
@@ -33,5 +35,7 @@ export default {
     app.component('ContactPanel', ContactPanel)
     app.component('KnowledgeLibrary', KnowledgeLibrary)
     app.component('ImportedKnowledge', ImportedKnowledge)
+    app.component('RagAssistant', RagAssistant)
+    app.component('KnowledgeAdmin', KnowledgeAdmin)
   }
 } satisfies Theme

@@ -9,6 +9,7 @@ const requiredFiles = [
   'site/cases.md',
   'site/admin/cases.md',
   'site/admin/site.md',
+  'site/admin/knowledge.md',
   'site/insights.md',
   'site/knowledge.md',
   'site/life.md',
@@ -20,12 +21,15 @@ const requiredFiles = [
   'site/.vitepress/theme/components/CaseAdmin.vue',
   'site/.vitepress/theme/components/SiteAdmin.vue',
   'site/.vitepress/theme/components/CooperationContent.vue',
+  'site/.vitepress/theme/components/KnowledgeAdmin.vue',
+  'site/.vitepress/theme/components/RagAssistant.vue',
   'site/.vitepress/theme/useSiteConfig.ts',
   'site/data/siteConfig.ts',
   'site/data/portal.ts',
   'site/data/cases.ts',
   'config/cases.json',
   'config/site-config.json',
+  'config/knowledge.json',
   'site/data/life.ts',
   'site/data/knowledge.ts',
   'site/data/importedKnowledge.ts',
@@ -35,6 +39,8 @@ const requiredFiles = [
   'scripts/database.mjs',
   'scripts/case-schema.mjs',
   'scripts/site-config-schema.mjs',
+  'scripts/knowledge-schema.mjs',
+  'scripts/rag-service.mjs',
   'scripts/test-database.mjs',
   'scripts/test-admin-api.mjs',
   'scripts/build-release.mjs',
@@ -60,12 +66,15 @@ const cases = JSON.parse(readFileSync(resolve(root, 'config/cases.json'), 'utf8'
 const caseComponentSource = readFileSync(resolve(root, 'site/.vitepress/theme/components/CaseGrid.vue'), 'utf8')
 const caseAdminSource = readFileSync(resolve(root, 'site/.vitepress/theme/components/CaseAdmin.vue'), 'utf8')
 const siteAdminSource = readFileSync(resolve(root, 'site/.vitepress/theme/components/SiteAdmin.vue'), 'utf8')
+const knowledgeAdminSource = readFileSync(resolve(root, 'site/.vitepress/theme/components/KnowledgeAdmin.vue'), 'utf8')
+const ragAssistantSource = readFileSync(resolve(root, 'site/.vitepress/theme/components/RagAssistant.vue'), 'utf8')
 const adminServerSource = readFileSync(resolve(root, 'scripts/serve-with-admin.mjs'), 'utf8')
 const databaseSource = readFileSync(resolve(root, 'scripts/database.mjs'), 'utf8')
 const dockerfileSource = readFileSync(resolve(root, 'Dockerfile'), 'utf8')
 const composeSource = readFileSync(resolve(root, 'compose.yaml'), 'utf8')
 const packageMetadata = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'))
 const siteConfig = JSON.parse(readFileSync(resolve(root, 'config/site-config.json'), 'utf8'))
+const knowledgeConfig = JSON.parse(readFileSync(resolve(root, 'config/knowledge.json'), 'utf8'))
 const knowledgeSource = readFileSync(resolve(root, 'site/data/knowledge.ts'), 'utf8')
 const importedKnowledgeSource = readFileSync(resolve(root, 'site/data/importedKnowledge.ts'), 'utf8')
 const importedKnowledgeComponent = readFileSync(
@@ -138,6 +147,12 @@ if (siteAdminSource.includes('localStorage')) throw new Error('Site admin must u
 if (!Array.isArray(siteConfig.routes) || !Array.isArray(siteConfig.timeline) || !Array.isArray(siteConfig.cooperation?.directions)) {
   throw new Error('Site configuration seed is incomplete')
 }
+const requiredKnowledgeAdminAnchors = ['/api/admin/knowledge', '/api/admin/ai-settings', '/api/admin/ai-test', '保存知识库', 'API Key']
+const missingKnowledgeAdminAnchors = requiredKnowledgeAdminAnchors.filter(anchor => !knowledgeAdminSource.includes(anchor))
+if (missingKnowledgeAdminAnchors.length) throw new Error(`Missing knowledge admin behavior: ${missingKnowledgeAdminAnchors.join(', ')}`)
+if (!ragAssistantSource.includes('/api/rag/query') || !ragAssistantSource.includes('引用的本地资料')) {
+  throw new Error('RAG assistant must call the protected server endpoint and show local citations')
+}
 
 const requiredServerAnchors = [
   'CASE_ADMIN_PASSWORD',
@@ -147,6 +162,11 @@ const requiredServerAnchors = [
   '/api/admin/cases',
   '/api/admin/site-config',
   '/api/site-config',
+  '/api/knowledge',
+  '/api/rag/query',
+  '/api/admin/knowledge',
+  '/api/admin/ai-settings',
+  '/api/admin/ai-test',
   'config/cases.json',
   '/api/health',
   'PortalDatabase',
@@ -171,6 +191,10 @@ const requiredDatabaseAnchors = [
   'CREATE TABLE IF NOT EXISTS case_changes',
   'CREATE TABLE IF NOT EXISTS site_config',
   'CREATE TABLE IF NOT EXISTS site_config_changes',
+  'CREATE TABLE IF NOT EXISTS knowledge_entries',
+  'CREATE TABLE IF NOT EXISTS knowledge_takeaways',
+  'CREATE TABLE IF NOT EXISTS ai_settings',
+  "createCipheriv('aes-256-gcm'",
   'CREATE INDEX IF NOT EXISTS',
   'await backup',
   'DatabaseConflictError'
@@ -186,12 +210,13 @@ if (missingDockerAnchors.length) throw new Error(`Missing Docker behavior: ${mis
 if (!composeSource.includes('portal-data:/data') || !composeSource.includes('read_only: true') || !composeSource.includes('no-new-privileges:true')) {
   throw new Error('Compose must keep SQLite in a volume and apply container hardening')
 }
-if (packageMetadata.version !== '3.7.0' || packageMetadata.engines?.node !== '>=22.16') {
+if (packageMetadata.version !== '3.8.0' || packageMetadata.engines?.node !== '>=22.16') {
   throw new Error('Package version or Node.js SQLite runtime requirement is incorrect')
 }
 
-const knowledgeCount = (knowledgeSource.match(/\n\s*id:\s*'k\d{2}'/g) || []).length
+const knowledgeCount = knowledgeConfig.length
 if (knowledgeCount !== 12) throw new Error(`Expected 12 knowledge entries, found ${knowledgeCount}`)
+if (knowledgeConfig.some(entry => !entry.body || typeof entry.published !== 'boolean')) throw new Error('Configurable knowledge entries require body and published fields')
 
 const importedKnowledgeCount = (importedKnowledgeSource.match(/"id":\s*"a\d{2}"/g) || []).length
 const referenceKnowledgeCount = (importedKnowledgeSource.match(/"isReference":\s*true/g) || []).length
@@ -216,8 +241,8 @@ if (missingImportedAssets.length) {
 }
 
 const knowledgePage = readFileSync(resolve(root, 'site/knowledge.md'), 'utf8')
-if (!knowledgePage.includes('以下 12 条内容均为原创整理')) {
-  throw new Error('Knowledge page must keep its original-content statement')
+if (!knowledgePage.includes('可通过管理后台新增、编辑、排序和控制发布状态')) {
+  throw new Error('Knowledge page must describe its configurable content workflow')
 }
 if (knowledgePage.includes('](http')) {
   throw new Error('Knowledge index must not link to external sites')

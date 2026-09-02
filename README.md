@@ -32,6 +32,7 @@ npm run build
 - `site/cases.md`：九个产品交付、人才、渠道与生态案例。
 - `site/admin/cases.md`：受账号保护的案例配置管理页，不出现在公开导航和搜索中。
 - `site/admin/site.md`：受账号保护的站点内容管理页，可配置身份、首页、联系、目录、履历和合作内容。
+- `site/admin/knowledge.md`：知识条目、RAG 和 AI 接口配置管理页。
 - `site/insights.md`：企业 AI、可信数字化、FDE 与生态建设主题地图。
 - `site/knowledge.md`：知识库总入口，包含 12 条当前原创方法卡和 17 条历史知识归档。
 - `site/kb/`：从 Arch3rPro 原知识库迁入的 14 篇本人原创全文及 3 个第三方引用页。
@@ -42,8 +43,8 @@ npm run build
 - `scripts/import-arch3rpro-knowledge.mjs`：从指定源仓库快照重新生成历史知识归档。
 - `scripts/serve-with-admin.mjs`：提供静态站点、案例公开读取 API 与受保护的管理 API。
 - `scripts/database.mjs`：SQLite 架构、事务、索引、版本控制和轮换备份。
-- `config/cases.json`、`config/site-config.json`：首次启动和静态构建使用的案例、站点内容种子数据。
-- `data/portal.sqlite`：运行时案例和站点配置数据库，由服务自动创建且不提交到 Git。
+- `config/cases.json`、`config/site-config.json`、`config/knowledge.json`：首次启动和静态构建使用的案例、站点与知识种子数据。
+- `data/portal.sqlite`：运行时案例、站点、知识与加密 AI 配置数据库，由服务自动创建且不提交到 Git。
 - `Dockerfile`、`compose.yaml`：跨平台容器构建、健康检查和持久化卷配置。
 - `install/`、`bin/`：Windows/Linux 安装与启动脚本。
 - `docs/DEPLOYMENT.md`：安装包、Docker、数据与升级操作手册。
@@ -71,7 +72,7 @@ npm run build
 | 精简版 | 企业 AI 商业合作伙伴介绍（精简背书标签） | `versions/index-v2.0.1-商业合作版.html` | `v2.0.1` |
 | 单页归档版 | 上海莲证科技 CIO 商业合作介绍 | `versions/index-v2.1.0-CIO商业合作版.html` | `v2.1.0` |
 | 多页面静态版 | 九案例图文商业合作主页 | `index.html` + `pages/` | `v2.3.2` |
-| 当前工作版 | SQLite + Docker 跨平台个人知识与内容管理门户 | `site/` | 待发布 `v3.7.0` |
+| 当前工作版 | SQLite + RAG + 可配置 AI 的个人知识门户 | `site/` | 待发布 `v3.8.0` |
 
 `v1.0.0` 与 `v1.1.0` 的 `index.html` 内容相同，因此只保留一份物理快照；两个 Git 标签仍完整存在。
 
@@ -81,7 +82,7 @@ npm run build
 git status
 git add site scripts config install bin docs Dockerfile compose.yaml .dockerignore .env.example .gitignore .github package.json package-lock.json CHANGELOG.md README.md
 git commit -m "重构个人知识与合作门户"
-git tag -a v3.7.0 -m "发布 v3.7.0"
+git tag -a v3.8.0 -m "发布 v3.8.0"
 ```
 
 ## 案例配置管理
@@ -97,12 +98,19 @@ npm run admin
 - 公开案例页：<http://127.0.0.1:4173/cases>
 - 独立管理页：<http://127.0.0.1:4173/admin/cases>
 - 站点内容管理页：<http://127.0.0.1:4173/admin/site>
+- 知识库与 AI 管理页：<http://127.0.0.1:4173/admin/knowledge>
 - 管理端使用服务端会话认证，登录 Cookie 设置为 `HttpOnly` 与 `SameSite=Strict`，并限制连续登录失败次数。
 - 首次启动自动把案例与站点默认配置迁移到 SQLite；后续保存全部写入 `data/portal.sqlite`。
 - 案例、标签、合作伙伴采用关联表存储；启用 WAL、外键、唯一约束、事务和查询索引。
 - 每次保存前生成一致性数据库备份，并用 ETag 防止多个管理页面互相覆盖。
 - 默认仅监听本机 `127.0.0.1`。如需在 NAS 或局域网部署，可在 `.env.local` 将 `CASE_ADMIN_HOST` 改为 `0.0.0.0`，并建议通过 HTTPS 反向代理开放管理端。
 - GitHub Pages 是纯静态部署，只展示构建时的默认配置，不提供在线管理 API；通过 Node/Docker 运行时，后台保存后页面刷新即生效。
+
+## 知识库 RAG 与 AI 问答
+
+知识库页面的问答会先检索 SQLite 中已发布的知识条目和 `dist/kb/` 中的本地历史文章，再根据配置决定是否调用外部模型。未启用模型时仍会显示相关资料，不会把浏览器问题直接发送给第三方。
+
+在 <http://127.0.0.1:4173/admin/knowledge> 中配置 OpenAI Chat Completions 兼容接口、模型和 API Key，保存后可先执行“测试已保存的接口”。API Key 使用 `PORTAL_ENCRYPTION_KEY` 加密保存；该密钥必须长期保持不变，否则需要重新填写 API Key。
 
 ## 跨平台安装与 Docker
 

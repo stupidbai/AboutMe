@@ -40,6 +40,7 @@ fi
 
 env_file="$install_dir/.env.local"
 if [ ! -f "$env_file" ] || [ "$force_config" = "1" ]; then
+  encryption_key=$(node -e "console.log(require('crypto').randomBytes(48).toString('hex'))")
   {
     echo "CASE_ADMIN_USERNAME=$admin_username"
     echo "CASE_ADMIN_PASSWORD=$admin_password"
@@ -48,6 +49,7 @@ if [ ! -f "$env_file" ] || [ "$force_config" = "1" ]; then
     echo "CASE_DATA_DIR=data"
     echo "CASE_BACKUP_LIMIT=10"
     echo "CASE_SESSION_HOURS=8"
+    echo "PORTAL_ENCRYPTION_KEY=$encryption_key"
   } > "$env_file"
   chmod 600 "$env_file"
 fi
@@ -56,5 +58,5 @@ chmod +x "$install_dir/bin/start-linux.sh"
 echo
 echo "Bai Yunfei portal installed."
 echo "Install directory: $install_dir"
-echo "Admin URL: http://127.0.0.1:$port/admin/cases"
+echo "Knowledge and AI admin: http://127.0.0.1:$port/admin/knowledge"
 echo "Start command: $install_dir/bin/start-linux.sh"

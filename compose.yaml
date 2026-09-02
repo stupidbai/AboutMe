@@ -5,7 +5,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: bai-yunfei-portal:3.7.0
+    image: bai-yunfei-portal:3.8.0
     init: true
     restart: unless-stopped
     read_only: true
@@ -21,6 +21,7 @@ services:
       CASE_DATA_DIR: /data
       CASE_BACKUP_LIMIT: ${CASE_BACKUP_LIMIT:-10}
       CASE_SESSION_HOURS: ${CASE_SESSION_HOURS:-8}
+      PORTAL_ENCRYPTION_KEY: ${PORTAL_ENCRYPTION_KEY:-change-this-encryption-key}
     volumes:
       - portal-data:/data
     tmpfs:

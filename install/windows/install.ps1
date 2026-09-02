@@ -39,6 +39,7 @@ if ($sourceRoot -ne $targetRoot) {
 New-Item -ItemType Directory -Path (Join-Path $targetRoot 'data') -Force | Out-Null
 $envPath = Join-Path $targetRoot '.env.local'
 if ($ForceConfig -or -not (Test-Path -LiteralPath $envPath)) {
+  $encryptionKey = -join (1..4 | ForEach-Object { [guid]::NewGuid().ToString('N') })
   @(
     "CASE_ADMIN_USERNAME=$AdminUsername"
     "CASE_ADMIN_PASSWORD=$AdminPassword"
@@ -47,6 +48,7 @@ if ($ForceConfig -or -not (Test-Path -LiteralPath $envPath)) {
     'CASE_DATA_DIR=data'
     'CASE_BACKUP_LIMIT=10'
     'CASE_SESSION_HOURS=8'
+    "PORTAL_ENCRYPTION_KEY=$encryptionKey"
   ) | Set-Content -LiteralPath $envPath -Encoding utf8
 }
 
@@ -54,6 +56,6 @@ $launcher = Join-Path $targetRoot 'bin\start-windows.cmd'
 Write-Host ''
 Write-Host '白云飞个人门户安装完成。' -ForegroundColor Green
 Write-Host "安装目录：$targetRoot"
-Write-Host "管理地址：http://127.0.0.1:$Port/admin/cases"
+Write-Host "知识与 AI 管理：http://127.0.0.1:$Port/admin/knowledge"
 Write-Host "启动命令：$launcher"
 Write-Host '首次登录后建议根据部署范围调整管理员密码。'

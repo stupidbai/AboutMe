@@ -3,15 +3,18 @@ import { createReadStream, existsSync, readFileSync, statSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { extname, resolve, sep } from 'node:path'
 import { DatabaseConflictError, PortalDatabase } from './database.mjs'
+import { RagService } from './rag-service.mjs'
 
 const root = resolve(import.meta.dirname, '..')
 const distRoot = resolve(root, 'dist')
 const envFile = resolve(root, '.env.local')
 const seedFile = resolve(root, 'config/cases.json')
 const siteConfigSeedFile = resolve(root, 'config/site-config.json')
+const knowledgeSeedFile = resolve(root, 'config/knowledge.json')
 const sessionCookieName = 'case_admin_session'
 const sessions = new Map()
 const loginAttempts = new Map()
+const ragAttempts = new Map()
 
 if (existsSync(envFile)) {
   for (const rawLine of readFileSync(envFile, 'utf8').split(/\r?\n/)) {
@@ -37,10 +40,19 @@ const sessionLifetimeMs = sessionHours * 60 * 60 * 1000
 if (!existsSync(distRoot)) throw new Error('缺少 dist 构建目录，请先运行 npm run build。')
 if (!existsSync(seedFile)) throw new Error('缺少 config/cases.json。')
 if (!existsSync(siteConfigSeedFile)) throw new Error('缺少 config/site-config.json。')
+if (!existsSync(knowledgeSeedFile)) throw new Error('缺少 config/knowledge.json。')
 if (adminPassword.length < 8) throw new Error('请设置至少 8 位的 CASE_ADMIN_PASSWORD。')
 if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('CASE_ADMIN_PORT 必须是 1-65535 的端口号。')
 
-const portalDatabase = new PortalDatabase({ dataDir, seedFile, siteConfigSeedFile, backupLimit })
+const portalDatabase = new PortalDatabase({
+  dataDir,
+  seedFile,
+  siteConfigSeedFile,
+  knowledgeSeedFile,
+  encryptionSecret: process.env.PORTAL_ENCRYPTION_KEY || adminPassword,
+  backupLimit
+})
+const ragService = new RagService({ distRoot })
 
 const mimeTypes = {
   '.css': 'text/css; charset=utf-8',
@@ -237,6 +249,65 @@ const handleRequest = async (request, response) => {
     return
   }
 
+  if (pathname === '/api/knowledge' && request.method === 'GET') {
+    const snapshot = portalDatabase.getKnowledgeSnapshot({ publishedOnly: true })
+    const etag = revisionTag('knowledge', snapshot.revision)
+    if (request.headers['if-none-match'] === etag) {
+      sendJson(response, 304, null, { etag })
+      return
+    }
+    sendJson(response, 200, snapshot.entries, { etag })
+    return
+  }
+
+  if (pathname === '/api/ai/status' && request.method === 'GET') {
+    const settings = portalDatabase.getAiSettings()
+    sendJson(response, 200, {
+      enabled: settings.enabled,
+      provider: settings.enabled ? settings.provider : '',
+      model: settings.enabled ? settings.model : '',
+      localDocuments: ragService.staticDocuments.length,
+      knowledgeEntries: portalDatabase.getHealth().knowledgeCount
+    })
+    return
+  }
+
+  if (pathname === '/api/rag/query' && request.method === 'POST') {
+    if (!sameOrigin(request)) {
+      sendJson(response, 403, { error: '请求来源无效。' })
+      return
+    }
+    const address = request.socket.remoteAddress || 'unknown'
+    const existingAttempt = ragAttempts.get(address)
+    const attempt = existingAttempt?.resetAt > Date.now()
+      ? existingAttempt
+      : { count: 0, resetAt: Date.now() + 10 * 60 * 1000 }
+    if (attempt.count >= 30) {
+      sendJson(response, 429, { error: '问答请求过多，请稍后再试。' })
+      return
+    }
+    attempt.count += 1
+    ragAttempts.set(address, attempt)
+    try {
+      const body = await readJsonBody(request, 32 * 1024)
+      const question = typeof body.question === 'string' ? body.question.trim() : ''
+      if (question.length < 2 || question.length > 500) {
+        sendJson(response, 400, { error: '问题长度必须为 2-500 个字符。' })
+        return
+      }
+      const result = await ragService.query(
+        question,
+        portalDatabase.getKnowledgeEntries({ publishedOnly: true }),
+        portalDatabase.getAiSettings({ includeSecret: true })
+      )
+      sendJson(response, 200, result)
+    } catch (error) {
+      console.error('[rag-error] ' + (error.stack || error.message))
+      sendJson(response, 502, { error: 'AI 问答服务暂时不可用，请稍后重试或联系管理员检查接口配置。' })
+    }
+    return
+  }
+
   if (pathname === '/api/admin/login' && request.method === 'POST') {
     if (!sameOrigin(request)) {
       sendJson(response, 403, { error: '请求来源无效。' })
@@ -354,6 +425,102 @@ const handleRequest = async (request, response) => {
     return
   }
 
+  if (pathname === '/api/admin/knowledge') {
+    const session = getSession(request)
+    if (!session) {
+      sendJson(response, 401, { error: '请先登录。' })
+      return
+    }
+    if (request.method === 'GET') {
+      const snapshot = portalDatabase.getKnowledgeSnapshot()
+      sendJson(response, 200, snapshot.entries, { etag: revisionTag('knowledge', snapshot.revision) })
+      return
+    }
+    if (request.method === 'PUT') {
+      if (!sameOrigin(request)) {
+        sendJson(response, 403, { error: '请求来源无效。' })
+        return
+      }
+      const expectedRevision = parseRevisionTag(request.headers['if-match'], 'knowledge')
+      if (expectedRevision === undefined) {
+        sendJson(response, 428, { error: '缺少有效的配置版本，请刷新管理页后重试。' })
+        return
+      }
+      try {
+        const snapshot = await portalDatabase.replaceKnowledge(await readJsonBody(request, 8 * 1024 * 1024), {
+          expectedRevision,
+          actor: session.username
+        })
+        sendJson(response, 200, snapshot.entries, { etag: revisionTag('knowledge', snapshot.revision) })
+      } catch (error) {
+        sendJson(response, error instanceof DatabaseConflictError ? 409 : 400, { error: error.message })
+      }
+      return
+    }
+    sendJson(response, 405, { error: '请求方法不支持。' }, { allow: 'GET, PUT' })
+    return
+  }
+
+  if (pathname === '/api/admin/ai-settings') {
+    const session = getSession(request)
+    if (!session) {
+      sendJson(response, 401, { error: '请先登录。' })
+      return
+    }
+    if (request.method === 'GET') {
+      const settings = portalDatabase.getAiSettings()
+      const { revision, ...publicSettings } = settings
+      sendJson(response, 200, { ...publicSettings, apiKey: '', clearApiKey: false }, { etag: revisionTag('ai-settings', revision) })
+      return
+    }
+    if (request.method === 'PUT') {
+      if (!sameOrigin(request)) {
+        sendJson(response, 403, { error: '请求来源无效。' })
+        return
+      }
+      const expectedRevision = parseRevisionTag(request.headers['if-match'], 'ai-settings')
+      if (expectedRevision === undefined) {
+        sendJson(response, 428, { error: '缺少有效的配置版本，请刷新管理页后重试。' })
+        return
+      }
+      try {
+        const saved = await portalDatabase.replaceAiSettings(await readJsonBody(request, 64 * 1024), {
+          expectedRevision,
+          actor: session.username
+        })
+        const { revision, ...publicSettings } = saved
+        sendJson(response, 200, { ...publicSettings, apiKey: '', clearApiKey: false }, { etag: revisionTag('ai-settings', revision) })
+      } catch (error) {
+        sendJson(response, error instanceof DatabaseConflictError ? 409 : 400, { error: error.message })
+      }
+      return
+    }
+    sendJson(response, 405, { error: '请求方法不支持。' }, { allow: 'GET, PUT' })
+    return
+  }
+
+  if (pathname === '/api/admin/ai-test' && request.method === 'POST') {
+    const session = getSession(request)
+    if (!session) {
+      sendJson(response, 401, { error: '请先登录。' })
+      return
+    }
+    if (!sameOrigin(request)) {
+      sendJson(response, 403, { error: '请求来源无效。' })
+      return
+    }
+    try {
+      const settings = portalDatabase.getAiSettings({ includeSecret: true })
+      const answer = await ragService.askAi('请用一句中文回复：AI 接口连接成功。', [{
+        title: '连接测试', excerpt: '这是管理后台发起的 AI 接口连接测试。'
+      }], settings)
+      sendJson(response, 200, { ok: true, answer })
+    } catch (error) {
+      sendJson(response, 502, { error: error.message })
+    }
+    return
+  }
+
   if (!['GET', 'HEAD'].includes(request.method || '')) {
     sendJson(response, 405, { error: '请求方法不支持。' })
     return
@@ -375,6 +542,7 @@ const cleanupTimer = setInterval(() => {
   const now = Date.now()
   for (const [token, session] of sessions) if (session.expiresAt <= now) sessions.delete(token)
   for (const [address, attempt] of loginAttempts) if (attempt.resetAt <= now) loginAttempts.delete(address)
+  for (const [address, attempt] of ragAttempts) if (attempt.resetAt <= now) ragAttempts.delete(address)
 }, 10 * 60 * 1000)
 cleanupTimer.unref()
 
@@ -394,5 +562,6 @@ server.listen(port, host, () => {
   console.log('Public site: http://' + host + ':' + port + '/cases')
   console.log('Case admin: http://' + host + ':' + port + '/admin/cases')
   console.log('Site admin: http://' + host + ':' + port + '/admin/site')
-  console.log('SQLite ready: ' + health.caseCount + ' cases, revisions cases=' + health.revision + '/site=' + health.siteConfigRevision + ', ' + health.journalMode + ' mode.')
+  console.log('Knowledge admin: http://' + host + ':' + port + '/admin/knowledge')
+  console.log('SQLite ready: ' + health.caseCount + ' cases/' + health.knowledgeCount + ' knowledge entries, revisions cases=' + health.revision + '/site=' + health.siteConfigRevision + '/knowledge=' + health.knowledgeRevision + ', ' + health.journalMode + ' mode.')
 })
