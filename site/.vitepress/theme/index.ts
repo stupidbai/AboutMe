@@ -9,6 +9,7 @@ import InsightGrid from './components/InsightGrid.vue'
 import LifeGallery from './components/LifeGallery.vue'
 import ContactPanel from './components/ContactPanel.vue'
 import KnowledgeLibrary from './components/KnowledgeLibrary.vue'
+import ImportedKnowledge from './components/ImportedKnowledge.vue'
 import './styles.css'
 
 export default {
@@ -25,5 +26,6 @@ export default {
     app.component('LifeGallery', LifeGallery)
     app.component('ContactPanel', ContactPanel)
     app.component('KnowledgeLibrary', KnowledgeLibrary)
+    app.component('ImportedKnowledge', ImportedKnowledge)
   }
 } satisfies Theme

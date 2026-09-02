@@ -8,6 +8,7 @@ node_modules/
 dist/
 site/.vitepress/cache/
 site/.vitepress/dist/
+.tmp/
 
 # Local server and temporary files
 *.log

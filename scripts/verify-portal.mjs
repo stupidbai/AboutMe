@@ -18,6 +18,10 @@ const requiredFiles = [
   'site/data/cases.ts',
   'site/data/life.ts',
   'site/data/knowledge.ts',
+  'site/data/importedKnowledge.ts',
+  'site/.vitepress/theme/components/ImportedKnowledge.vue',
+  'scripts/import-arch3rpro-knowledge.mjs',
+  'docs/knowledge-migration-manifest.json',
   'site/public/assets/wechat-qr.png'
 ]
 
@@ -28,6 +32,7 @@ if (missingFiles.length) {
 
 const caseSource = readFileSync(resolve(root, 'site/data/cases.ts'), 'utf8')
 const knowledgeSource = readFileSync(resolve(root, 'site/data/knowledge.ts'), 'utf8')
+const importedKnowledgeSource = readFileSync(resolve(root, 'site/data/importedKnowledge.ts'), 'utf8')
 const portalSource = readFileSync(resolve(root, 'site/data/portal.ts'), 'utf8')
 const contentSource = [
   portalSource,
@@ -44,8 +49,30 @@ if (caseCount !== 9) throw new Error(`Expected 9 cases, found ${caseCount}`)
 const knowledgeCount = (knowledgeSource.match(/\n\s*id:\s*'k\d{2}'/g) || []).length
 if (knowledgeCount !== 12) throw new Error(`Expected 12 knowledge entries, found ${knowledgeCount}`)
 
+const importedKnowledgeCount = (importedKnowledgeSource.match(/"id":\s*"a\d{2}"/g) || []).length
+const referenceKnowledgeCount = (importedKnowledgeSource.match(/"isReference":\s*true/g) || []).length
+if (importedKnowledgeCount !== 17) throw new Error(`Expected 17 imported knowledge entries, found ${importedKnowledgeCount}`)
+if (referenceKnowledgeCount !== 3) throw new Error(`Expected 3 reference-only entries, found ${referenceKnowledgeCount}`)
+
+const migrationManifest = JSON.parse(readFileSync(resolve(root, 'docs/knowledge-migration-manifest.json'), 'utf8'))
+if (migrationManifest.sourceCommit !== 'acf58fa03821905916b0fc605ec893eadf6063fe') {
+  throw new Error(`Unexpected knowledge source commit: ${migrationManifest.sourceCommit}`)
+}
+if (migrationManifest.summary.fullArticles !== 14 || migrationManifest.summary.referenceOnly !== 3) {
+  throw new Error('Knowledge migration manifest counts do not match the reviewed source boundary')
+}
+if (migrationManifest.summary.copiedAssets !== 63 || migrationManifest.assets.length !== 63) {
+  throw new Error('Knowledge migration asset manifest must contain 63 entries')
+}
+const missingImportedAssets = migrationManifest.assets
+  .map(asset => asset.destination)
+  .filter(destination => !existsSync(resolve(root, destination)))
+if (missingImportedAssets.length) {
+  throw new Error(`Missing imported knowledge assets:\n${missingImportedAssets.join('\n')}`)
+}
+
 const knowledgePage = readFileSync(resolve(root, 'site/knowledge.md'), 'utf8')
-if (!knowledgePage.includes('全部内容均为原创整理')) {
+if (!knowledgePage.includes('以下 12 条内容均为原创整理')) {
   throw new Error('Knowledge page must keep its original-content statement')
 }
 
@@ -76,6 +103,7 @@ const pageCount = ['index', 'profile', 'cooperation', 'cases', 'insights', 'know
 console.log(`Content pages: ${pageCount}`)
 console.log(`Case entries: ${caseCount}`)
 console.log(`Knowledge entries: ${knowledgeCount}`)
+console.log(`Imported knowledge entries: ${importedKnowledgeCount} (${referenceKnowledgeCount} reference-only)`)
 console.log(`Local asset references: ${localRefs.length}`)
 console.log(`Missing local assets: ${missingAssets.length}`)
 console.log('Critical career and contact facts: verified')

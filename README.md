@@ -31,10 +31,13 @@ npm run build
 - `site/cooperation.md`：合作匹配、四类方向与推进方式。
 - `site/cases.md`：九个产品交付、人才、渠道与生态案例。
 - `site/insights.md`：企业 AI、可信数字化、FDE 与生态建设主题地图。
-- `site/knowledge.md`：原创知识库入口，支持关键词搜索与分类筛选。
+- `site/knowledge.md`：知识库总入口，包含 12 条当前原创方法卡和 17 条历史知识归档。
+- `site/kb/`：从 Arch3rPro 原知识库迁入的 14 篇本人原创全文及 3 个第三方引用页。
 - `site/life.md`：户外影像、兴趣与内容账号。
 - `site/contact.md`：电话、邮箱、微信二维码与沟通建议。
 - `site/data/`：首页、案例、时间线、知识库和生活内容的数据源。
+- `docs/knowledge-migration-manifest.json`：源仓库提交、迁移边界、路径映射和 SHA-256 清单。
+- `scripts/import-arch3rpro-knowledge.mjs`：从指定源仓库快照重新生成历史知识归档。
 - `site/.vitepress/theme/`：Vue 组件与响应式主题。
 - `site/public/`：部署使用的本地图片、二维码和品牌素材。
 - `.github/workflows/deploy.yml`：GitHub Pages 自动构建与发布。
@@ -59,7 +62,7 @@ npm run build
 | 精简版 | 企业 AI 商业合作伙伴介绍（精简背书标签） | `versions/index-v2.0.1-商业合作版.html` | `v2.0.1` |
 | 单页归档版 | 上海莲证科技 CIO 商业合作介绍 | `versions/index-v2.1.0-CIO商业合作版.html` | `v2.1.0` |
 | 多页面静态版 | 九案例图文商业合作主页 | `index.html` + `pages/` | `v2.3.2` |
-| 当前工作版 | VitePress 个人知识、合作与原创知识库门户 | `site/` | 待发布 `v3.1.0` |
+| 当前工作版 | VitePress 个人知识、合作与知识归档门户 | `site/` | 待发布 `v3.2.0` |
 
 `v1.0.0` 与 `v1.1.0` 的 `index.html` 内容相同，因此只保留一份物理快照；两个 Git 标签仍完整存在。
 
@@ -69,8 +72,17 @@ npm run build
 git status
 git add site scripts .github package.json package-lock.json CHANGELOG.md README.md
 git commit -m "重构个人知识与合作门户"
-git tag -a v3.0.0 -m "发布 v3.0.0"
+git tag -a v3.2.0 -m "发布 v3.2.0"
 ```
+
+重新生成 Arch3rPro 历史知识归档：
+
+```powershell
+npm run import:knowledge -- <Arch3rPro仓库路径>
+npm run check
+```
+
+迁移规则：原仓库中本人原创文章保留全文、日期和本地资源；明确标记为 `isOriginal: false` 的条目只生成摘要引用页，保留原作者和原文链接。
 
 查看已有版本：
 

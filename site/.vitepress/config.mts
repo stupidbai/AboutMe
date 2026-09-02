@@ -1,6 +1,14 @@
 import { defineConfig } from 'vitepress'
+import { importedKnowledgeEntries } from '../data/importedKnowledge'
 
 const isGitHubPages = process.env.GITHUB_ACTIONS === 'true'
+const importedKnowledgeSidebar = ['技术博客', '效率工具', 'AI 软件', '安全工具'].map((category) => ({
+  text: `${category}（${importedKnowledgeEntries.filter((entry) => entry.category === category).length}）`,
+  collapsed: category !== '技术博客',
+  items: importedKnowledgeEntries
+    .filter((entry) => entry.category === category)
+    .map((entry) => ({ text: entry.title, link: entry.route }))
+}))
 
 export default defineConfig({
   lang: 'zh-CN',
@@ -40,6 +48,12 @@ export default defineConfig({
     outline: {
       label: '页面导航',
       level: [2, 3]
+    },
+    sidebar: {
+      '/kb/': [
+        { text: '知识库总览', link: '/knowledge' },
+        ...importedKnowledgeSidebar
+      ]
     },
     search: {
       provider: 'local',
