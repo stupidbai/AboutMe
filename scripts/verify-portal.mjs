@@ -26,7 +26,19 @@ const requiredFiles = [
   'site/.vitepress/theme/components/ImportedKnowledge.vue',
   'scripts/import-arch3rpro-knowledge.mjs',
   'scripts/serve-with-admin.mjs',
+  'scripts/database.mjs',
+  'scripts/case-schema.mjs',
+  'scripts/test-database.mjs',
   'scripts/test-admin-api.mjs',
+  'scripts/build-release.mjs',
+  'Dockerfile',
+  'compose.yaml',
+  '.dockerignore',
+  'install/windows/install.ps1',
+  'install/linux/install.sh',
+  'bin/start-windows.cmd',
+  'bin/start-linux.sh',
+  'docs/DEPLOYMENT.md',
   'docs/knowledge-migration-manifest.json',
   'site/public/assets/wechat-qr.png',
   '.env.example'
@@ -41,6 +53,10 @@ const cases = JSON.parse(readFileSync(resolve(root, 'config/cases.json'), 'utf8'
 const caseComponentSource = readFileSync(resolve(root, 'site/.vitepress/theme/components/CaseGrid.vue'), 'utf8')
 const caseAdminSource = readFileSync(resolve(root, 'site/.vitepress/theme/components/CaseAdmin.vue'), 'utf8')
 const adminServerSource = readFileSync(resolve(root, 'scripts/serve-with-admin.mjs'), 'utf8')
+const databaseSource = readFileSync(resolve(root, 'scripts/database.mjs'), 'utf8')
+const dockerfileSource = readFileSync(resolve(root, 'Dockerfile'), 'utf8')
+const composeSource = readFileSync(resolve(root, 'compose.yaml'), 'utf8')
+const packageMetadata = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'))
 const knowledgeSource = readFileSync(resolve(root, 'site/data/knowledge.ts'), 'utf8')
 const importedKnowledgeSource = readFileSync(resolve(root, 'site/data/importedKnowledge.ts'), 'utf8')
 const importedKnowledgeComponent = readFileSync(
@@ -94,7 +110,9 @@ const requiredAdminAnchors = [
   '/api/admin/cases',
   '新增案例',
   '删除',
-  '保存全部修改'
+  '保存全部修改',
+  "'if-match': revision.value",
+  'response.status === 409'
 ]
 const missingAdminAnchors = requiredAdminAnchors.filter(anchor => !caseAdminSource.includes(anchor))
 if (missingAdminAnchors.length) {
@@ -111,12 +129,44 @@ const requiredServerAnchors = [
   '/api/admin/login',
   '/api/admin/cases',
   'config/cases.json',
+  '/api/health',
+  'PortalDatabase',
+  'if-match',
+  'DatabaseConflictError',
   'loginAttempts',
   'attempt.count >= 5'
 ]
 const missingServerAnchors = requiredServerAnchors.filter(anchor => !adminServerSource.includes(anchor))
 if (missingServerAnchors.length) {
   throw new Error(`Missing protected admin server behavior: ${missingServerAnchors.join(', ')}`)
+}
+
+const requiredDatabaseAnchors = [
+  "from 'node:sqlite'",
+  'PRAGMA journal_mode = WAL',
+  'PRAGMA foreign_keys = ON',
+  'BEGIN IMMEDIATE',
+  'CREATE TABLE IF NOT EXISTS cases',
+  'CREATE TABLE IF NOT EXISTS case_tags',
+  'CREATE TABLE IF NOT EXISTS case_partners',
+  'CREATE TABLE IF NOT EXISTS case_changes',
+  'CREATE INDEX IF NOT EXISTS',
+  'await backup',
+  'DatabaseConflictError'
+]
+const missingDatabaseAnchors = requiredDatabaseAnchors.filter(anchor => !databaseSource.includes(anchor))
+if (missingDatabaseAnchors.length) {
+  throw new Error(`Missing SQLite behavior: ${missingDatabaseAnchors.join(', ')}`)
+}
+
+const requiredDockerAnchors = ['FROM node:24-bookworm-slim', 'USER node', 'VOLUME ["/data"]', 'HEALTHCHECK']
+const missingDockerAnchors = requiredDockerAnchors.filter(anchor => !dockerfileSource.includes(anchor))
+if (missingDockerAnchors.length) throw new Error(`Missing Docker behavior: ${missingDockerAnchors.join(', ')}`)
+if (!composeSource.includes('portal-data:/data') || !composeSource.includes('read_only: true') || !composeSource.includes('no-new-privileges:true')) {
+  throw new Error('Compose must keep SQLite in a volume and apply container hardening')
+}
+if (packageMetadata.version !== '3.6.0' || packageMetadata.engines?.node !== '>=22.16') {
+  throw new Error('Package version or Node.js SQLite runtime requirement is incorrect')
 }
 
 const knowledgeCount = (knowledgeSource.match(/\n\s*id:\s*'k\d{2}'/g) || []).length

@@ -3,7 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import type { CaseItem } from '../../../data/cases'
 import { withBase } from 'vitepress'
 
-type AdminCase = CaseItem & { tagText: string }
+type AdminCase = CaseItem & { tagText: string; partnerText: string }
 type ViewState = 'loading' | 'login' | 'ready' | 'unavailable'
 
 const state = ref<ViewState>('loading')
@@ -14,14 +14,17 @@ const busy = ref(false)
 const error = ref('')
 const message = ref('')
 const pendingDeleteId = ref('')
+const revision = ref('')
 
 const configuredCount = computed(() => cases.value.filter(item => item.nasUrl.trim()).length)
+const revisionNumber = computed(() => revision.value.match(/cases-(\d+)/)?.[1] || '—')
 
 const toAdminCase = (item: CaseItem): AdminCase => ({
   ...item,
   tags: [...item.tags],
   partners: item.partners?.map(partner => ({ ...partner })),
-  tagText: item.tags.join('、')
+  tagText: item.tags.join('、'),
+  partnerText: item.partners?.map(partner => `${partner.name}|${partner.logo}`).join('\n') || ''
 })
 
 const readError = async (response: Response) => {
@@ -50,6 +53,11 @@ const loadCases = async () => {
       return
     }
     const payload = await response.json() as CaseItem[]
+    revision.value = response.headers.get('etag') || ''
+    if (!revision.value) {
+      state.value = 'unavailable'
+      return
+    }
     cases.value = payload.map(toAdminCase)
     state.value = 'ready'
   } catch {
@@ -89,6 +97,9 @@ const validate = () => {
     if (!item.kicker.trim()) return `案例 ${item.id} 缺少分类说明。`
     if (!item.description.trim()) return `案例 ${item.id} 缺少案例介绍。`
     if (!item.image.trim()) return `案例 ${item.id} 缺少图片路径。`
+    const invalidPartner = item.partnerText.split(/\r?\n/).map(line => line.trim()).filter(Boolean)
+      .find(line => !line.includes('|') || line.split('|').some(part => !part.trim()))
+    if (invalidPartner) return `案例 ${item.id} 的合作伙伴格式无效，请使用“名称|Logo路径”。`
     if (item.nasUrl.trim()) {
       try {
         const parsed = new URL(item.nasUrl.trim())
@@ -106,7 +117,7 @@ const saveCases = async () => {
   message.value = ''
   if (error.value) return
   busy.value = true
-  const payload = cases.value.map(({ tagText, ...item }) => ({
+  const payload = cases.value.map(({ tagText, partnerText, ...item }) => ({
     ...item,
     id: item.id.trim(),
     title: item.title.trim(),
@@ -115,12 +126,16 @@ const saveCases = async () => {
     image: item.image.trim(),
     imageAlt: item.imageAlt.trim(),
     nasUrl: item.nasUrl.trim(),
-    tags: tagText.split(/[、,，]/).map(tag => tag.trim()).filter(Boolean)
+    tags: tagText.split(/[、,，]/).map(tag => tag.trim()).filter(Boolean),
+    partners: partnerText.split(/\r?\n/).map(line => line.trim()).filter(Boolean).map(line => {
+      const separator = line.indexOf('|')
+      return { name: line.slice(0, separator).trim(), logo: line.slice(separator + 1).trim() }
+    })
   }))
   try {
     const response = await fetch('/api/admin/cases', {
       method: 'PUT',
-      headers: { 'content-type': 'application/json', accept: 'application/json' },
+      headers: { 'content-type': 'application/json', accept: 'application/json', 'if-match': revision.value },
       credentials: 'same-origin',
       body: JSON.stringify(payload)
     })
@@ -129,11 +144,16 @@ const saveCases = async () => {
       error.value = '登录已过期，请重新登录。'
       return
     }
+    if (response.status === 409 || response.status === 428) {
+      error.value = `${await readError(response)} 当前编辑内容尚未覆盖服务器数据。`
+      return
+    }
     if (!response.ok) {
       error.value = await readError(response)
       return
     }
     const saved = await response.json() as CaseItem[]
+    revision.value = response.headers.get('etag') || revision.value
     cases.value = saved.map(toAdminCase)
     message.value = `已保存 ${saved.length} 个案例，其中 ${saved.filter(item => item.nasUrl).length} 个已配置 NAS 链接。`
     pendingDeleteId.value = ''
@@ -156,6 +176,7 @@ const addCase = () => {
     imageAlt: '',
     tags: [],
     tagText: '',
+    partnerText: '',
     nasUrl: '',
     contain: false
   })
@@ -185,6 +206,7 @@ const moveCase = (index: number, offset: number) => {
 const logout = async () => {
   await fetch('/api/admin/logout', { method: 'POST', credentials: 'same-origin' }).catch(() => undefined)
   cases.value = []
+  revision.value = ''
   state.value = 'login'
   message.value = ''
   error.value = ''
@@ -223,7 +245,7 @@ onMounted(loadCases)
 
     <template v-else>
       <div class="case-admin-toolbar">
-        <div><strong>{{ cases.length }}</strong> 个案例 · <strong>{{ configuredCount }}</strong> 个 NAS 链接</div>
+        <div><strong>{{ cases.length }}</strong> 个案例 · <strong>{{ configuredCount }}</strong> 个 NAS 链接 · SQLite r{{ revisionNumber }}</div>
         <div>
           <button type="button" class="case-admin-secondary" @click="addCase">新增案例</button>
           <button type="button" class="case-admin-primary" :disabled="busy" @click="saveCases">{{ busy ? '保存中…' : '保存全部修改' }}</button>
@@ -255,6 +277,7 @@ onMounted(loadCases)
             <label><span>图片路径</span><input v-model="item.image" placeholder="/assets/cases/example.jpg" required></label>
             <label><span>图片说明</span><input v-model="item.imageAlt"></label>
             <label class="wide"><span>标签（用顿号或逗号分隔）</span><input v-model="item.tagText" placeholder="知识工程、RAG、全栈交付"></label>
+            <label class="wide"><span>合作伙伴（每行：名称|Logo 路径）</span><textarea v-model="item.partnerText" rows="2" placeholder="华为|/assets/cases/partners/huawei.svg"></textarea></label>
             <label><span>结果数值</span><input v-model="item.outcome" placeholder="50%+"></label>
             <label><span>结果说明</span><input v-model="item.outcomeLabel"></label>
             <label class="case-admin-check"><input v-model="item.contain" type="checkbox"><span>图片完整显示，不裁切</span></label>

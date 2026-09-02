@@ -1,6 +1,6 @@
 {
   "name": "bai-yunfei-resume",
-  "version": "3.5.1",
+  "version": "3.6.0",
   "private": true,
   "description": "白云飞企业 AI 合作、项目案例与个人知识门户",
   "type": "module",
@@ -12,14 +12,16 @@
     "preview": "vitepress preview site --host 127.0.0.1 --port 8000",
     "admin": "npm run build && node scripts/serve-with-admin.mjs",
     "admin:serve": "node scripts/serve-with-admin.mjs",
+    "test:database": "node scripts/test-database.mjs",
     "test:admin": "node scripts/test-admin-api.mjs",
-    "check": "node scripts/verify-portal.mjs && npm run build"
+    "check": "node scripts/verify-portal.mjs && npm run build && npm run test:database && npm run test:admin",
+    "package:release": "npm run check && node scripts/build-release.mjs"
   },
   "devDependencies": {
     "vitepress": "1.6.4"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=22.16"
   },
   "packageManager": "npm@11.12.1"
 }

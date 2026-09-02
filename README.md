@@ -4,7 +4,7 @@
 
 ## 本地启动
 
-需要 Node.js 18 或更高版本。在项目目录执行：
+需要 Node.js 22.16 或更高版本。在项目目录执行：
 
 ```powershell
 npm start
@@ -40,7 +40,12 @@ npm run build
 - `docs/knowledge-migration-manifest.json`：源仓库提交、迁移边界、路径映射和 SHA-256 清单。
 - `scripts/import-arch3rpro-knowledge.mjs`：从指定源仓库快照重新生成历史知识归档。
 - `scripts/serve-with-admin.mjs`：提供静态站点、案例公开读取 API 与受保护的管理 API。
-- `config/cases.json`：案例内容、图片与 NAS 链接的服务端持久化配置。
+- `scripts/database.mjs`：SQLite 架构、事务、索引、版本控制和轮换备份。
+- `config/cases.json`：首次启动和静态构建使用的案例种子数据。
+- `data/portal.sqlite`：运行时案例数据库，由服务自动创建且不提交到 Git。
+- `Dockerfile`、`compose.yaml`：跨平台容器构建、健康检查和持久化卷配置。
+- `install/`、`bin/`：Windows/Linux 安装与启动脚本。
+- `docs/DEPLOYMENT.md`：安装包、Docker、数据与升级操作手册。
 - `site/.vitepress/theme/`：Vue 组件与响应式主题。
 - `site/public/`：部署使用的本地图片、二维码和品牌素材。
 - `.github/workflows/deploy.yml`：GitHub Pages 自动构建与发布。
@@ -65,7 +70,7 @@ npm run build
 | 精简版 | 企业 AI 商业合作伙伴介绍（精简背书标签） | `versions/index-v2.0.1-商业合作版.html` | `v2.0.1` |
 | 单页归档版 | 上海莲证科技 CIO 商业合作介绍 | `versions/index-v2.1.0-CIO商业合作版.html` | `v2.1.0` |
 | 多页面静态版 | 九案例图文商业合作主页 | `index.html` + `pages/` | `v2.3.2` |
-| 当前工作版 | VitePress 个人知识、合作与案例管理门户 | `site/` | 待发布 `v3.5.1` |
+| 当前工作版 | SQLite + Docker 跨平台个人知识与案例管理门户 | `site/` | 待发布 `v3.6.0` |
 
 `v1.0.0` 与 `v1.1.0` 的 `index.html` 内容相同，因此只保留一份物理快照；两个 Git 标签仍完整存在。
 
@@ -73,9 +78,9 @@ npm run build
 
 ```powershell
 git status
-git add site scripts config .env.example .gitignore .github package.json package-lock.json CHANGELOG.md README.md
+git add site scripts config install bin docs Dockerfile compose.yaml .dockerignore .env.example .gitignore .github package.json package-lock.json CHANGELOG.md README.md
 git commit -m "重构个人知识与合作门户"
-git tag -a v3.5.1 -m "发布 v3.5.1"
+git tag -a v3.6.0 -m "发布 v3.6.0"
 ```
 
 ## 案例配置管理
@@ -91,9 +96,29 @@ npm run admin
 - 公开案例页：<http://127.0.0.1:4173/cases>
 - 独立管理页：<http://127.0.0.1:4173/admin/cases>
 - 管理端使用服务端会话认证，登录 Cookie 设置为 `HttpOnly` 与 `SameSite=Strict`，并限制连续登录失败次数。
-- 保存后写入 `config/cases.json`，同时生成忽略提交的 `config/cases.json.bak` 作为最近一次备份。
+- 首次启动自动把 `config/cases.json` 迁移到 SQLite；后续保存全部写入 `data/portal.sqlite`。
+- 案例、标签、合作伙伴采用关联表存储；启用 WAL、外键、唯一约束、事务和查询索引。
+- 每次保存前生成一致性数据库备份，并用 ETag 防止多个管理页面互相覆盖。
 - 默认仅监听本机 `127.0.0.1`。如需在 NAS 或局域网部署，可在 `.env.local` 将 `CASE_ADMIN_HOST` 改为 `0.0.0.0`，并建议通过 HTTPS 反向代理开放管理端。
 - GitHub Pages 是纯静态部署，只会展示构建时的案例快照，不提供在线管理 API。
+
+## 跨平台安装与 Docker
+
+生成 Windows ZIP、Linux tar.gz 和 SHA-256 校验文件：
+
+```powershell
+npm run package:release
+```
+
+使用 Docker Compose：
+
+```powershell
+docker compose build
+docker compose up -d
+docker compose ps
+```
+
+容器数据保存在命名卷 `bai-yunfei-portal-data`。完整安装、升级、备份和局域网部署方法见 `docs/DEPLOYMENT.md`。
 
 重新生成 Arch3rPro 历史知识归档：
 

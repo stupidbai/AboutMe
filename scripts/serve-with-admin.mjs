@@ -1,14 +1,14 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
-import { createReadStream, copyFileSync, existsSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import { createReadStream, existsSync, readFileSync, statSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { extname, resolve, sep } from 'node:path'
+import { DatabaseConflictError, PortalDatabase } from './database.mjs'
 
 const root = resolve(import.meta.dirname, '..')
 const distRoot = resolve(root, 'dist')
-const casesFile = resolve(root, 'config/cases.json')
 const envFile = resolve(root, '.env.local')
+const seedFile = resolve(root, 'config/cases.json')
 const sessionCookieName = 'case_admin_session'
-const sessionLifetimeMs = 8 * 60 * 60 * 1000
 const sessions = new Map()
 const loginAttempts = new Map()
 
@@ -28,12 +28,17 @@ const adminUsername = process.env.CASE_ADMIN_USERNAME || 'admin'
 const adminPassword = process.env.CASE_ADMIN_PASSWORD || ''
 const host = process.env.CASE_ADMIN_HOST || '127.0.0.1'
 const port = Number.parseInt(process.env.CASE_ADMIN_PORT || '4173', 10)
+const dataDir = resolve(root, process.env.CASE_DATA_DIR || 'data')
+const backupLimit = Number.parseInt(process.env.CASE_BACKUP_LIMIT || '10', 10)
+const sessionHours = Math.max(1, Math.min(Number.parseInt(process.env.CASE_SESSION_HOURS || '8', 10) || 8, 72))
+const sessionLifetimeMs = sessionHours * 60 * 60 * 1000
 
 if (!existsSync(distRoot)) throw new Error('缺少 dist 构建目录，请先运行 npm run build。')
-if (!existsSync(casesFile)) throw new Error('缺少 config/cases.json。')
-if (adminPassword.length < 8) {
-  throw new Error('请在 .env.local 中设置至少 8 位的 CASE_ADMIN_PASSWORD。')
-}
+if (!existsSync(seedFile)) throw new Error('缺少 config/cases.json。')
+if (adminPassword.length < 8) throw new Error('请设置至少 8 位的 CASE_ADMIN_PASSWORD。')
+if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('CASE_ADMIN_PORT 必须是 1-65535 的端口号。')
+
+const portalDatabase = new PortalDatabase({ dataDir, seedFile, backupLimit })
 
 const mimeTypes = {
   '.css': 'text/css; charset=utf-8',
@@ -51,28 +56,40 @@ const mimeTypes = {
   '.xml': 'application/xml; charset=utf-8'
 }
 
+const securityHeaders = {
+  'cross-origin-opener-policy': 'same-origin',
+  'permissions-policy': 'camera=(), microphone=(), geolocation=()',
+  'referrer-policy': 'same-origin',
+  'x-content-type-options': 'nosniff',
+  'x-frame-options': 'DENY'
+}
+
 const sendJson = (response, status, payload, headers = {}) => {
   response.writeHead(status, {
     'cache-control': 'no-store',
     'content-type': 'application/json; charset=utf-8',
+    ...securityHeaders,
     ...headers
   })
-  response.end(JSON.stringify(payload))
+  response.end(status === 304 ? undefined : JSON.stringify(payload))
 }
 
 const readJsonBody = (request, limit = 1024 * 1024) => new Promise((resolveBody, rejectBody) => {
   const chunks = []
   let size = 0
+  let settled = false
   request.on('data', chunk => {
+    if (settled) return
     size += chunk.length
     if (size > limit) {
+      settled = true
       rejectBody(new Error('请求内容过大。'))
-      request.destroy()
       return
     }
     chunks.push(chunk)
   })
   request.on('end', () => {
+    if (settled) return
     try {
       resolveBody(JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'))
     } catch {
@@ -84,6 +101,11 @@ const readJsonBody = (request, limit = 1024 * 1024) => new Promise((resolveBody,
 
 const hashText = value => createHash('sha256').update(String(value)).digest()
 const safeEqual = (left, right) => timingSafeEqual(hashText(left), hashText(right))
+const revisionTag = revision => '"cases-' + revision + '"'
+const parseRevisionTag = value => {
+  const match = String(value || '').match(/^(?:W\/)?"cases-(\d+)"$/)
+  return match ? Number(match[1]) : undefined
+}
 
 const getProtocol = request => {
   const forwarded = request.headers['x-forwarded-proto']
@@ -94,7 +116,7 @@ const getProtocol = request => {
 const sameOrigin = request => {
   const origin = request.headers.origin
   if (!origin) return true
-  return origin === `${getProtocol(request)}://${request.headers.host}`
+  return origin === getProtocol(request) + '://' + request.headers.host
 }
 
 const parseCookies = request => Object.fromEntries(
@@ -120,16 +142,16 @@ const getSession = request => {
 }
 
 const createSessionCookie = (request, token) => [
-  `${sessionCookieName}=${encodeURIComponent(token)}`,
+  sessionCookieName + '=' + encodeURIComponent(token),
   'HttpOnly',
   'SameSite=Strict',
   'Path=/',
-  `Max-Age=${Math.floor(sessionLifetimeMs / 1000)}`,
+  'Max-Age=' + Math.floor(sessionLifetimeMs / 1000),
   getProtocol(request) === 'https' ? 'Secure' : ''
 ].filter(Boolean).join('; ')
 
 const clearSessionCookie = request => [
-  `${sessionCookieName}=`,
+  sessionCookieName + '=',
   'HttpOnly',
   'SameSite=Strict',
   'Path=/',
@@ -137,110 +159,68 @@ const clearSessionCookie = request => [
   getProtocol(request) === 'https' ? 'Secure' : ''
 ].filter(Boolean).join('; ')
 
-const readCases = () => JSON.parse(readFileSync(casesFile, 'utf8'))
-
-const requiredText = (value, label, maxLength = 5000) => {
-  if (typeof value !== 'string' || !value.trim()) throw new Error(`${label}不能为空。`)
-  if (value.trim().length > maxLength) throw new Error(`${label}内容过长。`)
-  return value.trim()
-}
-
-const optionalText = (value, maxLength = 5000) => {
-  if (value === undefined || value === null) return ''
-  if (typeof value !== 'string' || value.trim().length > maxLength) throw new Error('可选文本字段格式无效。')
-  return value.trim()
-}
-
-const isHttpUrl = value => {
-  try {
-    return ['http:', 'https:'].includes(new URL(value).protocol)
-  } catch {
-    return false
-  }
-}
-
-const sanitizeCase = (item, index) => {
-  if (!item || typeof item !== 'object' || Array.isArray(item)) throw new Error(`第 ${index + 1} 个案例格式无效。`)
-  const id = requiredText(item.id, '案例编号', 8)
-  if (!/^[A-Za-z0-9_-]+$/.test(id)) throw new Error(`案例 ${id} 的编号只能包含字母、数字、下划线或连字符。`)
-  const category = requiredText(item.category, `案例 ${id} 分类`, 20)
-  if (!['delivery', 'community', 'ecosystem'].includes(category)) throw new Error(`案例 ${id} 的分类无效。`)
-  const image = requiredText(item.image, `案例 ${id} 图片路径`, 1000)
-  if (!image.startsWith('/') && !isHttpUrl(image)) throw new Error(`案例 ${id} 的图片路径必须以 / 开头或使用 http/https。`)
-  const nasUrl = optionalText(item.nasUrl, 2000)
-  if (nasUrl && !isHttpUrl(nasUrl)) throw new Error(`案例 ${id} 的 NAS 地址必须使用 http/https。`)
-  const tags = Array.isArray(item.tags)
-    ? item.tags.map(tag => requiredText(tag, `案例 ${id} 标签`, 50)).slice(0, 12)
-    : []
-  const partners = Array.isArray(item.partners)
-    ? item.partners.slice(0, 12).map(partner => ({
-        name: requiredText(partner?.name, `案例 ${id} 合作伙伴名称`, 80),
-        logo: requiredText(partner?.logo, `案例 ${id} 合作伙伴标识`, 1000)
-      }))
-    : undefined
-
-  const sanitized = {
-    id,
-    category,
-    title: requiredText(item.title, `案例 ${id} 标题`, 200),
-    kicker: requiredText(item.kicker, `案例 ${id} 分类说明`, 200),
-    description: requiredText(item.description, `案例 ${id} 介绍`, 5000),
-    image,
-    imageAlt: optionalText(item.imageAlt, 500),
-    tags,
-    nasUrl
-  }
-  const outcome = optionalText(item.outcome, 80)
-  const outcomeLabel = optionalText(item.outcomeLabel, 200)
-  if (outcome) sanitized.outcome = outcome
-  if (outcomeLabel) sanitized.outcomeLabel = outcomeLabel
-  if (item.contain === true) sanitized.contain = true
-  if (partners?.length) sanitized.partners = partners
-  return sanitized
-}
-
-const validateCases = payload => {
-  if (!Array.isArray(payload)) throw new Error('案例配置必须是数组。')
-  if (payload.length > 99) throw new Error('案例数量不能超过 99 个。')
-  const sanitized = payload.map(sanitizeCase)
-  const ids = sanitized.map(item => item.id)
-  if (new Set(ids).size !== ids.length) throw new Error('案例编号不能重复。')
-  return sanitized
-}
-
-const saveCases = cases => {
-  copyFileSync(casesFile, `${casesFile}.bak`)
-  writeFileSync(casesFile, `${JSON.stringify(cases, null, 2)}\n`, 'utf8')
-}
-
 const serveStatic = (request, response, pathname) => {
-  const decoded = decodeURIComponent(pathname)
+  let decoded
+  try {
+    decoded = decodeURIComponent(pathname)
+  } catch {
+    response.writeHead(400, { 'content-type': 'text/plain; charset=utf-8', ...securityHeaders })
+    response.end('Bad request')
+    return
+  }
   const relativePath = decoded === '/' ? 'index.html' : decoded.replace(/^\/+/, '')
   const candidates = extname(relativePath)
     ? [relativePath]
-    : [relativePath, `${relativePath}.html`, `${relativePath}/index.html`]
+    : [relativePath, relativePath + '.html', relativePath + '/index.html']
   const file = candidates
     .map(candidate => resolve(distRoot, candidate))
-    .find(candidate => candidate.startsWith(`${distRoot}${sep}`) && existsSync(candidate) && statSync(candidate).isFile())
+    .find(candidate => candidate.startsWith(distRoot + sep) && existsSync(candidate) && statSync(candidate).isFile())
   if (!file) {
-    response.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' })
+    response.writeHead(404, { 'content-type': 'text/plain; charset=utf-8', ...securityHeaders })
     response.end('Not found')
+    return
+  }
+  const stat = statSync(file)
+  const etag = 'W/"' + stat.size + '-' + Math.floor(stat.mtimeMs) + '"'
+  if (request.headers['if-none-match'] === etag) {
+    response.writeHead(304, { etag, ...securityHeaders })
+    response.end()
     return
   }
   response.writeHead(200, {
     'cache-control': extname(file) === '.html' ? 'no-cache' : 'public, max-age=31536000, immutable',
-    'content-type': mimeTypes[extname(file).toLowerCase()] || 'application/octet-stream'
+    'content-length': stat.size,
+    'content-type': mimeTypes[extname(file).toLowerCase()] || 'application/octet-stream',
+    etag,
+    ...securityHeaders
   })
   if (request.method === 'HEAD') response.end()
   else createReadStream(file).pipe(response)
 }
 
-const server = createServer(async (request, response) => {
-  const url = new URL(request.url || '/', `http://${request.headers.host || 'localhost'}`)
+const handleRequest = async (request, response) => {
+  const url = new URL(request.url || '/', 'http://' + (request.headers.host || 'localhost'))
   const pathname = url.pathname
 
+  if (pathname === '/api/health' && request.method === 'GET') {
+    sendJson(response, 200, {
+      status: 'ok',
+      database: portalDatabase.getHealth(),
+      uptimeSeconds: Math.floor(process.uptime()),
+      platform: process.platform,
+      node: process.version
+    })
+    return
+  }
+
   if (pathname === '/api/cases' && request.method === 'GET') {
-    sendJson(response, 200, readCases())
+    const snapshot = portalDatabase.getSnapshot()
+    const etag = revisionTag(snapshot.revision)
+    if (request.headers['if-none-match'] === etag) {
+      sendJson(response, 304, null, { etag })
+      return
+    }
+    sendJson(response, 200, snapshot.cases, { etag })
     return
   }
 
@@ -294,7 +274,8 @@ const server = createServer(async (request, response) => {
       return
     }
     if (request.method === 'GET') {
-      sendJson(response, 200, readCases())
+      const snapshot = portalDatabase.getSnapshot()
+      sendJson(response, 200, snapshot.cases, { etag: revisionTag(snapshot.revision) })
       return
     }
     if (request.method === 'PUT') {
@@ -302,12 +283,20 @@ const server = createServer(async (request, response) => {
         sendJson(response, 403, { error: '请求来源无效。' })
         return
       }
+      const expectedRevision = parseRevisionTag(request.headers['if-match'])
+      if (expectedRevision === undefined) {
+        sendJson(response, 428, { error: '缺少有效的配置版本，请刷新管理页后重试。' })
+        return
+      }
       try {
-        const cases = validateCases(await readJsonBody(request))
-        saveCases(cases)
-        sendJson(response, 200, cases)
+        const snapshot = await portalDatabase.replaceCases(await readJsonBody(request), {
+          expectedRevision,
+          actor: session.username
+        })
+        sendJson(response, 200, snapshot.cases, { etag: revisionTag(snapshot.revision) })
       } catch (error) {
-        sendJson(response, 400, { error: error.message })
+        const status = error instanceof DatabaseConflictError ? 409 : 400
+        sendJson(response, status, { error: error.message })
       }
       return
     }
@@ -320,10 +309,39 @@ const server = createServer(async (request, response) => {
     return
   }
   serveStatic(request, response, pathname)
+}
+
+const server = createServer((request, response) => {
+  handleRequest(request, response).catch(error => {
+    console.error('[request-error] ' + (error.stack || error.message))
+    if (!response.headersSent) sendJson(response, 500, { error: '服务暂时不可用。' })
+    else response.destroy()
+  })
 })
+server.keepAliveTimeout = 65_000
+server.headersTimeout = 66_000
+
+const cleanupTimer = setInterval(() => {
+  const now = Date.now()
+  for (const [token, session] of sessions) if (session.expiresAt <= now) sessions.delete(token)
+  for (const [address, attempt] of loginAttempts) if (attempt.resetAt <= now) loginAttempts.delete(address)
+}, 10 * 60 * 1000)
+cleanupTimer.unref()
+
+const shutdown = signal => {
+  console.log('Received ' + signal + '; closing service.')
+  server.close(() => {
+    portalDatabase.close()
+    process.exit(0)
+  })
+  setTimeout(() => process.exit(1), 10_000).unref()
+}
+process.once('SIGINT', () => shutdown('SIGINT'))
+process.once('SIGTERM', () => shutdown('SIGTERM'))
 
 server.listen(port, host, () => {
-  console.log(`Public site: http://${host}:${port}/cases`)
-  console.log(`Case admin: http://${host}:${port}/admin/cases`)
-  console.log('Admin credentials are loaded from .env.local or environment variables.')
+  const health = portalDatabase.getHealth()
+  console.log('Public site: http://' + host + ':' + port + '/cases')
+  console.log('Case admin: http://' + host + ':' + port + '/admin/cases')
+  console.log('SQLite ready: ' + health.caseCount + ' cases, revision ' + health.revision + ', ' + health.journalMode + ' mode.')
 })
