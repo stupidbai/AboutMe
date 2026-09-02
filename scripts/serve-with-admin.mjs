@@ -31,8 +31,8 @@ const port = Number.parseInt(process.env.CASE_ADMIN_PORT || '4173', 10)
 
 if (!existsSync(distRoot)) throw new Error('缺少 dist 构建目录，请先运行 npm run build。')
 if (!existsSync(casesFile)) throw new Error('缺少 config/cases.json。')
-if (adminPassword.length < 12) {
-  throw new Error('请在 .env.local 中设置至少 12 位的 CASE_ADMIN_PASSWORD。')
+if (adminPassword.length < 8) {
+  throw new Error('请在 .env.local 中设置至少 8 位的 CASE_ADMIN_PASSWORD。')
 }
 
 const mimeTypes = {

@@ -65,7 +65,7 @@ npm run build
 | 精简版 | 企业 AI 商业合作伙伴介绍（精简背书标签） | `versions/index-v2.0.1-商业合作版.html` | `v2.0.1` |
 | 单页归档版 | 上海莲证科技 CIO 商业合作介绍 | `versions/index-v2.1.0-CIO商业合作版.html` | `v2.1.0` |
 | 多页面静态版 | 九案例图文商业合作主页 | `index.html` + `pages/` | `v2.3.2` |
-| 当前工作版 | VitePress 个人知识、合作与案例管理门户 | `site/` | 待发布 `v3.5.0` |
+| 当前工作版 | VitePress 个人知识、合作与案例管理门户 | `site/` | 待发布 `v3.5.1` |
 
 `v1.0.0` 与 `v1.1.0` 的 `index.html` 内容相同，因此只保留一份物理快照；两个 Git 标签仍完整存在。
 
@@ -75,14 +75,14 @@ npm run build
 git status
 git add site scripts config .env.example .gitignore .github package.json package-lock.json CHANGELOG.md README.md
 git commit -m "重构个人知识与合作门户"
-git tag -a v3.5.0 -m "发布 v3.5.0"
+git tag -a v3.5.1 -m "发布 v3.5.1"
 ```
 
 ## 案例配置管理
 
 案例页对公众只读，不提供任何修改入口。管理员可在独立管理页新增、删除、排序和编辑案例，并配置完整的 `http://` 或 `https://` NAS 地址。
 
-首次使用时，将 `.env.example` 复制为 `.env.local`，设置至少 12 位的管理员密码，然后运行：
+首次使用时，将 `.env.example` 复制为 `.env.local`，设置至少 8 位的管理员密码（面向局域网或公网时建议使用更长的随机密码），然后运行：
 
 ```powershell
 npm run admin
