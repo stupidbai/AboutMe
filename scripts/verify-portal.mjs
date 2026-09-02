@@ -67,6 +67,17 @@ if (invalidCaseLinks.length) {
 if (!caseComponentSource.includes(':href="item.nasUrl || undefined"') || !caseComponentSource.includes('noopener noreferrer')) {
   throw new Error('Case cards must use configurable NAS links with safe new-tab navigation')
 }
+const webConfigAnchors = [
+  'bai-yunfei-case-nas-links-v1',
+  'window.localStorage.setItem',
+  'window.localStorage.getItem',
+  '保存网页配置',
+  '恢复文件默认值'
+]
+const missingWebConfigAnchors = webConfigAnchors.filter(anchor => !caseComponentSource.includes(anchor))
+if (missingWebConfigAnchors.length) {
+  throw new Error(`Missing browser case-link configuration behavior: ${missingWebConfigAnchors.join(', ')}`)
+}
 
 const knowledgeCount = (knowledgeSource.match(/\n\s*id:\s*'k\d{2}'/g) || []).length
 if (knowledgeCount !== 12) throw new Error(`Expected 12 knowledge entries, found ${knowledgeCount}`)
