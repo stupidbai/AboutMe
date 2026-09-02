@@ -306,7 +306,7 @@ const imported = articleDefinitions.map(([sourcePath, category], index) => {
       '',
       `---`,
       '',
-      `本地迁移记录：\`posts/${sourcePath}\` · 源提交：\`${sourceCommit.slice(0, 12)}\` · [查看本地迁移说明](/knowledge#内容与来源边界)`,
+      `本地归档：\`posts/${sourcePath}\` · 源提交：\`${sourceCommit.slice(0, 12)}\``,
       ''
     ].join('\n')
   }

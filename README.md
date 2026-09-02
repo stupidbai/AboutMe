@@ -62,7 +62,7 @@ npm run build
 | 精简版 | 企业 AI 商业合作伙伴介绍（精简背书标签） | `versions/index-v2.0.1-商业合作版.html` | `v2.0.1` |
 | 单页归档版 | 上海莲证科技 CIO 商业合作介绍 | `versions/index-v2.1.0-CIO商业合作版.html` | `v2.1.0` |
 | 多页面静态版 | 九案例图文商业合作主页 | `index.html` + `pages/` | `v2.3.2` |
-| 当前工作版 | VitePress 个人知识、合作与本地知识归档门户 | `site/` | 待发布 `v3.2.1` |
+| 当前工作版 | VitePress 个人知识、合作与本地知识归档门户 | `site/` | 待发布 `v3.2.2` |
 
 `v1.0.0` 与 `v1.1.0` 的 `index.html` 内容相同，因此只保留一份物理快照；两个 Git 标签仍完整存在。
 
@@ -72,7 +72,7 @@ npm run build
 git status
 git add site scripts .github package.json package-lock.json CHANGELOG.md README.md
 git commit -m "重构个人知识与合作门户"
-git tag -a v3.2.1 -m "发布 v3.2.1"
+git tag -a v3.2.2 -m "发布 v3.2.2"
 ```
 
 重新生成 Arch3rPro 历史知识归档：

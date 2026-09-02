@@ -82,6 +82,9 @@ if (!knowledgePage.includes('以下 12 条内容均为原创整理')) {
 if (knowledgePage.includes('](http')) {
   throw new Error('Knowledge index must not link to external sites')
 }
+if (knowledgePage.includes('内容与来源边界') || knowledgePage.includes('原知识库名称')) {
+  throw new Error('Knowledge index must not display the removed source-boundary section')
+}
 if (/原文入口|原文链接/.test(`${knowledgePage}\n${importedKnowledgeComponent}`)) {
   throw new Error('Knowledge index must describe sources as local records, not outbound links')
 }

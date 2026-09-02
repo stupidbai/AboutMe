@@ -59,4 +59,4 @@ VitePress 支持在所有 Markdown 文件中使用 YAML frontmatter，并使用 
 
 ---
 
-本地迁移记录：`posts/blog/2024/vitepress-blog/README.md` · 源提交：`acf58fa03821` · [查看本地迁移说明](/knowledge#内容与来源边界)
+本地归档：`posts/blog/2024/vitepress-blog/README.md` · 源提交：`acf58fa03821`

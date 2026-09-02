@@ -116,4 +116,4 @@ CherryStudio 高度自定义的设计、强大的扩展能力和友好的用户�
 
 ---
 
-本地迁移记录：`posts/software/cherrystudio/introduce/README.md` · 源提交：`acf58fa03821` · [查看本地迁移说明](/knowledge#内容与来源边界)
+本地归档：`posts/software/cherrystudio/introduce/README.md` · 源提交：`acf58fa03821`

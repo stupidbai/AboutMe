@@ -60,4 +60,4 @@ outline: deep
 
 ---
 
-本地迁移记录：`posts/efficiency/recommend/browser/README.md` · 源提交：`acf58fa03821` · [查看本地迁移说明](/knowledge#内容与来源边界)
+本地归档：`posts/efficiency/recommend/browser/README.md` · 源提交：`acf58fa03821`
