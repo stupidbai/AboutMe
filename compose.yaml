@@ -16,6 +16,7 @@ services:
     environment:
       CASE_ADMIN_USERNAME: ${CASE_ADMIN_USERNAME:-admin}
       CASE_ADMIN_PASSWORD: ${CASE_ADMIN_PASSWORD:?Create a .env file and set a strong CASE_ADMIN_PASSWORD}
+      ALLOW_INSECURE_ADMIN: ${ALLOW_INSECURE_ADMIN:-false}
       CASE_ADMIN_HOST: 0.0.0.0
       CASE_ADMIN_PORT: 4173
       CASE_DATA_DIR: /data

@@ -75,7 +75,9 @@ docker compose restart portal
 docker compose down
 ~~~
 
-数据库和自动生成的加密密钥保存在命名卷 bai-yunfei-portal-data 中，重新构建镜像或删除容器不会丢失案例、知识、用户、评论、论坛、站点配置与访问分析事件。除非明确要删除所有业务数据，不要执行 docker compose down -v。Compose 要求显式设置 `CASE_ADMIN_PASSWORD`，不再使用默认弱密码。
+数据库和自动生成的加密密钥保存在命名卷 bai-yunfei-portal-data 中，重新构建镜像或删除容器不会丢失案例、知识、用户、评论、论坛、站点配置与访问分析事件。除非明确要删除所有业务数据，不要执行 docker compose down -v。Compose 要求显式设置 `CASE_ADMIN_PASSWORD`，并默认拒绝弱密码。
+
+如需兼容旧管理密码 `admin123`，必须同时显式设置 `ALLOW_INSECURE_ADMIN=true`。该开关仅用于已确认的兼容场景；公网部署应改用高强度随机密码。
 
 默认端口只绑定本机。需要供局域网访问时，将 compose.yaml 的端口绑定由 127.0.0.1 改为 0.0.0.0，并在防火墙中仅放行可信网段。面向公网时应放在 HTTPS 反向代理之后，并把 CASE_ADMIN_PASSWORD 改为强随机密码。
 
