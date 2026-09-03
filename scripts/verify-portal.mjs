@@ -12,6 +12,7 @@ const requiredFiles = [
   'site/admin/knowledge.md',
   'site/insights.md',
   'site/knowledge.md',
+  'site/knowledge/archive.md',
   'site/life.md',
   'site/contact.md',
   'site/.vitepress/config.mts',
@@ -41,6 +42,8 @@ const requiredFiles = [
   'scripts/site-config-schema.mjs',
   'scripts/knowledge-schema.mjs',
   'scripts/rag-service.mjs',
+  'scripts/network-security.mjs',
+  'scripts/test-rag-service.mjs',
   'scripts/test-database.mjs',
   'scripts/test-admin-api.mjs',
   'scripts/build-release.mjs',
@@ -53,6 +56,7 @@ const requiredFiles = [
   'bin/start-linux.sh',
   'docs/DEPLOYMENT.md',
   'docs/knowledge-migration-manifest.json',
+  'THIRD_PARTY_NOTICES.md',
   'site/public/assets/wechat-qr.png',
   '.env.example'
 ]
@@ -68,6 +72,8 @@ const caseAdminSource = readFileSync(resolve(root, 'site/.vitepress/theme/compon
 const siteAdminSource = readFileSync(resolve(root, 'site/.vitepress/theme/components/SiteAdmin.vue'), 'utf8')
 const knowledgeAdminSource = readFileSync(resolve(root, 'site/.vitepress/theme/components/KnowledgeAdmin.vue'), 'utf8')
 const ragAssistantSource = readFileSync(resolve(root, 'site/.vitepress/theme/components/RagAssistant.vue'), 'utf8')
+const ragServiceSource = readFileSync(resolve(root, 'scripts/rag-service.mjs'), 'utf8')
+const networkSecuritySource = readFileSync(resolve(root, 'scripts/network-security.mjs'), 'utf8')
 const adminServerSource = readFileSync(resolve(root, 'scripts/serve-with-admin.mjs'), 'utf8')
 const databaseSource = readFileSync(resolve(root, 'scripts/database.mjs'), 'utf8')
 const dockerfileSource = readFileSync(resolve(root, 'Dockerfile'), 'utf8')
@@ -147,10 +153,10 @@ if (siteAdminSource.includes('localStorage')) throw new Error('Site admin must u
 if (!Array.isArray(siteConfig.routes) || !Array.isArray(siteConfig.timeline) || !Array.isArray(siteConfig.cooperation?.directions)) {
   throw new Error('Site configuration seed is incomplete')
 }
-const requiredKnowledgeAdminAnchors = ['/api/admin/knowledge', '/api/admin/ai-settings', '/api/admin/ai-test', '保存知识库', 'API Key']
+const requiredKnowledgeAdminAnchors = ['/api/admin/knowledge', '/api/admin/ai-settings', '/api/admin/ai-test', '/api/admin/rag-stats', '/api/admin/export', '导入 Markdown/TXT', '保存知识库', 'API Key']
 const missingKnowledgeAdminAnchors = requiredKnowledgeAdminAnchors.filter(anchor => !knowledgeAdminSource.includes(anchor))
 if (missingKnowledgeAdminAnchors.length) throw new Error(`Missing knowledge admin behavior: ${missingKnowledgeAdminAnchors.join(', ')}`)
-if (!ragAssistantSource.includes('/api/rag/query') || !ragAssistantSource.includes('引用的本地资料')) {
+if (!ragAssistantSource.includes('/api/rag/query') || !ragAssistantSource.includes('/api/rag/feedback') || !ragAssistantSource.includes('引用的本地资料')) {
   throw new Error('RAG assistant must call the protected server endpoint and show local citations')
 }
 
@@ -167,6 +173,10 @@ const requiredServerAnchors = [
   '/api/admin/knowledge',
   '/api/admin/ai-settings',
   '/api/admin/ai-test',
+  '/api/admin/rag-stats',
+  '/api/admin/security-status',
+  '/api/admin/export',
+  '/api/rag/feedback',
   'config/cases.json',
   '/api/health',
   'PortalDatabase',
@@ -194,6 +204,7 @@ const requiredDatabaseAnchors = [
   'CREATE TABLE IF NOT EXISTS knowledge_entries',
   'CREATE TABLE IF NOT EXISTS knowledge_takeaways',
   'CREATE TABLE IF NOT EXISTS ai_settings',
+  'CREATE TABLE IF NOT EXISTS rag_queries',
   "createCipheriv('aes-256-gcm'",
   'CREATE INDEX IF NOT EXISTS',
   'await backup',
@@ -210,8 +221,11 @@ if (missingDockerAnchors.length) throw new Error(`Missing Docker behavior: ${mis
 if (!composeSource.includes('portal-data:/data') || !composeSource.includes('read_only: true') || !composeSource.includes('no-new-privileges:true')) {
   throw new Error('Compose must keep SQLite in a volume and apply container hardening')
 }
-if (packageMetadata.version !== '3.8.0' || packageMetadata.engines?.node !== '>=22.16') {
+if (packageMetadata.version !== '3.9.0' || packageMetadata.engines?.node !== '>=22.16' || packageMetadata.dependencies?.minisearch !== '^7.2.0') {
   throw new Error('Package version or Node.js SQLite runtime requirement is incorrect')
+}
+if (!ragServiceSource.includes("from 'minisearch'") || !ragServiceSource.includes('new MiniSearch') || !networkSecuritySource.includes('assertSafeOutboundUrl')) {
+  throw new Error('MiniSearch retrieval or outbound network guard is missing')
 }
 
 const knowledgeCount = knowledgeConfig.length
@@ -318,7 +332,7 @@ const localRefs = [
 const missingAssets = localRefs.filter(ref => !existsSync(resolve(root, 'site/public', ref.slice(1))))
 if (missingAssets.length) throw new Error(`Missing local assets:\n${missingAssets.join('\n')}`)
 
-const pageCount = ['index', 'profile', 'cooperation', 'cases', 'insights', 'knowledge', 'life', 'contact'].length
+const pageCount = ['index', 'profile', 'cooperation', 'cases', 'insights', 'knowledge', 'knowledge/archive', 'life', 'contact'].length
 console.log(`Content pages: ${pageCount}`)
 console.log(`Case entries: ${cases.length}`)
 console.log(`Configured NAS case links: ${cases.filter(item => item.nasUrl.trim()).length}`)

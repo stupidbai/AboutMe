@@ -5,7 +5,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: bai-yunfei-portal:3.8.0
+    image: bai-yunfei-portal:3.9.0
     init: true
     restart: unless-stopped
     read_only: true
@@ -15,13 +15,13 @@ services:
       - "127.0.0.1:${CASE_PORT:-4173}:4173"
     environment:
       CASE_ADMIN_USERNAME: ${CASE_ADMIN_USERNAME:-admin}
-      CASE_ADMIN_PASSWORD: ${CASE_ADMIN_PASSWORD:-admin123}
+      CASE_ADMIN_PASSWORD: ${CASE_ADMIN_PASSWORD:?Create a .env file and set a strong CASE_ADMIN_PASSWORD}
       CASE_ADMIN_HOST: 0.0.0.0
       CASE_ADMIN_PORT: 4173
       CASE_DATA_DIR: /data
       CASE_BACKUP_LIMIT: ${CASE_BACKUP_LIMIT:-10}
       CASE_SESSION_HOURS: ${CASE_SESSION_HOURS:-8}
-      PORTAL_ENCRYPTION_KEY: ${PORTAL_ENCRYPTION_KEY:-change-this-encryption-key}
+      PORTAL_ENCRYPTION_KEY: ${PORTAL_ENCRYPTION_KEY:-}
     volumes:
       - portal-data:/data
     tmpfs:

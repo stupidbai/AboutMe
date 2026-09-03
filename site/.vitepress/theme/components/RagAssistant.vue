@@ -3,7 +3,7 @@ import { onMounted, ref } from 'vue'
 import { portalHref } from '../useSiteConfig'
 
 interface RagSource { id: string; title: string; category: string; route: string; excerpt: string; score: number }
-interface RagResult { mode: 'search' | 'ai'; answer: string; sources: RagSource[]; model?: string; provider?: string }
+interface RagResult { mode: 'search' | 'ai'; answer: string; sources: RagSource[]; queryId: string; model?: string; provider?: string }
 
 const question = ref('')
 const result = ref<RagResult | null>(null)
@@ -12,6 +12,7 @@ const error = ref('')
 const available = ref(true)
 const aiEnabled = ref(false)
 const provider = ref('')
+const feedback = ref(0)
 const examples = ['RAG 项目应该先做什么？', 'FDE 团队如何培养？', '高风险 AI 功能有哪些上线边界？']
 
 onMounted(async () => {
@@ -30,6 +31,7 @@ const ask = async () => {
   busy.value = true
   error.value = ''
   result.value = null
+  feedback.value = 0
   try {
     const response = await fetch('/api/rag/query', {
       method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json' },
@@ -43,6 +45,13 @@ const ask = async () => {
 }
 
 const useExample = (value: string) => { question.value = value; ask() }
+const sendFeedback = async (value: 1 | -1) => {
+  if (!result.value?.queryId || feedback.value) return
+  try {
+    const response = await fetch('/api/rag/feedback', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ queryId: result.value.queryId, feedback: value }) })
+    if (response.ok) feedback.value = value
+  } catch {}
+}
 </script>
 
 <template>
@@ -53,7 +62,8 @@ const useExample = (value: string) => { question.value = value; ask() }
       <form class="rag-form" @submit.prevent="ask"><label><span>你的问题</span><textarea v-model="question" rows="3" maxlength="500" placeholder="例如：企业做 RAG 项目时，第一步应该关注什么？"></textarea></label><button :disabled="busy">{{ busy ? '正在检索与生成…' : '开始提问' }}</button></form>
       <div class="rag-examples"><span>试着问：</span><button v-for="example in examples" :key="example" type="button" :disabled="busy" @click="useExample(example)">{{ example }}</button></div>
       <p v-if="error" class="case-admin-feedback case-admin-feedback--error" role="alert">{{ error }}</p>
-      <article v-if="result" class="rag-answer"><div class="rag-answer__label">{{ result.mode === 'ai' ? 'AI 回答' : '检索结果' }}</div><p>{{ result.answer }}</p><div v-if="result.sources.length" class="rag-sources"><h3>引用的本地资料</h3><a v-for="source in result.sources" :key="source.id" :href="portalHref(source.route)"><strong>{{ source.title }}</strong><span>{{ source.category }}</span><p>{{ source.excerpt }}</p></a></div></article>
+      <article v-if="result" class="rag-answer"><div class="rag-answer__label">{{ result.mode === 'ai' ? 'AI 回答' : '检索结果' }}</div><p>{{ result.answer }}</p><div v-if="result.sources.length" class="rag-sources"><h3>引用的本地资料</h3><a v-for="source in result.sources" :key="source.id" :href="portalHref(source.route)"><strong>{{ source.title }}</strong><span>{{ source.category }}</span><p>{{ source.excerpt }}</p></a></div><div class="rag-feedback"><span>{{ feedback ? '感谢反馈' : '这次回答有帮助吗？' }}</span><button :class="{ active: feedback === 1 }" :disabled="!!feedback" @click="sendFeedback(1)">有帮助</button><button :class="{ active: feedback === -1 }" :disabled="!!feedback" @click="sendFeedback(-1)">没帮助</button></div></article>
+      <p class="rag-privacy">为改进知识库，系统会保存问题、响应模式、命中数量和反馈，不记录访问者姓名或联系方式。</p>
     </template>
   </section>
 </template>

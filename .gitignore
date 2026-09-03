@@ -5,6 +5,8 @@ Desktop.ini
 .vscode/
 .idea/
 .env.local
+.env
+!.env.example
 node_modules/
 dist/
 data/

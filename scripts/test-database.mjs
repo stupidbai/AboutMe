@@ -36,12 +36,25 @@ try {
   if (savedKnowledge.revision !== 2 || !savedKnowledge.entries[0].summary.endsWith('数据库测试。')) throw new Error('知识库更新事务失败。')
 
   const initialAi = database.getAiSettings()
+  if (database.getHealth().schemaVersion !== 4 || initialAi.dailyLimit !== 200 || initialAi.allowPrivateNetwork !== false) {
+    throw new Error('数据库 v4 或 AI 安全默认值迁移失败。')
+  }
   const savedAi = await database.replaceAiSettings({
     ...initialAi, apiKey: 'test-secret-api-key', apiKeySet: undefined, clearApiKey: false,
     enabled: true, apiUrl: 'http://127.0.0.1:65535/v1/chat/completions'
   }, { expectedRevision: initialAi.revision, actor: 'database-test' })
   if (savedAi.revision !== 2 || !savedAi.apiKeySet || database.getAiSettings({ includeSecret: true }).apiKey !== 'test-secret-api-key') {
     throw new Error('AI 配置加密保存失败。')
+  }
+  const queryId = '0123456789abcdef01234567'
+  const clientHash = 'database-test-client'
+  database.recordRagQuery({ id: queryId, clientHash, question: '知识库如何配置？', mode: 'search', sourceCount: 2, durationMs: 12, status: 'ok' })
+  if (database.getRagQueryCount(clientHash, new Date(Date.now() - 60_000).toISOString()) !== 1 || !database.setRagFeedback(queryId, 1)) {
+    throw new Error('RAG 问答记录或反馈写入失败。')
+  }
+  const ragStats = database.getRagStats(1)
+  if (ragStats.summary.total !== 1 || ragStats.summary.helpful !== 1 || ragStats.recent[0]?.question !== '知识库如何配置？') {
+    throw new Error('RAG 统计聚合失败。')
   }
 
   const changedSiteConfig = structuredClone(initialSite.config)
@@ -80,6 +93,7 @@ try {
   console.log('Revisioned site configuration persistence: verified')
   console.log('Knowledge configuration persistence: verified')
   console.log('Encrypted AI configuration persistence: verified')
+  console.log('RAG query statistics and feedback persistence: verified')
 } finally {
   database?.close()
   rmSync(dataDir, { recursive: true, force: true })

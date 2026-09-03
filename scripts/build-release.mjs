@@ -30,8 +30,11 @@ const copyEntries = [
   ['scripts/site-config-schema.mjs', 'scripts/site-config-schema.mjs'],
   ['scripts/knowledge-schema.mjs', 'scripts/knowledge-schema.mjs'],
   ['scripts/rag-service.mjs', 'scripts/rag-service.mjs'],
+  ['scripts/network-security.mjs', 'scripts/network-security.mjs'],
+  ['node_modules/minisearch', 'node_modules/minisearch'],
   ['install', 'install'],
   ['bin', 'bin'],
+  ['THIRD_PARTY_NOTICES.md', 'THIRD_PARTY_NOTICES.md'],
   ['.env.example', '.env.example'],
   ['docs/DEPLOYMENT.md', 'INSTALL.md']
 ]
@@ -57,6 +60,9 @@ writeFileSync(resolve(staging, 'package.json'), JSON.stringify({
   type: 'module',
   scripts: {
     start: 'node scripts/serve-with-admin.mjs'
+  },
+  dependencies: {
+    minisearch: '7.2.0'
   },
   engines: {
     node: '>=22.16'

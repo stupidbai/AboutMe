@@ -1,5 +1,8 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
+import { createHash } from 'node:crypto'
 import { extname, relative, resolve, sep } from 'node:path'
+import MiniSearch from 'minisearch'
+import { assertSafeOutboundUrl } from './network-security.mjs'
 
 const decodeHtml = value => value
   .replace(/&nbsp;/gi, ' ')
@@ -33,11 +36,18 @@ const collectHtml = directory => {
 
 const tokenize = value => {
   const normalized = String(value || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim()
-  const tokens = normalized.match(/[a-z0-9][a-z0-9._+-]{1,}|[\p{Script=Han}]/gu) || []
-  const chinese = [...normalized.replace(/[^\p{Script=Han}]/gu, '')]
-  for (let index = 0; index < chinese.length - 1; index += 1) tokens.push(chinese[index] + chinese[index + 1])
-  return [...new Set(tokens.filter(token => token.length > 1 || /[\p{Script=Han}]/u.test(token)))]
+  const tokens = normalized.match(/[a-z0-9][a-z0-9._+-]{1,}/g) || []
+  for (const sequence of normalized.match(/\p{Script=Han}+/gu) || []) {
+    if (sequence.length === 1) tokens.push(sequence)
+    else for (let index = 0; index < sequence.length - 1; index += 1) tokens.push(sequence.slice(index, index + 2))
+  }
+  return tokens
 }
+
+const removeArchiveNoise = text => text
+  .replace(/历史知识归档：由白云飞以\s*arch3rpro\s*账号首次发布，本次经本人授权迁移。原始发布日期：[^。]+。/gi, ' ')
+  .replace(/\s+/g, ' ')
+  .trim()
 
 const excerpt = (body, tokens, max = 260) => {
   const lower = body.toLowerCase()
@@ -47,10 +57,30 @@ const excerpt = (body, tokens, max = 260) => {
   return `${start ? '…' : ''}${value}${start + max < body.length ? '…' : ''}`
 }
 
+const chunkText = (text, maxLength = 900, overlap = 120) => {
+  const normalized = String(text || '').replace(/\s+/g, ' ').trim()
+  if (!normalized) return []
+  const chunks = []
+  let start = 0
+  while (start < normalized.length) {
+    let end = Math.min(normalized.length, start + maxLength)
+    if (end < normalized.length) {
+      const candidate = normalized.slice(start + Math.floor(maxLength * .55), end)
+      const boundary = Math.max(candidate.lastIndexOf('。'), candidate.lastIndexOf('；'), candidate.lastIndexOf('！'), candidate.lastIndexOf('？'))
+      if (boundary >= 0) end = start + Math.floor(maxLength * .55) + boundary + 1
+    }
+    chunks.push(normalized.slice(start, end))
+    if (end >= normalized.length) break
+    start = Math.max(start + 1, end - overlap)
+  }
+  return chunks
+}
+
 export class RagService {
   constructor({ distRoot }) {
     this.distRoot = resolve(distRoot)
     this.staticDocuments = this.loadStaticDocuments()
+    this.indexCache = { fingerprint: '', index: null, chunkCount: 0 }
   }
 
   loadStaticDocuments() {
@@ -65,39 +95,78 @@ export class RagService {
         title: stripHtml(titleHtml).replace(/\s*[|｜].*$/, ''),
         category: '历史知识归档',
         summary: '',
-        body: stripHtml(main).slice(0, 50000),
+        body: removeArchiveNoise(stripHtml(main)).slice(0, 50000),
         route: '/' + routePath
       }
     }).filter(item => item.body.length > 40)
   }
 
-  retrieve(question, knowledgeEntries, topK = 5) {
-    const tokens = tokenize(question)
+  buildSearchIndex(knowledgeEntries) {
+    const fingerprint = createHash('sha256').update(JSON.stringify(knowledgeEntries)).digest('hex')
+    if (this.indexCache.fingerprint === fingerprint && this.indexCache.index) return this.indexCache
     const dynamic = knowledgeEntries.filter(item => item.published).map(item => ({
       ...item,
       route: `/knowledge#${item.id}`,
       body: [item.summary, item.body, ...(item.takeaways || [])].join('\n')
     }))
-    const scored = [...dynamic, ...this.staticDocuments].map(document => {
-      const title = document.title.toLowerCase()
-      const summary = String(document.summary || '').toLowerCase()
-      const body = document.body.toLowerCase()
-      let score = body.includes(question.toLowerCase()) ? 20 : 0
-      for (const token of tokens) {
-        if (title.includes(token)) score += 8
-        if (summary.includes(token)) score += 4
-        const occurrences = body.split(token).length - 1
-        score += Math.min(occurrences, 6)
+    const chunks = [...dynamic, ...this.staticDocuments].flatMap(document =>
+      chunkText(document.body).map((body, chunkIndex) => ({
+        searchId: `${document.id}::${chunkIndex}`,
+        originalId: document.id,
+        title: document.title,
+        category: document.category,
+        summary: document.summary || '',
+        route: document.route,
+        body,
+        chunkIndex
+      })))
+    const index = new MiniSearch({
+      idField: 'searchId',
+      fields: ['title', 'summary', 'body', 'category'],
+      storeFields: ['originalId', 'title', 'category', 'route', 'body', 'chunkIndex'],
+      tokenize,
+      processTerm: term => term.toLowerCase(),
+      searchOptions: {
+        boost: { title: 5, summary: 2.5, category: 1.5 },
+        combineWith: 'OR'
       }
-      return { ...document, score }
-    }).filter(item => item.score > 0).sort((left, right) => right.score - left.score)
-    return scored.slice(0, Math.max(1, Math.min(Number(topK) || 5, 10))).map(item => ({
-      id: item.id, title: item.title, category: item.category, route: item.route,
-      excerpt: excerpt(item.body, tokens), score: item.score
+    })
+    index.addAll(chunks)
+    this.indexCache = { fingerprint, index, chunkCount: chunks.length }
+    return this.indexCache
+  }
+
+  retrieve(question, knowledgeEntries, topK = 5) {
+    const tokens = [...new Set(tokenize(question))]
+    if (!tokens.length) return []
+    const { index, chunkCount } = this.buildSearchIndex(knowledgeEntries)
+    if (!chunkCount) return []
+    const normalizedQuestion = String(question).trim().toLowerCase()
+    const scored = index.search(question, {
+      prefix: term => /^[a-z0-9]/i.test(term) && term.length >= 3,
+      fuzzy: term => /^[a-z0-9]/i.test(term) && term.length >= 5 ? 0.18 : false
+    }).map(item => ({
+      ...item,
+      score: item.score + (String(item.body).toLowerCase().includes(normalizedQuestion) ? 20 : 0)
+    })).sort((left, right) => right.score - left.score)
+    const relevanceFloor = (scored[0]?.score || 0) * 0.12
+    const unique = []
+    const seen = new Set()
+    for (const item of scored) {
+      if (item.score < relevanceFloor) continue
+      if (seen.has(item.originalId)) continue
+      seen.add(item.originalId)
+      unique.push(item)
+      if (unique.length >= Math.max(1, Math.min(Number(topK) || 5, 10))) break
+    }
+    return unique.map(item => ({
+      id: item.originalId, title: item.title, category: item.category, route: item.route,
+      excerpt: excerpt(item.body, tokens), score: Number(item.score.toFixed(3)), chunk: item.chunkIndex + 1
     }))
   }
 
   async askAi(question, sources, settings) {
+    await assertSafeOutboundUrl(settings.apiUrl, { allowPrivateNetwork: settings.allowPrivateNetwork })
     const context = sources.map((source, index) => `[资料 ${index + 1}] ${source.title}\n${source.excerpt}`).join('\n\n')
     const response = await fetch(settings.apiUrl, {
       method: 'POST',

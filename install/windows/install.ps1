@@ -27,7 +27,7 @@ if ($AdminPassword.Length -lt 8) {
 
 New-Item -ItemType Directory -Path $targetRoot -Force | Out-Null
 if ($sourceRoot -ne $targetRoot) {
-  foreach ($item in @('dist', 'scripts', 'config', 'bin', 'package.json', '.env.example', 'INSTALL.md')) {
+  foreach ($item in @('dist', 'scripts', 'config', 'bin', 'node_modules', 'package.json', '.env.example', 'INSTALL.md', 'THIRD_PARTY_NOTICES.md')) {
     $source = Join-Path $sourceRoot $item
     if (-not (Test-Path -LiteralPath $source)) {
       throw "安装包缺少必要内容：$item"

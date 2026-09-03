@@ -108,7 +108,7 @@ const save = (payload, match = revision) => adminFetch('/api/admin/cases', {
 
 try {
   const health = await waitForHealth()
-  if (health.status !== 'ok' || health.database.schemaVersion !== 3 || health.database.siteConfigRevision !== 1 || health.database.knowledgeCount !== 12 || health.database.journalMode !== 'wal') {
+  if (health.status !== 'ok' || health.database.schemaVersion !== 4 || health.database.siteConfigRevision !== 1 || health.database.knowledgeCount !== 12 || health.database.ragQueryCount !== 0 || health.database.journalMode !== 'wal') {
     throw new Error('SQLite 健康状态不符合预期。')
   }
 
@@ -138,12 +138,17 @@ try {
   const searchOnlyResult = await (await expectStatus(await fetch(baseUrl + '/api/rag/query', {
     method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ question: 'RAG 项目如何做知识治理？' })
   }), 200, '本地 RAG 检索')).json()
-  if (searchOnlyResult.mode !== 'search' || !searchOnlyResult.sources.length) throw new Error('未启用 AI 时应返回本地检索结果。')
+  if (searchOnlyResult.mode !== 'search' || !searchOnlyResult.sources.length || !searchOnlyResult.queryId) throw new Error('未启用 AI 时应返回本地检索结果和问答编号。')
+  await expectStatus(await fetch(baseUrl + '/api/rag/feedback', {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ queryId: searchOnlyResult.queryId, feedback: 1 })
+  }), 200, '提交问答反馈')
 
   await expectStatus(await adminFetch('/api/admin/cases'), 401, '未登录访问管理 API')
   await expectStatus(await adminFetch('/api/admin/site-config'), 401, '未登录访问站点配置 API')
   await expectStatus(await adminFetch('/api/admin/knowledge'), 401, '未登录访问知识管理 API')
   await expectStatus(await adminFetch('/api/admin/ai-settings'), 401, '未登录访问 AI 配置 API')
+  await expectStatus(await adminFetch('/api/admin/rag-stats'), 401, '未登录访问问答统计 API')
+  await expectStatus(await adminFetch('/api/admin/export'), 401, '未登录访问导出 API')
   await expectStatus(await adminFetch('/api/admin/login', {
     method: 'POST',
     headers: { origin: 'https://invalid.example' },
@@ -212,16 +217,31 @@ try {
     method: 'PUT', headers: match ? { 'if-match': match } : {}, body: JSON.stringify(payload)
   })
   await expectStatus(await saveAi(originalAi, ''), 428, 'AI 配置缺少并发版本保护')
-  const configuredAi = { ...originalAi, enabled: true, provider: 'Mock AI', apiUrl: mockAiUrl, model: 'mock-rag-model', apiKey: 'encrypted-api-test-key', clearApiKey: false }
+  const configuredAi = { ...originalAi, enabled: true, provider: 'Mock AI', apiUrl: mockAiUrl, model: 'mock-rag-model', apiKey: 'encrypted-api-test-key', clearApiKey: false, allowPrivateNetwork: false }
   const aiWrite = await expectStatus(await saveAi(configuredAi), 200, '保存 AI 配置')
   aiRevision = aiWrite.headers.get('etag') || ''
   const savedAiPayload = await aiWrite.json()
   if (!savedAiPayload.apiKeySet || savedAiPayload.apiKey) throw new Error('AI 配置不应向管理前端返回 API Key 明文。')
+  await expectStatus(await adminFetch('/api/admin/ai-test', { method: 'POST' }), 502, '默认阻止 AI 内网接口')
+  const privateNetworkWrite = await expectStatus(await saveAi({ ...configuredAi, apiKey: '', allowPrivateNetwork: true }), 200, '显式允许 AI 内网接口')
+  aiRevision = privateNetworkWrite.headers.get('etag') || ''
   await expectStatus(await adminFetch('/api/admin/ai-test', { method: 'POST' }), 200, 'AI 接口连接测试')
   const aiRagResult = await (await expectStatus(await fetch(baseUrl + '/api/rag/query', {
     method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ question: 'RAG 项目应该先做什么？' })
   }), 200, 'AI RAG 问答')).json()
   if (aiRagResult.mode !== 'ai' || !aiRagResult.answer.includes('mock-rag-model') || mockRequests < 2) throw new Error('AI RAG 调用未通过模拟接口。')
+
+  const ragStats = await (await expectStatus(await adminFetch('/api/admin/rag-stats?days=30'), 200, '读取问答统计')).json()
+  if (ragStats.summary.total < 3 || ragStats.summary.helpful !== 1 || !ragStats.recent.some(item => item.id === searchOnlyResult.queryId)) {
+    throw new Error('问答统计或用户反馈未持久化。')
+  }
+  const securityStatus = await (await expectStatus(await adminFetch('/api/admin/security-status'), 200, '读取安全状态')).json()
+  if (securityStatus.encryptionKeySource !== 'environment' || securityStatus.localOnlyHost !== true) throw new Error('安全状态信息不符合预期。')
+  const exportResponse = await expectStatus(await adminFetch('/api/admin/export'), 200, '导出站点配置')
+  const exported = await exportResponse.json()
+  if (exported.formatVersion !== 1 || exported.ai.apiKeyIncluded !== false || JSON.stringify(exported).includes('encrypted-api-test-key')) {
+    throw new Error('配置导出必须完整且不能包含 API Key。')
+  }
   const restoreAi = await expectStatus(await saveAi({ ...originalAi, clearApiKey: true }), 200, '恢复 AI 配置')
   aiRevision = restoreAi.headers.get('etag') || ''
 
@@ -284,6 +304,9 @@ try {
   console.log('Optimistic concurrency and serialized writes: 428/409 verified')
   console.log('Site configuration update/restore: verified')
   console.log('Knowledge CRUD and live RAG retrieval: verified')
+  console.log('RAG query log, statistics and feedback: verified')
+  console.log('Security status and secret-free export: verified')
+  console.log('Private-network AI endpoint opt-in: verified')
   console.log('Encrypted AI configuration and mock completion: verified')
   console.log('Transactional create/delete: verified (9 -> 10 -> 9)')
   console.log('Rotating database backups: verified')

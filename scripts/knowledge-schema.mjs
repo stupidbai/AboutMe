@@ -43,9 +43,11 @@ export const validateAiSettings = payload => {
   const topK = Number(item.topK)
   const temperature = Number(item.temperature)
   const maxTokens = Number(item.maxTokens)
+  const dailyLimit = Number(item.dailyLimit)
   if (!Number.isInteger(topK) || topK < 1 || topK > 10) throw new Error('RAG 召回数量必须为 1-10。')
   if (!Number.isFinite(temperature) || temperature < 0 || temperature > 2) throw new Error('模型温度必须为 0-2。')
   if (!Number.isInteger(maxTokens) || maxTokens < 128 || maxTokens > 8192) throw new Error('最大输出 Token 必须为 128-8192。')
+  if (!Number.isInteger(dailyLimit) || dailyLimit < 1 || dailyLimit > 100000) throw new Error('每日问答限额必须为 1-100000。')
   return {
     enabled: item.enabled === true,
     provider: text(item.provider, '服务商名称', 80),
@@ -56,6 +58,8 @@ export const validateAiSettings = payload => {
     topK,
     temperature,
     maxTokens,
+    dailyLimit,
+    allowPrivateNetwork: item.allowPrivateNetwork === true,
     systemPrompt: text(item.systemPrompt, '系统提示词', 4000)
   }
 }
@@ -70,5 +74,7 @@ export const defaultAiSettings = {
   topK: 5,
   temperature: 0.2,
   maxTokens: 1200,
+  dailyLimit: 200,
+  allowPrivateNetwork: false,
   systemPrompt: '你是白云飞个人知识库的 AI 助手。只依据提供的本地知识上下文回答；资料不足时明确说明，不得编造。回答使用中文，并在结尾列出引用资料标题。'
 }

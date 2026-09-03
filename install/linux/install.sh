@@ -29,7 +29,7 @@ fi
 
 mkdir -p "$install_dir" "$install_dir/data"
 if [ "$source_root" != "$install_dir" ]; then
-  for item in dist scripts config bin package.json .env.example INSTALL.md; do
+  for item in dist scripts config bin node_modules package.json .env.example INSTALL.md THIRD_PARTY_NOTICES.md; do
     if [ ! -e "$source_root/$item" ]; then
       echo "Installation package is missing: $item" >&2
       exit 1

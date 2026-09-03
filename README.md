@@ -34,7 +34,8 @@ npm run build
 - `site/admin/site.md`：受账号保护的站点内容管理页，可配置身份、首页、联系、目录、履历和合作内容。
 - `site/admin/knowledge.md`：知识条目、RAG 和 AI 接口配置管理页。
 - `site/insights.md`：企业 AI、可信数字化、FDE 与生态建设主题地图。
-- `site/knowledge.md`：知识库总入口，包含 12 条当前原创方法卡和 17 条历史知识归档。
+- `site/knowledge.md`：知识库与 AI 问答入口，包含 12 条当前原创方法卡。
+- `site/knowledge/archive.md`：独立的 17 条历史知识归档入口，避免总览页过长。
 - `site/kb/`：从 Arch3rPro 原知识库迁入的 14 篇本人原创全文及 3 个第三方引用页。
 - `site/life.md`：户外影像、兴趣与内容账号。
 - `site/contact.md`：电话、邮箱、微信二维码与沟通建议。
@@ -42,7 +43,9 @@ npm run build
 - `docs/knowledge-migration-manifest.json`：源仓库提交、迁移边界、路径映射和 SHA-256 清单。
 - `scripts/import-arch3rpro-knowledge.mjs`：从指定源仓库快照重新生成历史知识归档。
 - `scripts/serve-with-admin.mjs`：提供静态站点、案例公开读取 API 与受保护的管理 API。
-- `scripts/database.mjs`：SQLite 架构、事务、索引、版本控制和轮换备份。
+- `scripts/database.mjs`：SQLite 架构、事务、索引、版本控制、问答统计和轮换备份。
+- `scripts/rag-service.mjs`：基于 MiniSearch 的中文分段全文检索和 OpenAI 兼容问答编排。
+- `THIRD_PARTY_NOTICES.md`：集成开源组件的项目、版本、用途与许可说明。
 - `config/cases.json`、`config/site-config.json`、`config/knowledge.json`：首次启动和静态构建使用的案例、站点与知识种子数据。
 - `data/portal.sqlite`：运行时案例、站点、知识与加密 AI 配置数据库，由服务自动创建且不提交到 Git。
 - `Dockerfile`、`compose.yaml`：跨平台容器构建、健康检查和持久化卷配置。
@@ -72,7 +75,7 @@ npm run build
 | 精简版 | 企业 AI 商业合作伙伴介绍（精简背书标签） | `versions/index-v2.0.1-商业合作版.html` | `v2.0.1` |
 | 单页归档版 | 上海莲证科技 CIO 商业合作介绍 | `versions/index-v2.1.0-CIO商业合作版.html` | `v2.1.0` |
 | 多页面静态版 | 九案例图文商业合作主页 | `index.html` + `pages/` | `v2.3.2` |
-| 当前工作版 | SQLite + RAG + 可配置 AI 的个人知识门户 | `site/` | 待发布 `v3.8.0` |
+| 当前工作版 | SQLite + MiniSearch RAG + 可配置 AI 的个人知识门户 | `site/` | 待发布 `v3.9.0` |
 
 `v1.0.0` 与 `v1.1.0` 的 `index.html` 内容相同，因此只保留一份物理快照；两个 Git 标签仍完整存在。
 
@@ -82,7 +85,7 @@ npm run build
 git status
 git add site scripts config install bin docs Dockerfile compose.yaml .dockerignore .env.example .gitignore .github package.json package-lock.json CHANGELOG.md README.md
 git commit -m "重构个人知识与合作门户"
-git tag -a v3.8.0 -m "发布 v3.8.0"
+git tag -a v3.9.0 -m "发布 v3.9.0"
 ```
 
 ## 案例配置管理
@@ -108,9 +111,11 @@ npm run admin
 
 ## 知识库 RAG 与 AI 问答
 
-知识库页面的问答会先检索 SQLite 中已发布的知识条目和 `dist/kb/` 中的本地历史文章，再根据配置决定是否调用外部模型。未启用模型时仍会显示相关资料，不会把浏览器问题直接发送给第三方。
+知识库页面的问答通过 MiniSearch 7.2.0 对 SQLite 已发布知识和 `dist/kb/` 本地历史文章进行分段全文检索，再根据配置决定是否调用外部模型。检索支持标题/摘要权重、中文单字与双字切分、英文前缀和拼写容错；未启用模型时仍会显示相关资料，不会把浏览器问题直接发送给第三方。
 
-在 <http://127.0.0.1:4173/admin/knowledge> 中配置 OpenAI Chat Completions 兼容接口、模型和 API Key，保存后可先执行“测试已保存的接口”。API Key 使用 `PORTAL_ENCRYPTION_KEY` 加密保存；该密钥必须长期保持不变，否则需要重新填写 API Key。
+在 <http://127.0.0.1:4173/admin/knowledge> 中配置 OpenAI Chat Completions 兼容接口、模型、API Key 和每日配额，保存后可先执行“测试已保存的接口”。API Key 使用持久化密钥加密保存：设置 `PORTAL_ENCRYPTION_KEY` 时使用该值，否则服务首次启动会在数据目录自动生成 `.portal-encryption-key`。默认阻止 AI 接口连接本机和内网地址；只有接入本地模型时才应显式开启。
+
+管理页支持批量导入 Markdown/TXT 为未发布草稿、导出不含 API Key 的完整配置、查看近 30 天问答命中/耗时/反馈统计。访客可在回答下提交“有帮助/没帮助”反馈。
 
 ## 跨平台安装与 Docker
 
@@ -125,10 +130,13 @@ npm run package:release
 使用 Docker Compose：
 
 ```powershell
+$env:CASE_ADMIN_PASSWORD = '请替换为高强度随机密码'
 docker compose build
 docker compose up -d
 docker compose ps
 ```
+
+也可在项目根目录创建已被 `.gitignore` 排除的 `.env` 文件写入 `CASE_ADMIN_PASSWORD`；Compose 不再提供默认弱密码。`PORTAL_ENCRYPTION_KEY` 可选，省略时会安全生成并保存在数据卷。
 
 容器数据保存在命名卷 `bai-yunfei-portal-data`。完整安装、升级、备份和局域网部署方法见 `docs/DEPLOYMENT.md`。
 

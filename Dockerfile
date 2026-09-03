@@ -7,12 +7,13 @@ RUN npm ci
 COPY config ./config
 COPY site ./site
 COPY scripts ./scripts
+COPY THIRD_PARTY_NOTICES.md ./THIRD_PARTY_NOTICES.md
 RUN npm run build
 
 FROM node:24-bookworm-slim AS runtime
 
 LABEL org.opencontainers.image.title="白云飞个人知识与合作门户" \
-      org.opencontainers.image.version="3.8.0"
+      org.opencontainers.image.version="3.9.0"
 
 ENV NODE_ENV=production \
     CASE_ADMIN_HOST=0.0.0.0 \
@@ -32,6 +33,9 @@ COPY --from=build --chown=node:node /app/scripts/case-schema.mjs ./scripts/case-
 COPY --from=build --chown=node:node /app/scripts/site-config-schema.mjs ./scripts/site-config-schema.mjs
 COPY --from=build --chown=node:node /app/scripts/knowledge-schema.mjs ./scripts/knowledge-schema.mjs
 COPY --from=build --chown=node:node /app/scripts/rag-service.mjs ./scripts/rag-service.mjs
+COPY --from=build --chown=node:node /app/scripts/network-security.mjs ./scripts/network-security.mjs
+COPY --from=build --chown=node:node /app/node_modules/minisearch ./node_modules/minisearch
+COPY --from=build --chown=node:node /app/THIRD_PARTY_NOTICES.md ./THIRD_PARTY_NOTICES.md
 
 RUN mkdir -p /data/backups && chown -R node:node /data
 USER node

@@ -1,7 +1,7 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
-import { createReadStream, existsSync, readFileSync, statSync } from 'node:fs'
+import { chmodSync, createReadStream, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
-import { extname, resolve, sep } from 'node:path'
+import { extname, join, resolve, sep } from 'node:path'
 import { DatabaseConflictError, PortalDatabase } from './database.mjs'
 import { RagService } from './rag-service.mjs'
 
@@ -36,20 +36,37 @@ const dataDir = resolve(root, process.env.CASE_DATA_DIR || 'data')
 const backupLimit = Number.parseInt(process.env.CASE_BACKUP_LIMIT || '10', 10)
 const sessionHours = Math.max(1, Math.min(Number.parseInt(process.env.CASE_SESSION_HOURS || '8', 10) || 8, 72))
 const sessionLifetimeMs = sessionHours * 60 * 60 * 1000
+const weakAdminPassword = ['admin123', 'password', '12345678', 'replace-with-at-least-8-characters'].includes(adminPassword.toLowerCase())
+const localOnlyHost = ['127.0.0.1', 'localhost', '::1'].includes(host.toLowerCase())
 
 if (!existsSync(distRoot)) throw new Error('缺少 dist 构建目录，请先运行 npm run build。')
 if (!existsSync(seedFile)) throw new Error('缺少 config/cases.json。')
 if (!existsSync(siteConfigSeedFile)) throw new Error('缺少 config/site-config.json。')
 if (!existsSync(knowledgeSeedFile)) throw new Error('缺少 config/knowledge.json。')
 if (adminPassword.length < 8) throw new Error('请设置至少 8 位的 CASE_ADMIN_PASSWORD。')
+if (!localOnlyHost && weakAdminPassword && process.env.ALLOW_INSECURE_ADMIN !== 'true') {
+  throw new Error('非本机监听禁止使用默认弱密码，请设置强 CASE_ADMIN_PASSWORD。')
+}
 if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('CASE_ADMIN_PORT 必须是 1-65535 的端口号。')
+
+const loadEncryptionSecret = () => {
+  if (process.env.PORTAL_ENCRYPTION_KEY) return { secret: process.env.PORTAL_ENCRYPTION_KEY, source: 'environment' }
+  mkdirSync(dataDir, { recursive: true })
+  const keyFile = join(dataDir, '.portal-encryption-key')
+  if (!existsSync(keyFile)) {
+    writeFileSync(keyFile, randomBytes(48).toString('hex'), { encoding: 'utf8', mode: 0o600, flag: 'wx' })
+  }
+  try { chmodSync(keyFile, 0o600) } catch {}
+  return { secret: readFileSync(keyFile, 'utf8').trim(), source: 'data-file' }
+}
+const encryption = loadEncryptionSecret()
 
 const portalDatabase = new PortalDatabase({
   dataDir,
   seedFile,
   siteConfigSeedFile,
   knowledgeSeedFile,
-  encryptionSecret: process.env.PORTAL_ENCRYPTION_KEY || adminPassword,
+  encryptionSecret: encryption.secret,
   backupLimit
 })
 const ragService = new RagService({ distRoot })
@@ -267,7 +284,8 @@ const handleRequest = async (request, response) => {
       provider: settings.enabled ? settings.provider : '',
       model: settings.enabled ? settings.model : '',
       localDocuments: ragService.staticDocuments.length,
-      knowledgeEntries: portalDatabase.getHealth().knowledgeCount
+      knowledgeEntries: portalDatabase.getHealth().knowledgeCount,
+      retrievalEngine: 'MiniSearch 7.2.0'
     })
     return
   }
@@ -288,22 +306,64 @@ const handleRequest = async (request, response) => {
     }
     attempt.count += 1
     ragAttempts.set(address, attempt)
+    let question = ''
+    let queryId = ''
+    let clientHash = ''
+    const startedAt = Date.now()
     try {
       const body = await readJsonBody(request, 32 * 1024)
-      const question = typeof body.question === 'string' ? body.question.trim() : ''
+      question = typeof body.question === 'string' ? body.question.trim() : ''
       if (question.length < 2 || question.length > 500) {
         sendJson(response, 400, { error: '问题长度必须为 2-500 个字符。' })
+        return
+      }
+      queryId = randomBytes(12).toString('hex')
+      clientHash = createHash('sha256').update(encryption.secret + '|' + address).digest('hex')
+      const settings = portalDatabase.getAiSettings({ includeSecret: true })
+      const rollingDayStart = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+      if (portalDatabase.getRagQueryCount(clientHash, rollingDayStart) >= settings.dailyLimit) {
+        sendJson(response, 429, { error: '今日问答额度已用完，请明天再试。' })
         return
       }
       const result = await ragService.query(
         question,
         portalDatabase.getKnowledgeEntries({ publishedOnly: true }),
-        portalDatabase.getAiSettings({ includeSecret: true })
+        settings
       )
-      sendJson(response, 200, result)
+      portalDatabase.recordRagQuery({
+        id: queryId, clientHash, question, mode: result.mode, sourceCount: result.sources.length,
+        durationMs: Date.now() - startedAt, status: result.sources.length ? 'ok' : 'no_results'
+      })
+      sendJson(response, 200, { ...result, queryId })
     } catch (error) {
       console.error('[rag-error] ' + (error.stack || error.message))
+      if (queryId && clientHash && question) {
+        portalDatabase.recordRagQuery({ id: queryId, clientHash, question, mode: 'error', sourceCount: 0,
+          durationMs: Date.now() - startedAt, status: 'error', errorMessage: error.message })
+      }
       sendJson(response, 502, { error: 'AI 问答服务暂时不可用，请稍后重试或联系管理员检查接口配置。' })
+    }
+    return
+  }
+
+  if (pathname === '/api/rag/feedback' && request.method === 'POST') {
+    if (!sameOrigin(request)) {
+      sendJson(response, 403, { error: '请求来源无效。' })
+      return
+    }
+    try {
+      const body = await readJsonBody(request, 8 * 1024)
+      if (!/^[a-f0-9]{24}$/.test(String(body.queryId || '')) || ![-1, 1].includes(Number(body.feedback))) {
+        sendJson(response, 400, { error: '反馈参数无效。' })
+        return
+      }
+      if (!portalDatabase.setRagFeedback(body.queryId, Number(body.feedback))) {
+        sendJson(response, 404, { error: '未找到对应问答记录。' })
+        return
+      }
+      sendJson(response, 200, { ok: true })
+    } catch (error) {
+      sendJson(response, 400, { error: error.message })
     }
     return
   }
@@ -521,6 +581,50 @@ const handleRequest = async (request, response) => {
     return
   }
 
+  if (pathname === '/api/admin/rag-stats' && request.method === 'GET') {
+    if (!getSession(request)) {
+      sendJson(response, 401, { error: '请先登录。' })
+      return
+    }
+    sendJson(response, 200, portalDatabase.getRagStats(url.searchParams.get('days') || 30))
+    return
+  }
+
+  if (pathname === '/api/admin/security-status' && request.method === 'GET') {
+    if (!getSession(request)) {
+      sendJson(response, 401, { error: '请先登录。' })
+      return
+    }
+    sendJson(response, 200, {
+      localOnlyHost,
+      weakAdminPassword,
+      encryptionKeySource: encryption.source,
+      warnings: [
+        ...(weakAdminPassword ? ['当前管理员密码为默认弱密码；对外部署前必须更换。'] : []),
+        ...(!localOnlyHost ? ['服务正在监听非本机地址，请确保已配置 HTTPS 和访问控制。'] : [])
+      ]
+    })
+    return
+  }
+
+  if (pathname === '/api/admin/export' && request.method === 'GET') {
+    if (!getSession(request)) {
+      sendJson(response, 401, { error: '请先登录。' })
+      return
+    }
+    const aiSettings = portalDatabase.getAiSettings()
+    const { revision: aiRevision, apiKeySet, ...safeAiSettings } = aiSettings
+    sendJson(response, 200, {
+      exportedAt: new Date().toISOString(),
+      formatVersion: 1,
+      cases: portalDatabase.getSnapshot(),
+      site: portalDatabase.getSiteConfigSnapshot(),
+      knowledge: portalDatabase.getKnowledgeSnapshot(),
+      ai: { settings: safeAiSettings, revision: aiRevision, apiKeyIncluded: false, hadApiKey: apiKeySet }
+    }, { 'content-disposition': `attachment; filename="portal-export-${new Date().toISOString().slice(0, 10)}.json"` })
+    return
+  }
+
   if (!['GET', 'HEAD'].includes(request.method || '')) {
     sendJson(response, 405, { error: '请求方法不支持。' })
     return
@@ -563,5 +667,7 @@ server.listen(port, host, () => {
   console.log('Case admin: http://' + host + ':' + port + '/admin/cases')
   console.log('Site admin: http://' + host + ':' + port + '/admin/site')
   console.log('Knowledge admin: http://' + host + ':' + port + '/admin/knowledge')
+  if (weakAdminPassword) console.warn('Security warning: default weak admin password is allowed only because the service listens locally.')
+  console.log('Encryption key source: ' + encryption.source + '.')
   console.log('SQLite ready: ' + health.caseCount + ' cases/' + health.knowledgeCount + ' knowledge entries, revisions cases=' + health.revision + '/site=' + health.siteConfigRevision + '/knowledge=' + health.knowledgeRevision + ', ' + health.journalMode + ' mode.')
 })
