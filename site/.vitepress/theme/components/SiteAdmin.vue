@@ -99,7 +99,7 @@ onMounted(loadConfig)
   <section class="case-admin site-admin">
     <header class="case-admin__hero">
       <div><span>PRIVATE CMS</span><h1>站点内容管理</h1><p>集中维护首页、身份、联系、目录、履历与合作内容。所有修改均保存在 SQLite，并带版本冲突保护和自动备份。</p></div>
-      <div class="site-admin__links"><a :href="withBase('/')" target="_blank">查看网站 ↗</a><a :href="withBase('/admin/knowledge')">知识与 AI →</a><a :href="withBase('/admin/cases')">案例管理 →</a></div>
+      <div class="site-admin__links"><a :href="withBase('/')" target="_blank">查看网站 ↗</a><a :href="withBase('/admin/knowledge')">知识与 AI →</a><a :href="withBase('/admin/cases')">案例管理 →</a><a :href="withBase('/admin/users')">用户与社区 →</a></div>
     </header>
 
     <div v-if="state === 'loading'" class="case-admin-state">正在连接管理服务…</div>

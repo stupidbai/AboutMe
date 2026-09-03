@@ -8,19 +8,20 @@ COPY config ./config
 COPY site ./site
 COPY scripts ./scripts
 COPY THIRD_PARTY_NOTICES.md ./THIRD_PARTY_NOTICES.md
-RUN npm run build
+RUN npm run build && npm prune --omit=dev
 
 FROM node:24-bookworm-slim AS runtime
 
 LABEL org.opencontainers.image.title="白云飞个人知识与合作门户" \
-      org.opencontainers.image.version="3.9.0"
+      org.opencontainers.image.version="4.0.0"
 
 ENV NODE_ENV=production \
     CASE_ADMIN_HOST=0.0.0.0 \
     CASE_ADMIN_PORT=4173 \
     CASE_DATA_DIR=/data \
     CASE_BACKUP_LIMIT=10 \
-    CASE_SESSION_HOURS=8
+    CASE_SESSION_HOURS=8 \
+    COMMUNITY_SESSION_DAYS=30
 
 WORKDIR /app
 COPY --from=build --chown=node:node /app/dist ./dist
@@ -34,7 +35,8 @@ COPY --from=build --chown=node:node /app/scripts/site-config-schema.mjs ./script
 COPY --from=build --chown=node:node /app/scripts/knowledge-schema.mjs ./scripts/knowledge-schema.mjs
 COPY --from=build --chown=node:node /app/scripts/rag-service.mjs ./scripts/rag-service.mjs
 COPY --from=build --chown=node:node /app/scripts/network-security.mjs ./scripts/network-security.mjs
-COPY --from=build --chown=node:node /app/node_modules/minisearch ./node_modules/minisearch
+COPY --from=build --chown=node:node /app/scripts/community-service.mjs ./scripts/community-service.mjs
+COPY --from=build --chown=node:node /app/node_modules ./node_modules
 COPY --from=build --chown=node:node /app/THIRD_PARTY_NOTICES.md ./THIRD_PARTY_NOTICES.md
 
 RUN mkdir -p /data/backups && chown -R node:node /data

@@ -90,6 +90,7 @@ const waitForHealth = async () => {
 }
 
 let cookie = ''
+let userCookie = ''
 let revision = ''
 const adminFetch = (path, options = {}) => fetch(baseUrl + path, {
   ...options,
@@ -105,10 +106,19 @@ const save = (payload, match = revision) => adminFetch('/api/admin/cases', {
   headers: match ? { 'if-match': match } : {},
   body: JSON.stringify(payload)
 })
+const communityFetch = (path, options = {}) => fetch(baseUrl + path, {
+  ...options,
+  headers: {
+    accept: 'application/json',
+    ...(options.body ? { 'content-type': 'application/json' } : {}),
+    ...(userCookie ? { cookie: userCookie } : {}),
+    ...options.headers
+  }
+})
 
 try {
   const health = await waitForHealth()
-  if (health.status !== 'ok' || health.database.schemaVersion !== 4 || health.database.siteConfigRevision !== 1 || health.database.knowledgeCount !== 12 || health.database.ragQueryCount !== 0 || health.database.journalMode !== 'wal') {
+  if (health.status !== 'ok' || health.database.schemaVersion !== 5 || health.database.siteConfigRevision !== 1 || health.database.knowledgeCount !== 12 || health.database.ragQueryCount !== 0 || health.database.communityUserCount !== 0 || health.database.journalMode !== 'wal') {
     throw new Error('SQLite 健康状态不符合预期。')
   }
 
@@ -135,6 +145,39 @@ try {
   await expectStatus(await fetch(baseUrl + '/api/knowledge', { headers: { 'if-none-match': publicKnowledgeEtag } }), 304, '知识库缓存协商')
   const aiStatus = await (await expectStatus(await fetch(baseUrl + '/api/ai/status'), 200, '公开读取 AI 状态')).json()
   if (aiStatus.enabled || aiStatus.knowledgeEntries !== 12 || aiStatus.localDocuments < 10) throw new Error('AI 初始状态或本地文档索引无效。')
+
+  const anonymousSession = await (await expectStatus(await communityFetch('/api/auth/session'), 200, '访客会话')).json()
+  if (anonymousSession.authenticated || anonymousSession.user) throw new Error('访客不应被识别为注册用户。')
+  await expectStatus(await communityFetch('/api/comments', { method: 'POST', body: JSON.stringify({ articlePath: '/kb/blog/2025/vitepress-markdown', body: '未登录评论' }) }), 401, '访客禁止评论')
+  await expectStatus(await communityFetch('/api/auth/register', {
+    method: 'POST', headers: { origin: 'https://invalid.example' },
+    body: JSON.stringify({ username: 'portal_user', displayName: '门户测试用户', email: 'portal@example.com', password: 'Secure123', confirmPassword: 'Secure123', acceptedTerms: true })
+  }), 403, '跨来源注册')
+  const register = await expectStatus(await communityFetch('/api/auth/register', {
+    method: 'POST', body: JSON.stringify({ username: 'portal_user', displayName: '门户测试用户', email: 'portal@example.com', password: 'Secure123', confirmPassword: 'Secure123', acceptedTerms: true, website: '' })
+  }), 201, '注册社区用户')
+  const registeredUser = (await register.json()).user
+  const userSetCookie = register.headers.get('set-cookie') || ''
+  if (!registeredUser?.id || !userSetCookie.includes('HttpOnly') || !userSetCookie.includes('SameSite=Lax')) throw new Error('注册响应或用户会话 Cookie 无效。')
+  userCookie = userSetCookie.split(';', 1)[0]
+  await expectStatus(await communityFetch('/api/auth/register', {
+    method: 'POST', body: JSON.stringify({ username: 'portal_user', displayName: '重复用户', email: 'another@example.com', password: 'Secure123', confirmPassword: 'Secure123', acceptedTerms: true })
+  }), 409, '阻止重复用户名')
+  const sessionAfterRegister = await (await expectStatus(await communityFetch('/api/auth/session'), 200, '注册后会话')).json()
+  if (!sessionAfterRegister.authenticated || sessionAfterRegister.user.username !== 'portal_user') throw new Error('数据库用户会话未生效。')
+  const profile = await (await expectStatus(await communityFetch('/api/auth/profile', { method: 'PUT', body: JSON.stringify({ displayName: '门户用户已更新', bio: '关注企业 AI 与工程实践。' }) }), 200, '更新社区资料')).json()
+  if (profile.user.displayName !== '门户用户已更新' || profile.user.bio !== '关注企业 AI 与工程实践。') throw new Error('社区资料更新失败。')
+  const comment = await (await expectStatus(await communityFetch('/api/comments', { method: 'POST', body: JSON.stringify({ articlePath: '/kb/blog/2025/vitepress-markdown', body: '**安全评论** <script>alert(1)</script>' }) }), 201, '注册用户发表评论')).json()
+  if (!comment.id || /script/i.test(comment.bodyHtml) || !comment.bodyHtml.includes('<strong>安全评论</strong>')) throw new Error('评论内容未正确渲染或清洗。')
+  const likedComment = await (await expectStatus(await communityFetch(`/api/comments/${comment.id}/like`, { method: 'POST' }), 200, '点赞文章评论')).json()
+  if (!likedComment.liked || likedComment.likeCount !== 1) throw new Error('文章评论点赞失败。')
+  const categories = await (await expectStatus(await communityFetch('/api/forum/categories'), 200, '读取论坛板块')).json()
+  if (categories.length !== 4 || !categories.some(item => item.id === 'ai')) throw new Error('论坛默认板块缺失。')
+  const post = await (await expectStatus(await communityFetch('/api/forum/posts', { method: 'POST', body: JSON.stringify({ categoryId: 'ai', title: '企业 AI 落地讨论', body: '讨论企业 AI 从知识治理到试点上线的实践路径。' }) }), 201, '注册用户发帖')).json()
+  const reply = await (await expectStatus(await communityFetch(`/api/forum/posts/${post.id}/replies`, { method: 'POST', body: JSON.stringify({ body: '建议先定义可验证的业务指标。' }) }), 201, '注册用户回复')).json()
+  if (!post.id || !reply.id) throw new Error('论坛发帖或回复失败。')
+  const forumDetail = await (await expectStatus(await communityFetch(`/api/forum/posts/${post.id}`), 200, '读取论坛详情')).json()
+  if (forumDetail.post.replyCount !== 1 || forumDetail.replies.length !== 1 || !forumDetail.post.bodyHtml.includes('实践路径')) throw new Error('论坛详情聚合失败。')
   const searchOnlyResult = await (await expectStatus(await fetch(baseUrl + '/api/rag/query', {
     method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ question: 'RAG 项目如何做知识治理？' })
   }), 200, '本地 RAG 检索')).json()
@@ -149,6 +192,8 @@ try {
   await expectStatus(await adminFetch('/api/admin/ai-settings'), 401, '未登录访问 AI 配置 API')
   await expectStatus(await adminFetch('/api/admin/rag-stats'), 401, '未登录访问问答统计 API')
   await expectStatus(await adminFetch('/api/admin/export'), 401, '未登录访问导出 API')
+  await expectStatus(await adminFetch('/api/admin/users'), 401, '未登录访问用户管理 API')
+  await expectStatus(await adminFetch('/api/admin/moderation'), 401, '未登录访问内容审核 API')
   await expectStatus(await adminFetch('/api/admin/login', {
     method: 'POST',
     headers: { origin: 'https://invalid.example' },
@@ -164,6 +209,19 @@ try {
     throw new Error('管理会话 Cookie 缺少 HttpOnly 或 SameSite=Strict。')
   }
   cookie = setCookie.split(';', 1)[0]
+
+  const communityStats = await (await expectStatus(await adminFetch('/api/admin/community/stats'), 200, '读取社区统计')).json()
+  if (communityStats.users !== 1 || communityStats.comments !== 1 || communityStats.posts !== 1 || communityStats.replies !== 1) throw new Error('管理端社区统计无效。')
+  const managedUsers = await (await expectStatus(await adminFetch('/api/admin/users?search=portal'), 200, '搜索注册用户')).json()
+  if (managedUsers.length !== 1 || managedUsers[0].id !== registeredUser.id) throw new Error('用户管理搜索失败。')
+  const promoted = await (await expectStatus(await adminFetch(`/api/admin/users/${registeredUser.id}`, { method: 'PATCH', body: JSON.stringify({ role: 'moderator', status: 'active' }) }), 200, '授予版主权限')).json()
+  if (promoted.role !== 'moderator') throw new Error('用户角色更新失败。')
+  const moderation = await (await expectStatus(await adminFetch('/api/admin/moderation'), 200, '读取待审核内容')).json()
+  if (!moderation.some(item => item.id === comment.id) || !moderation.some(item => item.id === post.id)) throw new Error('内容审核列表不完整。')
+  await expectStatus(await adminFetch(`/api/admin/moderation/comment/${comment.id}`, { method: 'PATCH', body: JSON.stringify({ status: 'hidden' }) }), 200, '隐藏评论')
+  const hiddenComments = await (await expectStatus(await communityFetch('/api/comments?article=%2Fkb%2Fblog%2F2025%2Fvitepress-markdown'), 200, '隐藏后读取评论')).json()
+  if (hiddenComments.comments.some(item => item.id === comment.id)) throw new Error('隐藏评论仍出现在公开列表。')
+  await expectStatus(await adminFetch(`/api/admin/moderation/comment/${comment.id}`, { method: 'PATCH', body: JSON.stringify({ status: 'active' }) }), 200, '恢复评论')
 
   const managedResponse = await expectStatus(await adminFetch('/api/admin/cases'), 200, '登录后读取案例')
   const originalCases = await managedResponse.json()
@@ -239,7 +297,7 @@ try {
   if (securityStatus.encryptionKeySource !== 'environment' || securityStatus.localOnlyHost !== true) throw new Error('安全状态信息不符合预期。')
   const exportResponse = await expectStatus(await adminFetch('/api/admin/export'), 200, '导出站点配置')
   const exported = await exportResponse.json()
-  if (exported.formatVersion !== 1 || exported.ai.apiKeyIncluded !== false || JSON.stringify(exported).includes('encrypted-api-test-key')) {
+  if (exported.formatVersion !== 1 || exported.ai.apiKeyIncluded !== false || exported.community.personalDataIncluded !== false || JSON.stringify(exported).includes('encrypted-api-test-key') || JSON.stringify(exported).includes('portal@example.com')) {
     throw new Error('配置导出必须完整且不能包含 API Key。')
   }
   const restoreAi = await expectStatus(await saveAi({ ...originalAi, clearApiKey: true }), 200, '恢复 AI 配置')
@@ -281,6 +339,13 @@ try {
     throw new Error('删除案例后数据库未恢复。')
   }
 
+  await expectStatus(await adminFetch(`/api/admin/users/${registeredUser.id}`, { method: 'PATCH', body: JSON.stringify({ role: 'member', status: 'suspended' }) }), 200, '停用社区用户')
+  const suspendedSession = await (await expectStatus(await communityFetch('/api/auth/session'), 200, '停用后会话失效')).json()
+  if (suspendedSession.authenticated) throw new Error('停用账号未立即注销数据库会话。')
+  userCookie = ''
+  await expectStatus(await adminFetch(`/api/admin/users/${registeredUser.id}`, { method: 'DELETE' }), 200, '删除社区用户')
+  await expectStatus(await communityFetch('/api/auth/login', { method: 'POST', body: JSON.stringify({ identity: 'portal_user', password: 'Secure123' }) }), 401, '已删除用户不能登录')
+
   await expectStatus(await adminFetch('/api/admin/logout', { method: 'POST' }), 200, '退出登录')
   cookie = ''
   await expectStatus(await adminFetch('/api/admin/cases'), 401, '退出后访问管理 API')
@@ -311,6 +376,10 @@ try {
   console.log('Transactional create/delete: verified (9 -> 10 -> 9)')
   console.log('Rotating database backups: verified')
   console.log('Logout invalidation: verified')
+  console.log('Visitor, registration, persistent session and profile: verified')
+  console.log('Knowledge comments, likes and safe Markdown: verified')
+  console.log('Forum categories, posts and replies: verified')
+  console.log('User roles, suspension, deletion and content moderation: verified')
 } finally {
   if (child.exitCode === null) child.kill()
   await new Promise(resolveExit => {

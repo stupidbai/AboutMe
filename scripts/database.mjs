@@ -6,7 +6,7 @@ import { validateCases } from './case-schema.mjs'
 import { validateSiteConfig } from './site-config-schema.mjs'
 import { defaultAiSettings, validateAiSettings, validateKnowledgeEntries } from './knowledge-schema.mjs'
 
-const SCHEMA_VERSION = 4
+const SCHEMA_VERSION = 5
 
 export class DatabaseConflictError extends Error {
   constructor(message = '配置已被其他管理员更新，请刷新后重试。') {
@@ -34,6 +34,7 @@ export class PortalDatabase {
     this.seedSiteConfigIfEmpty()
     this.seedKnowledgeIfEmpty()
     this.seedAiSettingsIfEmpty()
+    this.seedCommunityIfEmpty()
   }
 
   configure() {
@@ -206,6 +207,125 @@ export class PortalDatabase {
         COMMIT;
       `)
     }
+    if (currentVersion < 5) {
+      this.database.exec(`
+        BEGIN IMMEDIATE;
+        CREATE TABLE IF NOT EXISTS community_users (
+          id TEXT PRIMARY KEY,
+          username TEXT NOT NULL COLLATE NOCASE UNIQUE,
+          email TEXT NOT NULL COLLATE NOCASE UNIQUE,
+          display_name TEXT NOT NULL,
+          password_hash TEXT NOT NULL,
+          role TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('member', 'moderator')),
+          status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'suspended')),
+          bio TEXT NOT NULL DEFAULT '',
+          terms_accepted_at TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          last_login_at TEXT
+        ) STRICT;
+        CREATE TABLE IF NOT EXISTS community_sessions (
+          token_hash TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL REFERENCES community_users(id) ON DELETE CASCADE,
+          ip_hash TEXT NOT NULL DEFAULT '',
+          user_agent_hash TEXT NOT NULL DEFAULT '',
+          created_at TEXT NOT NULL,
+          last_seen_at TEXT NOT NULL,
+          expires_at TEXT NOT NULL
+        ) STRICT;
+        CREATE TABLE IF NOT EXISTS article_comments (
+          id TEXT PRIMARY KEY,
+          article_path TEXT NOT NULL,
+          user_id TEXT REFERENCES community_users(id) ON DELETE SET NULL,
+          parent_id TEXT REFERENCES article_comments(id) ON DELETE SET NULL,
+          body_md TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'hidden', 'deleted')),
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        ) STRICT;
+        CREATE TABLE IF NOT EXISTS article_comment_likes (
+          comment_id TEXT NOT NULL REFERENCES article_comments(id) ON DELETE CASCADE,
+          user_id TEXT NOT NULL REFERENCES community_users(id) ON DELETE CASCADE,
+          created_at TEXT NOT NULL,
+          PRIMARY KEY (comment_id, user_id)
+        ) STRICT;
+        CREATE TABLE IF NOT EXISTS forum_categories (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          description TEXT NOT NULL DEFAULT '',
+          sort_order INTEGER NOT NULL UNIQUE,
+          created_at TEXT NOT NULL
+        ) STRICT;
+        CREATE TABLE IF NOT EXISTS forum_posts (
+          id TEXT PRIMARY KEY,
+          category_id TEXT NOT NULL REFERENCES forum_categories(id),
+          user_id TEXT REFERENCES community_users(id) ON DELETE SET NULL,
+          title TEXT NOT NULL,
+          body_md TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'hidden', 'locked', 'deleted')),
+          view_count INTEGER NOT NULL DEFAULT 0 CHECK (view_count >= 0),
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          last_activity_at TEXT NOT NULL
+        ) STRICT;
+        CREATE TABLE IF NOT EXISTS forum_replies (
+          id TEXT PRIMARY KEY,
+          post_id TEXT NOT NULL REFERENCES forum_posts(id) ON DELETE CASCADE,
+          user_id TEXT REFERENCES community_users(id) ON DELETE SET NULL,
+          parent_id TEXT REFERENCES forum_replies(id) ON DELETE SET NULL,
+          body_md TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'hidden', 'deleted')),
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        ) STRICT;
+        CREATE TABLE IF NOT EXISTS forum_post_likes (
+          post_id TEXT NOT NULL REFERENCES forum_posts(id) ON DELETE CASCADE,
+          user_id TEXT NOT NULL REFERENCES community_users(id) ON DELETE CASCADE,
+          created_at TEXT NOT NULL,
+          PRIMARY KEY (post_id, user_id)
+        ) STRICT;
+        CREATE TABLE IF NOT EXISTS forum_reply_likes (
+          reply_id TEXT NOT NULL REFERENCES forum_replies(id) ON DELETE CASCADE,
+          user_id TEXT NOT NULL REFERENCES community_users(id) ON DELETE CASCADE,
+          created_at TEXT NOT NULL,
+          PRIMARY KEY (reply_id, user_id)
+        ) STRICT;
+        CREATE TABLE IF NOT EXISTS community_audit (
+          id INTEGER PRIMARY KEY,
+          actor_type TEXT NOT NULL CHECK (actor_type IN ('admin', 'user', 'system')),
+          actor_id TEXT NOT NULL DEFAULT '',
+          action TEXT NOT NULL,
+          target_type TEXT NOT NULL,
+          target_id TEXT NOT NULL DEFAULT '',
+          detail TEXT NOT NULL DEFAULT '',
+          created_at TEXT NOT NULL
+        ) STRICT;
+        CREATE INDEX IF NOT EXISTS idx_community_users_status_created ON community_users(status, created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_community_sessions_user ON community_sessions(user_id, expires_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_community_sessions_expiry ON community_sessions(expires_at);
+        CREATE INDEX IF NOT EXISTS idx_article_comments_path_created ON article_comments(article_path, created_at);
+        CREATE INDEX IF NOT EXISTS idx_article_comments_user ON article_comments(user_id, created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_forum_posts_category_activity ON forum_posts(category_id, last_activity_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_forum_posts_user ON forum_posts(user_id, created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_forum_replies_post_created ON forum_replies(post_id, created_at);
+        CREATE INDEX IF NOT EXISTS idx_forum_replies_user ON forum_replies(user_id, created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_community_audit_created ON community_audit(created_at DESC);
+        PRAGMA user_version = 5;
+        COMMIT;
+      `)
+    }
+  }
+
+  seedCommunityIfEmpty() {
+    const categories = [
+      ['ai', '企业 AI', '讨论企业 AI 场景、RAG、Agent、模型治理与落地。'],
+      ['engineering', '技术实践', '分享工程实现、架构设计、工具链和排障经验。'],
+      ['cooperation', '商业合作', '发布合作需求、资源对接、解决方案和项目讨论。'],
+      ['chat', '交流广场', '开放交流、经验分享与社区建议。']
+    ]
+    const insert = this.database.prepare('INSERT OR IGNORE INTO forum_categories (id, name, description, sort_order, created_at) VALUES (?, ?, ?, ?, ?)')
+    const now = new Date().toISOString()
+    categories.forEach((category, index) => insert.run(category[0], category[1], category[2], index, now))
   }
 
   seedIfEmpty() {
@@ -377,6 +497,9 @@ export class PortalDatabase {
       knowledgeRevision: this.getKnowledgeRevision(),
       aiEnabled: Boolean(this.database.prepare('SELECT enabled FROM ai_settings WHERE id = 1').get()?.enabled),
       ragQueryCount: Number(this.database.prepare('SELECT COUNT(*) AS count FROM rag_queries').get().count),
+      communityUserCount: Number(this.database.prepare('SELECT COUNT(*) AS count FROM community_users').get().count),
+      forumPostCount: Number(this.database.prepare("SELECT COUNT(*) AS count FROM forum_posts WHERE status IN ('active', 'locked')").get().count),
+      articleCommentCount: Number(this.database.prepare("SELECT COUNT(*) AS count FROM article_comments WHERE status = 'active'").get().count),
       journalMode: this.database.prepare('PRAGMA journal_mode').get().journal_mode
     }
   }
@@ -573,6 +696,387 @@ export class PortalDatabase {
       },
       recent
     }
+  }
+
+  mapCommunityUser(row, { includePrivate = false } = {}) {
+    if (!row) return null
+    const user = {
+      id: row.id, username: row.username, displayName: row.display_name, role: row.role,
+      status: row.status, bio: row.bio || '', createdAt: row.created_at,
+      updatedAt: row.updated_at, lastLoginAt: row.last_login_at || ''
+    }
+    if (includePrivate) {
+      user.email = row.email
+      user.passwordHash = row.password_hash
+      user.termsAcceptedAt = row.terms_accepted_at
+    }
+    return user
+  }
+
+  createCommunityUser({ id, username, email, displayName, passwordHash }) {
+    const now = new Date().toISOString()
+    this.database.prepare(`
+      INSERT INTO community_users (
+        id, username, email, display_name, password_hash, role, status, bio,
+        terms_accepted_at, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, 'member', 'active', '', ?, ?, ?)
+    `).run(id, username, email, displayName, passwordHash, now, now, now)
+    this.recordCommunityAudit({ actorType: 'user', actorId: id, action: 'register', targetType: 'user', targetId: id })
+    return this.getCommunityUserById(id)
+  }
+
+  getCommunityUserById(id, { includePrivate = false } = {}) {
+    return this.mapCommunityUser(this.database.prepare('SELECT * FROM community_users WHERE id = ?').get(id), { includePrivate })
+  }
+
+  getCommunityUserByIdentity(identity, { includePrivate = true } = {}) {
+    return this.mapCommunityUser(this.database.prepare('SELECT * FROM community_users WHERE username = ? COLLATE NOCASE OR email = ? COLLATE NOCASE').get(identity, identity), { includePrivate })
+  }
+
+  updateCommunityLastLogin(userId) {
+    const now = new Date().toISOString()
+    this.database.prepare('UPDATE community_users SET last_login_at = ?, updated_at = ? WHERE id = ?').run(now, now, userId)
+  }
+
+  updateCommunityProfile(userId, { displayName, bio }) {
+    const now = new Date().toISOString()
+    this.database.prepare('UPDATE community_users SET display_name = ?, bio = ?, updated_at = ? WHERE id = ?')
+      .run(displayName, bio, now, userId)
+    this.recordCommunityAudit({ actorType: 'user', actorId: userId, action: 'update_profile', targetType: 'user', targetId: userId })
+    return this.getCommunityUserById(userId, { includePrivate: true })
+  }
+
+  updateCommunityPassword(userId, passwordHash) {
+    this.database.prepare('UPDATE community_users SET password_hash = ?, updated_at = ? WHERE id = ?')
+      .run(passwordHash, new Date().toISOString(), userId)
+    this.recordCommunityAudit({ actorType: 'user', actorId: userId, action: 'change_password', targetType: 'user', targetId: userId })
+  }
+
+  createCommunitySession({ tokenHash, userId, ipHash = '', userAgentHash = '', expiresAt }) {
+    const now = new Date().toISOString()
+    this.database.prepare(`
+      INSERT INTO community_sessions (token_hash, user_id, ip_hash, user_agent_hash, created_at, last_seen_at, expires_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(tokenHash, userId, ipHash, userAgentHash, now, now, expiresAt)
+  }
+
+  getCommunitySession(tokenHash) {
+    const row = this.database.prepare(`
+      SELECT s.token_hash, s.expires_at, s.last_seen_at,
+             u.id, u.username, u.email, u.display_name, u.password_hash, u.role, u.status,
+             u.bio, u.terms_accepted_at, u.created_at, u.updated_at, u.last_login_at
+      FROM community_sessions s
+      JOIN community_users u ON u.id = s.user_id
+      WHERE s.token_hash = ? AND s.expires_at > ?
+    `).get(tokenHash, new Date().toISOString())
+    if (!row) return null
+    const lastSeen = Date.parse(row.last_seen_at)
+    if (!Number.isFinite(lastSeen) || lastSeen < Date.now() - 5 * 60 * 1000) {
+      this.database.prepare('UPDATE community_sessions SET last_seen_at = ? WHERE token_hash = ?')
+        .run(new Date().toISOString(), tokenHash)
+    }
+    return { tokenHash: row.token_hash, expiresAt: row.expires_at, user: this.mapCommunityUser(row, { includePrivate: true }) }
+  }
+
+  deleteCommunitySession(tokenHash) {
+    return Number(this.database.prepare('DELETE FROM community_sessions WHERE token_hash = ?').run(tokenHash).changes) > 0
+  }
+
+  deleteCommunitySessions(userId, exceptTokenHash = '') {
+    if (exceptTokenHash) return Number(this.database.prepare('DELETE FROM community_sessions WHERE user_id = ? AND token_hash <> ?').run(userId, exceptTokenHash).changes)
+    return Number(this.database.prepare('DELETE FROM community_sessions WHERE user_id = ?').run(userId).changes)
+  }
+
+  pruneCommunitySessions() {
+    return Number(this.database.prepare('DELETE FROM community_sessions WHERE expires_at <= ?').run(new Date().toISOString()).changes)
+  }
+
+  listCommunityUsers({ search = '', limit = 100 } = {}) {
+    const safeLimit = Math.max(1, Math.min(Number(limit) || 100, 500))
+    const term = `%${String(search).trim().slice(0, 100)}%`
+    return this.database.prepare(`
+      SELECT u.*,
+        (SELECT COUNT(*) FROM article_comments c WHERE c.user_id = u.id AND c.status = 'active') AS comment_count,
+        (SELECT COUNT(*) FROM forum_posts p WHERE p.user_id = u.id AND p.status IN ('active', 'locked')) AS post_count,
+        (SELECT COUNT(*) FROM forum_replies r WHERE r.user_id = u.id AND r.status = 'active') AS reply_count
+      FROM community_users u
+      WHERE (? = '%%' OR u.username LIKE ? COLLATE NOCASE OR u.email LIKE ? COLLATE NOCASE OR u.display_name LIKE ? COLLATE NOCASE)
+      ORDER BY u.created_at DESC LIMIT ?
+    `).all(term, term, term, term, safeLimit).map(row => ({
+      ...this.mapCommunityUser(row, { includePrivate: true }),
+      commentCount: Number(row.comment_count), postCount: Number(row.post_count), replyCount: Number(row.reply_count)
+    }))
+  }
+
+  updateCommunityUserByAdmin(userId, { role, status }, actor = 'admin') {
+    if (!['member', 'moderator'].includes(role) || !['active', 'suspended'].includes(status)) throw new Error('用户角色或状态无效。')
+    const result = this.database.prepare('UPDATE community_users SET role = ?, status = ?, updated_at = ? WHERE id = ?')
+      .run(role, status, new Date().toISOString(), userId)
+    if (!result.changes) throw new Error('用户不存在。')
+    if (status === 'suspended') this.deleteCommunitySessions(userId)
+    this.recordCommunityAudit({ actorType: 'admin', actorId: actor, action: 'update_user', targetType: 'user', targetId: userId, detail: JSON.stringify({ role, status }) })
+    return this.getCommunityUserById(userId, { includePrivate: true })
+  }
+
+  deleteCommunityUserByAdmin(userId, actor = 'admin') {
+    const user = this.getCommunityUserById(userId, { includePrivate: true })
+    if (!user) throw new Error('用户不存在。')
+    this.recordCommunityAudit({ actorType: 'admin', actorId: actor, action: 'delete_user', targetType: 'user', targetId: userId, detail: user.username })
+    this.database.prepare('DELETE FROM community_users WHERE id = ?').run(userId)
+    return user
+  }
+
+  listArticleComments(articlePath, viewerUserId = '') {
+    return this.database.prepare(`
+      SELECT c.id, c.article_path, c.parent_id, c.body_md, c.status, c.created_at, c.updated_at,
+             u.id AS user_id, u.username, u.display_name, u.role,
+             (SELECT COUNT(*) FROM article_comment_likes l WHERE l.comment_id = c.id) AS like_count,
+             EXISTS(SELECT 1 FROM article_comment_likes l WHERE l.comment_id = c.id AND l.user_id = ?) AS viewer_liked
+      FROM article_comments c
+      LEFT JOIN community_users u ON u.id = c.user_id
+      WHERE c.article_path = ? AND c.status <> 'hidden'
+      ORDER BY c.created_at ASC
+    `).all(viewerUserId, articlePath).map(row => ({
+      id: row.id, articlePath: row.article_path, parentId: row.parent_id || '',
+      body: row.status === 'deleted' ? '' : row.body_md, status: row.status,
+      createdAt: row.created_at, updatedAt: row.updated_at,
+      author: row.status === 'deleted' || !row.user_id ? null : {
+        id: row.user_id, username: row.username, displayName: row.display_name, role: row.role
+      },
+      likeCount: Number(row.like_count), viewerLiked: Boolean(row.viewer_liked)
+    }))
+  }
+
+  createArticleComment({ id, articlePath, userId, parentId = '', body }) {
+    if (parentId) {
+      const parent = this.database.prepare("SELECT id FROM article_comments WHERE id = ? AND article_path = ? AND status = 'active'").get(parentId, articlePath)
+      if (!parent) throw new Error('要回复的评论不存在或已不可用。')
+    }
+    const now = new Date().toISOString()
+    this.database.prepare(`
+      INSERT INTO article_comments (id, article_path, user_id, parent_id, body_md, status, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, 'active', ?, ?)
+    `).run(id, articlePath, userId, parentId || null, body, now, now)
+    this.recordCommunityAudit({ actorType: 'user', actorId: userId, action: parentId ? 'reply_comment' : 'create_comment', targetType: 'comment', targetId: id, detail: articlePath })
+    return this.database.prepare('SELECT * FROM article_comments WHERE id = ?').get(id)
+  }
+
+  getArticleComment(id) {
+    return this.database.prepare('SELECT * FROM article_comments WHERE id = ?').get(id) || null
+  }
+
+  setArticleCommentStatus(id, status, { actorType = 'user', actorId = '' } = {}) {
+    if (!['active', 'hidden', 'deleted'].includes(status)) throw new Error('评论状态无效。')
+    const result = this.database.prepare('UPDATE article_comments SET status = ?, updated_at = ? WHERE id = ?')
+      .run(status, new Date().toISOString(), id)
+    if (!result.changes) throw new Error('评论不存在。')
+    this.recordCommunityAudit({ actorType, actorId, action: 'set_comment_status', targetType: 'comment', targetId: id, detail: status })
+  }
+
+  toggleArticleCommentLike(commentId, userId) {
+    const comment = this.database.prepare("SELECT id FROM article_comments WHERE id = ? AND status = 'active'").get(commentId)
+    if (!comment) throw new Error('评论不存在或已不可用。')
+    const existing = this.database.prepare('SELECT 1 FROM article_comment_likes WHERE comment_id = ? AND user_id = ?').get(commentId, userId)
+    if (existing) this.database.prepare('DELETE FROM article_comment_likes WHERE comment_id = ? AND user_id = ?').run(commentId, userId)
+    else this.database.prepare('INSERT INTO article_comment_likes (comment_id, user_id, created_at) VALUES (?, ?, ?)').run(commentId, userId, new Date().toISOString())
+    return {
+      liked: !existing,
+      likeCount: Number(this.database.prepare('SELECT COUNT(*) AS count FROM article_comment_likes WHERE comment_id = ?').get(commentId).count)
+    }
+  }
+
+  getForumCategories() {
+    return this.database.prepare(`
+      SELECT c.id, c.name, c.description,
+        (SELECT COUNT(*) FROM forum_posts p WHERE p.category_id = c.id AND p.status IN ('active', 'locked')) AS post_count
+      FROM forum_categories c ORDER BY c.sort_order
+    `).all().map(row => ({ id: row.id, name: row.name, description: row.description, postCount: Number(row.post_count) }))
+  }
+
+  listForumPosts({ categoryId = '', query = '', page = 1, pageSize = 20, viewerUserId = '' } = {}) {
+    const safePage = Math.max(1, Number(page) || 1)
+    const safePageSize = Math.max(1, Math.min(Number(pageSize) || 20, 50))
+    const term = `%${String(query).trim().slice(0, 100)}%`
+    const conditions = ["p.status IN ('active', 'locked')"]
+    const params = []
+    if (categoryId) { conditions.push('p.category_id = ?'); params.push(categoryId) }
+    if (term !== '%%') { conditions.push('(p.title LIKE ? COLLATE NOCASE OR p.body_md LIKE ? COLLATE NOCASE)'); params.push(term, term) }
+    const where = conditions.join(' AND ')
+    const total = Number(this.database.prepare(`SELECT COUNT(*) AS count FROM forum_posts p WHERE ${where}`).get(...params).count)
+    const rows = this.database.prepare(`
+      SELECT p.id, p.category_id, p.title, p.body_md, p.status, p.view_count, p.created_at, p.last_activity_at,
+             c.name AS category_name, u.id AS user_id, u.username, u.display_name, u.role,
+             (SELECT COUNT(*) FROM forum_replies r WHERE r.post_id = p.id AND r.status = 'active') AS reply_count,
+             (SELECT COUNT(*) FROM forum_post_likes l WHERE l.post_id = p.id) AS like_count,
+             EXISTS(SELECT 1 FROM forum_post_likes l WHERE l.post_id = p.id AND l.user_id = ?) AS viewer_liked
+      FROM forum_posts p
+      JOIN forum_categories c ON c.id = p.category_id
+      LEFT JOIN community_users u ON u.id = p.user_id
+      WHERE ${where}
+      ORDER BY p.last_activity_at DESC LIMIT ? OFFSET ?
+    `).all(viewerUserId, ...params, safePageSize, (safePage - 1) * safePageSize)
+    return {
+      page: safePage, pageSize: safePageSize, total,
+      posts: rows.map(row => ({
+        id: row.id, categoryId: row.category_id, categoryName: row.category_name,
+        title: row.title, excerpt: row.body_md.slice(0, 220), status: row.status,
+        viewCount: Number(row.view_count), replyCount: Number(row.reply_count), likeCount: Number(row.like_count), viewerLiked: Boolean(row.viewer_liked),
+        createdAt: row.created_at, lastActivityAt: row.last_activity_at,
+        author: row.user_id ? { id: row.user_id, username: row.username, displayName: row.display_name, role: row.role } : null
+      }))
+    }
+  }
+
+  createForumPost({ id, categoryId, userId, title, body }) {
+    if (!this.database.prepare('SELECT id FROM forum_categories WHERE id = ?').get(categoryId)) throw new Error('论坛板块不存在。')
+    const now = new Date().toISOString()
+    this.database.prepare(`
+      INSERT INTO forum_posts (id, category_id, user_id, title, body_md, status, created_at, updated_at, last_activity_at)
+      VALUES (?, ?, ?, ?, ?, 'active', ?, ?, ?)
+    `).run(id, categoryId, userId, title, body, now, now, now)
+    this.recordCommunityAudit({ actorType: 'user', actorId: userId, action: 'create_post', targetType: 'post', targetId: id, detail: categoryId })
+    return id
+  }
+
+  getForumPost(postId, viewerUserId = '', { incrementView = false } = {}) {
+    if (incrementView) this.database.prepare("UPDATE forum_posts SET view_count = view_count + 1 WHERE id = ? AND status IN ('active', 'locked')").run(postId)
+    const row = this.database.prepare(`
+      SELECT p.*, c.name AS category_name, u.id AS author_id, u.username, u.display_name, u.role,
+             (SELECT COUNT(*) FROM forum_replies r WHERE r.post_id = p.id AND r.status = 'active') AS reply_count,
+             (SELECT COUNT(*) FROM forum_post_likes l WHERE l.post_id = p.id) AS like_count,
+             EXISTS(SELECT 1 FROM forum_post_likes l WHERE l.post_id = p.id AND l.user_id = ?) AS viewer_liked
+      FROM forum_posts p JOIN forum_categories c ON c.id = p.category_id
+      LEFT JOIN community_users u ON u.id = p.user_id
+      WHERE p.id = ? AND p.status IN ('active', 'locked')
+    `).get(viewerUserId, postId)
+    if (!row) return null
+    return {
+      id: row.id, categoryId: row.category_id, categoryName: row.category_name,
+      title: row.title, body: row.body_md, status: row.status, viewCount: Number(row.view_count),
+      replyCount: Number(row.reply_count), likeCount: Number(row.like_count), viewerLiked: Boolean(row.viewer_liked),
+      createdAt: row.created_at, updatedAt: row.updated_at, lastActivityAt: row.last_activity_at,
+      author: row.author_id ? { id: row.author_id, username: row.username, displayName: row.display_name, role: row.role } : null
+    }
+  }
+
+  listForumReplies(postId, viewerUserId = '') {
+    return this.database.prepare(`
+      SELECT r.id, r.post_id, r.parent_id, r.body_md, r.status, r.created_at, r.updated_at,
+             u.id AS user_id, u.username, u.display_name, u.role,
+             (SELECT COUNT(*) FROM forum_reply_likes l WHERE l.reply_id = r.id) AS like_count,
+             EXISTS(SELECT 1 FROM forum_reply_likes l WHERE l.reply_id = r.id AND l.user_id = ?) AS viewer_liked
+      FROM forum_replies r LEFT JOIN community_users u ON u.id = r.user_id
+      WHERE r.post_id = ? AND r.status <> 'hidden' ORDER BY r.created_at ASC
+    `).all(viewerUserId, postId).map(row => ({
+      id: row.id, postId: row.post_id, parentId: row.parent_id || '', body: row.status === 'deleted' ? '' : row.body_md,
+      status: row.status, createdAt: row.created_at, updatedAt: row.updated_at,
+      author: row.status === 'deleted' || !row.user_id ? null : { id: row.user_id, username: row.username, displayName: row.display_name, role: row.role },
+      likeCount: Number(row.like_count), viewerLiked: Boolean(row.viewer_liked)
+    }))
+  }
+
+  createForumReply({ id, postId, userId, parentId = '', body }) {
+    const post = this.database.prepare("SELECT id FROM forum_posts WHERE id = ? AND status = 'active'").get(postId)
+    if (!post) throw new Error('帖子不存在、已锁定或已不可用。')
+    if (parentId && !this.database.prepare("SELECT id FROM forum_replies WHERE id = ? AND post_id = ? AND status = 'active'").get(parentId, postId)) {
+      throw new Error('要回复的内容不存在或已不可用。')
+    }
+    const now = new Date().toISOString()
+    this.database.exec('BEGIN IMMEDIATE')
+    try {
+      this.database.prepare(`
+        INSERT INTO forum_replies (id, post_id, user_id, parent_id, body_md, status, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, 'active', ?, ?)
+      `).run(id, postId, userId, parentId || null, body, now, now)
+      this.database.prepare('UPDATE forum_posts SET last_activity_at = ?, updated_at = ? WHERE id = ?').run(now, now, postId)
+      this.database.exec('COMMIT')
+    } catch (error) {
+      this.database.exec('ROLLBACK')
+      throw error
+    }
+    this.recordCommunityAudit({ actorType: 'user', actorId: userId, action: 'create_reply', targetType: 'reply', targetId: id, detail: postId })
+    return id
+  }
+
+  getForumReply(id) {
+    return this.database.prepare('SELECT * FROM forum_replies WHERE id = ?').get(id) || null
+  }
+
+  getForumPostRecord(id) {
+    return this.database.prepare('SELECT * FROM forum_posts WHERE id = ?').get(id) || null
+  }
+
+  setForumPostStatus(id, status, { actorType = 'user', actorId = '' } = {}) {
+    if (!['active', 'hidden', 'locked', 'deleted'].includes(status)) throw new Error('帖子状态无效。')
+    const result = this.database.prepare('UPDATE forum_posts SET status = ?, updated_at = ? WHERE id = ?').run(status, new Date().toISOString(), id)
+    if (!result.changes) throw new Error('帖子不存在。')
+    this.recordCommunityAudit({ actorType, actorId, action: 'set_post_status', targetType: 'post', targetId: id, detail: status })
+  }
+
+  setForumReplyStatus(id, status, { actorType = 'user', actorId = '' } = {}) {
+    if (!['active', 'hidden', 'deleted'].includes(status)) throw new Error('回复状态无效。')
+    const result = this.database.prepare('UPDATE forum_replies SET status = ?, updated_at = ? WHERE id = ?').run(status, new Date().toISOString(), id)
+    if (!result.changes) throw new Error('回复不存在。')
+    this.recordCommunityAudit({ actorType, actorId, action: 'set_reply_status', targetType: 'reply', targetId: id, detail: status })
+  }
+
+  toggleForumLike(type, targetId, userId) {
+    const config = type === 'post'
+      ? { source: 'forum_posts', likes: 'forum_post_likes', id: 'post_id', states: "('active', 'locked')" }
+      : type === 'reply'
+        ? { source: 'forum_replies', likes: 'forum_reply_likes', id: 'reply_id', states: "('active')" }
+        : null
+    if (!config || !this.database.prepare(`SELECT id FROM ${config.source} WHERE id = ? AND status IN ${config.states}`).get(targetId)) throw new Error('互动目标不存在或已不可用。')
+    const existing = this.database.prepare(`SELECT 1 FROM ${config.likes} WHERE ${config.id} = ? AND user_id = ?`).get(targetId, userId)
+    if (existing) this.database.prepare(`DELETE FROM ${config.likes} WHERE ${config.id} = ? AND user_id = ?`).run(targetId, userId)
+    else this.database.prepare(`INSERT INTO ${config.likes} (${config.id}, user_id, created_at) VALUES (?, ?, ?)`).run(targetId, userId, new Date().toISOString())
+    return {
+      liked: !existing,
+      likeCount: Number(this.database.prepare(`SELECT COUNT(*) AS count FROM ${config.likes} WHERE ${config.id} = ?`).get(targetId).count)
+    }
+  }
+
+  getCommunityStats() {
+    const count = (table, where = '') => Number(this.database.prepare(`SELECT COUNT(*) AS count FROM ${table} ${where}`).get().count)
+    return {
+      users: count('community_users'), activeUsers: count('community_users', "WHERE status = 'active'"),
+      suspendedUsers: count('community_users', "WHERE status = 'suspended'"),
+      comments: count('article_comments', "WHERE status = 'active'"),
+      posts: count('forum_posts', "WHERE status IN ('active', 'locked')"),
+      replies: count('forum_replies', "WHERE status = 'active'"),
+      hiddenContent: count('article_comments', "WHERE status = 'hidden'") + count('forum_posts', "WHERE status = 'hidden'") + count('forum_replies', "WHERE status = 'hidden'")
+    }
+  }
+
+  getModerationItems(limit = 100) {
+    const safeLimit = Math.max(1, Math.min(Number(limit) || 100, 300))
+    const comments = this.database.prepare(`
+      SELECT c.id, 'comment' AS type, c.body_md AS content, c.status, c.created_at, c.article_path AS context,
+             u.username, u.display_name FROM article_comments c LEFT JOIN community_users u ON u.id = c.user_id
+      ORDER BY c.created_at DESC LIMIT ?
+    `).all(safeLimit)
+    const posts = this.database.prepare(`
+      SELECT p.id, 'post' AS type, p.title || char(10) || p.body_md AS content, p.status, p.created_at, p.category_id AS context,
+             u.username, u.display_name FROM forum_posts p LEFT JOIN community_users u ON u.id = p.user_id
+      ORDER BY p.created_at DESC LIMIT ?
+    `).all(safeLimit)
+    const replies = this.database.prepare(`
+      SELECT r.id, 'reply' AS type, r.body_md AS content, r.status, r.created_at, r.post_id AS context,
+             u.username, u.display_name FROM forum_replies r LEFT JOIN community_users u ON u.id = r.user_id
+      ORDER BY r.created_at DESC LIMIT ?
+    `).all(safeLimit)
+    return [...comments, ...posts, ...replies]
+      .sort((left, right) => right.created_at.localeCompare(left.created_at))
+      .slice(0, safeLimit)
+      .map(row => ({ id: row.id, type: row.type, content: row.content.slice(0, 500), status: row.status, createdAt: row.created_at,
+        context: row.context, author: row.display_name || row.username || '已注销用户' }))
+  }
+
+  recordCommunityAudit({ actorType, actorId = '', action, targetType, targetId = '', detail = '' }) {
+    this.database.prepare(`
+      INSERT INTO community_audit (actor_type, actor_id, action, target_type, target_id, detail, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(actorType, String(actorId).slice(0, 100), String(action).slice(0, 100), String(targetType).slice(0, 100), String(targetId).slice(0, 100), String(detail).slice(0, 1000), new Date().toISOString())
   }
 
   replaceInsideTransaction(cases, revision, actor) {

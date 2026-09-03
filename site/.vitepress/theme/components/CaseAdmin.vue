@@ -223,7 +223,7 @@ onMounted(loadCases)
         <h1>案例配置管理</h1>
         <p>此页面通过服务端账号验证。公开案例页只能查看，无法新增、修改或删除配置。</p>
       </div>
-      <div class="site-admin__links"><a :href="withBase('/cases')" target="_blank" rel="noopener">查看公开案例页 ↗</a><a :href="withBase('/admin/site')">站点内容管理 →</a><a :href="withBase('/admin/knowledge')">知识与 AI →</a></div>
+      <div class="site-admin__links"><a :href="withBase('/cases')" target="_blank" rel="noopener">查看公开案例页 ↗</a><a :href="withBase('/admin/site')">站点内容管理 →</a><a :href="withBase('/admin/knowledge')">知识与 AI →</a><a :href="withBase('/admin/users')">用户与社区 →</a></div>
     </header>
 
     <div v-if="state === 'loading'" class="case-admin-state">正在连接管理服务…</div>

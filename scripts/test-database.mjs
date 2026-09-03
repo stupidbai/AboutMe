@@ -36,8 +36,8 @@ try {
   if (savedKnowledge.revision !== 2 || !savedKnowledge.entries[0].summary.endsWith('数据库测试。')) throw new Error('知识库更新事务失败。')
 
   const initialAi = database.getAiSettings()
-  if (database.getHealth().schemaVersion !== 4 || initialAi.dailyLimit !== 200 || initialAi.allowPrivateNetwork !== false) {
-    throw new Error('数据库 v4 或 AI 安全默认值迁移失败。')
+  if (database.getHealth().schemaVersion !== 5 || initialAi.dailyLimit !== 200 || initialAi.allowPrivateNetwork !== false) {
+    throw new Error('数据库 v5 或 AI 安全默认值迁移失败。')
   }
   const savedAi = await database.replaceAiSettings({
     ...initialAi, apiKey: 'test-secret-api-key', apiKeySet: undefined, clearApiKey: false,
@@ -56,6 +56,21 @@ try {
   if (ragStats.summary.total !== 1 || ragStats.summary.helpful !== 1 || ragStats.recent[0]?.question !== '知识库如何配置？') {
     throw new Error('RAG 统计聚合失败。')
   }
+
+  const userId = '111111111111111111111111'
+  const commentId = '222222222222222222222222'
+  const postId = '333333333333333333333333'
+  const replyId = '444444444444444444444444'
+  database.createCommunityUser({ id: userId, username: 'database_user', email: 'database@example.com', displayName: '数据库用户', passwordHash: 'test-hash' })
+  database.createCommunitySession({ tokenHash: 'session-hash', userId, expiresAt: new Date(Date.now() + 60_000).toISOString() })
+  if (database.getCommunitySession('session-hash')?.user.id !== userId || database.getForumCategories().length !== 4) throw new Error('用户会话或论坛板块初始化失败。')
+  database.createArticleComment({ id: commentId, articlePath: '/kb/blog/test', userId, body: '数据库评论' })
+  if (!database.toggleArticleCommentLike(commentId, userId).liked || database.listArticleComments('/kb/blog/test', userId)[0]?.likeCount !== 1) throw new Error('文章评论或点赞事务失败。')
+  database.createForumPost({ id: postId, categoryId: 'ai', userId, title: '数据库论坛测试', body: '这是用于验证数据库论坛功能的正文。' })
+  database.createForumReply({ id: replyId, postId, userId, body: '数据库论坛回复' })
+  if (!database.toggleForumLike('post', postId, userId).liked || database.getForumPost(postId, userId)?.replyCount !== 1) throw new Error('论坛发帖、回复或点赞事务失败。')
+  const communityStats = database.getCommunityStats()
+  if (communityStats.users !== 1 || communityStats.comments !== 1 || communityStats.posts !== 1 || communityStats.replies !== 1) throw new Error('社区统计聚合失败。')
 
   const changedSiteConfig = structuredClone(initialSite.config)
   changedSiteConfig.identity.city = '上海 / 徐州 / 自动化测试'
@@ -79,6 +94,9 @@ try {
   if (database.getKnowledgeSnapshot().revision !== 2 || database.getAiSettings().revision !== 2) {
     throw new Error('知识库或 AI 配置重启后未持久化。')
   }
+  if (database.getCommunityStats().users !== 1 || database.getForumPost(postId)?.replyCount !== 1) {
+    throw new Error('用户、评论或论坛数据重启后未持久化。')
+  }
 
   const restored = await database.replaceCases(seedCases, { expectedRevision: reopened.revision, actor: 'database-test' })
   if (restored.revision !== 3 || restored.cases.length !== seedCases.length) {
@@ -94,6 +112,7 @@ try {
   console.log('Knowledge configuration persistence: verified')
   console.log('Encrypted AI configuration persistence: verified')
   console.log('RAG query statistics and feedback persistence: verified')
+  console.log('Community users, sessions, comments, likes and forum persistence: verified')
 } finally {
   database?.close()
   rmSync(dataDir, { recursive: true, force: true })

@@ -1,7 +1,7 @@
 import DefaultTheme from 'vitepress/theme'
 import type { Theme } from 'vitepress'
 import { h } from 'vue'
-import { useData } from 'vitepress'
+import { useData, useRoute } from 'vitepress'
 import HomePortal from './components/HomePortal.vue'
 import ProfileTimeline from './components/ProfileTimeline.vue'
 import CaseGrid from './components/CaseGrid.vue'
@@ -15,13 +15,22 @@ import KnowledgeLibrary from './components/KnowledgeLibrary.vue'
 import ImportedKnowledge from './components/ImportedKnowledge.vue'
 import RagAssistant from './components/RagAssistant.vue'
 import KnowledgeAdmin from './components/KnowledgeAdmin.vue'
+import CommunityAccount from './components/CommunityAccount.vue'
+import ArticleComments from './components/ArticleComments.vue'
+import ForumBoard from './components/ForumBoard.vue'
+import UserAdmin from './components/UserAdmin.vue'
 import './styles.css'
 
 export default {
   extends: DefaultTheme,
   Layout: () => {
     const { frontmatter } = useData()
-    return h('div', { class: frontmatter.value.layoutClass || undefined }, [h(DefaultTheme.Layout)])
+    const route = useRoute()
+    return h('div', { class: frontmatter.value.layoutClass || undefined }, [
+      h(DefaultTheme.Layout, null, {
+        'doc-after': () => route.path.startsWith('/kb/') ? h(ArticleComments) : null
+      })
+    ])
   },
   enhanceApp({ app }) {
     app.component('HomePortal', HomePortal)
@@ -37,5 +46,8 @@ export default {
     app.component('ImportedKnowledge', ImportedKnowledge)
     app.component('RagAssistant', RagAssistant)
     app.component('KnowledgeAdmin', KnowledgeAdmin)
+    app.component('CommunityAccount', CommunityAccount)
+    app.component('ForumBoard', ForumBoard)
+    app.component('UserAdmin', UserAdmin)
   }
 } satisfies Theme

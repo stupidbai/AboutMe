@@ -49,6 +49,7 @@ if [ ! -f "$env_file" ] || [ "$force_config" = "1" ]; then
     echo "CASE_DATA_DIR=data"
     echo "CASE_BACKUP_LIMIT=10"
     echo "CASE_SESSION_HOURS=8"
+    echo "COMMUNITY_SESSION_DAYS=30"
     echo "PORTAL_ENCRYPTION_KEY=$encryption_key"
   } > "$env_file"
   chmod 600 "$env_file"
@@ -59,4 +60,5 @@ echo
 echo "Bai Yunfei portal installed."
 echo "Install directory: $install_dir"
 echo "Knowledge and AI admin: http://127.0.0.1:$port/admin/knowledge"
+echo "Users and community admin: http://127.0.0.1:$port/admin/users"
 echo "Start command: $install_dir/bin/start-linux.sh"

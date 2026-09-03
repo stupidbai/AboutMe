@@ -42,6 +42,8 @@ export default defineConfig({
       { text: '案例', link: '/cases' },
       { text: '主题地图', link: '/insights' },
       { text: '知识库', link: '/knowledge' },
+      { text: '论坛', link: '/forum' },
+      { text: '账号', link: '/account' },
       { text: '生活', link: '/life' },
       { text: '联系', link: '/contact' }
     ],

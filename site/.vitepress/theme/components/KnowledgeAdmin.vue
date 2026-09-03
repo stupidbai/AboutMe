@@ -144,7 +144,7 @@ onMounted(load)
 
 <template>
   <section class="case-admin knowledge-admin">
-    <header class="case-admin__hero"><div><span>KNOWLEDGE CMS · RAG</span><h1>知识库与 AI 管理</h1><p>管理公开知识条目，并配置 OpenAI 兼容接口。API Key 由服务端加密保存，不会发送到公开页面。</p></div><div class="site-admin__links"><a :href="withBase('/knowledge')" target="_blank">查看知识库 ↗</a><a :href="withBase('/admin/site')">站点管理 →</a><a :href="withBase('/admin/cases')">案例管理 →</a></div></header>
+    <header class="case-admin__hero"><div><span>KNOWLEDGE CMS · RAG</span><h1>知识库与 AI 管理</h1><p>管理公开知识条目，并配置 OpenAI 兼容接口。API Key 由服务端加密保存，不会发送到公开页面。</p></div><div class="site-admin__links"><a :href="withBase('/knowledge')" target="_blank">查看知识库 ↗</a><a :href="withBase('/admin/site')">站点管理 →</a><a :href="withBase('/admin/cases')">案例管理 →</a><a :href="withBase('/admin/users')">用户与社区 →</a></div></header>
     <div v-if="state === 'loading'" class="case-admin-state">正在连接管理服务…</div>
     <div v-else-if="state === 'unavailable'" class="case-admin-state case-admin-state--warning"><h2>管理服务未启动</h2><p>请运行 <code>npm run admin</code> 后刷新。</p><button @click="load">重新连接</button></div>
     <form v-else-if="state === 'login'" class="case-admin-login" @submit.prevent="login"><h2>管理员登录</h2><label><span>账号</span><input v-model="username" autocomplete="username" required></label><label><span>密码</span><input v-model="password" type="password" autocomplete="current-password" required></label><p v-if="error" class="case-admin-feedback case-admin-feedback--error">{{ error }}</p><button :disabled="busy === 'login'">{{ busy === 'login' ? '登录中…' : '登录管理后台' }}</button></form>

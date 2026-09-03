@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { chmodSync, copyFileSync, lstatSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
-import { basename, resolve, sep } from 'node:path'
+import { basename, relative, resolve, sep } from 'node:path'
 import { spawnSync } from 'node:child_process'
 
 const root = resolve(import.meta.dirname, '..')
@@ -31,7 +31,7 @@ const copyEntries = [
   ['scripts/knowledge-schema.mjs', 'scripts/knowledge-schema.mjs'],
   ['scripts/rag-service.mjs', 'scripts/rag-service.mjs'],
   ['scripts/network-security.mjs', 'scripts/network-security.mjs'],
-  ['node_modules/minisearch', 'node_modules/minisearch'],
+  ['scripts/community-service.mjs', 'scripts/community-service.mjs'],
   ['install', 'install'],
   ['bin', 'bin'],
   ['THIRD_PARTY_NOTICES.md', 'THIRD_PARTY_NOTICES.md'],
@@ -53,6 +53,17 @@ for (const [source, destination] of copyEntries) {
   copyTree(resolve(root, source), target)
 }
 
+const lock = JSON.parse(readFileSync(resolve(root, 'package-lock.json'), 'utf8'))
+const dependencyPaths = Object.entries(lock.packages || {})
+  .filter(([path, metadata]) => path.startsWith('node_modules/') && !metadata.dev)
+  .map(([path]) => path)
+for (const dependencyPath of dependencyPaths) {
+  const source = resolve(root, dependencyPath)
+  const destination = resolve(staging, relative(root, source))
+  if (!destination.startsWith(resolve(staging, 'node_modules') + sep)) throw new Error('生产依赖路径超出 node_modules：' + source)
+  copyTree(source, destination)
+}
+
 writeFileSync(resolve(staging, 'package.json'), JSON.stringify({
   name: 'bai-yunfei-portal-runtime',
   version,
@@ -61,9 +72,7 @@ writeFileSync(resolve(staging, 'package.json'), JSON.stringify({
   scripts: {
     start: 'node scripts/serve-with-admin.mjs'
   },
-  dependencies: {
-    minisearch: '7.2.0'
-  },
+  dependencies: packageMetadata.dependencies,
   engines: {
     node: '>=22.16'
   }

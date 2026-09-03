@@ -1,6 +1,6 @@
 {
   "name": "bai-yunfei-resume",
-  "version": "3.9.0",
+  "version": "4.0.0",
   "private": true,
   "description": "白云飞企业 AI 合作、项目案例与个人知识门户",
   "type": "module",
@@ -14,8 +14,9 @@
     "admin:serve": "node scripts/serve-with-admin.mjs",
     "test:database": "node scripts/test-database.mjs",
     "test:rag": "node scripts/test-rag-service.mjs",
+    "test:community": "node scripts/test-community-service.mjs",
     "test:admin": "node scripts/test-admin-api.mjs",
-    "check": "node scripts/verify-portal.mjs && npm run build && npm run test:database && npm run test:rag && npm run test:admin",
+    "check": "node scripts/verify-portal.mjs && npm run build && npm run test:community && npm run test:database && npm run test:rag && npm run test:admin",
     "package:release": "npm run check && node scripts/build-release.mjs"
   },
   "devDependencies": {
@@ -26,6 +27,9 @@
   },
   "packageManager": "npm@11.12.1",
   "dependencies": {
-    "minisearch": "^7.2.0"
+    "@noble/hashes": "^2.4.0",
+    "marked": "^18.0.11",
+    "minisearch": "^7.2.0",
+    "sanitize-html": "^2.17.7"
   }
 }

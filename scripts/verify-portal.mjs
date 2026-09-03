@@ -10,6 +10,9 @@ const requiredFiles = [
   'site/admin/cases.md',
   'site/admin/site.md',
   'site/admin/knowledge.md',
+  'site/admin/users.md',
+  'site/account.md',
+  'site/forum.md',
   'site/insights.md',
   'site/knowledge.md',
   'site/knowledge/archive.md',
@@ -24,6 +27,11 @@ const requiredFiles = [
   'site/.vitepress/theme/components/CooperationContent.vue',
   'site/.vitepress/theme/components/KnowledgeAdmin.vue',
   'site/.vitepress/theme/components/RagAssistant.vue',
+  'site/.vitepress/theme/components/CommunityAccount.vue',
+  'site/.vitepress/theme/components/ArticleComments.vue',
+  'site/.vitepress/theme/components/ForumBoard.vue',
+  'site/.vitepress/theme/components/UserAdmin.vue',
+  'site/.vitepress/theme/useCommunityAuth.ts',
   'site/.vitepress/theme/useSiteConfig.ts',
   'site/data/siteConfig.ts',
   'site/data/portal.ts',
@@ -43,6 +51,8 @@ const requiredFiles = [
   'scripts/knowledge-schema.mjs',
   'scripts/rag-service.mjs',
   'scripts/network-security.mjs',
+  'scripts/community-service.mjs',
+  'scripts/test-community-service.mjs',
   'scripts/test-rag-service.mjs',
   'scripts/test-database.mjs',
   'scripts/test-admin-api.mjs',
@@ -72,6 +82,11 @@ const caseAdminSource = readFileSync(resolve(root, 'site/.vitepress/theme/compon
 const siteAdminSource = readFileSync(resolve(root, 'site/.vitepress/theme/components/SiteAdmin.vue'), 'utf8')
 const knowledgeAdminSource = readFileSync(resolve(root, 'site/.vitepress/theme/components/KnowledgeAdmin.vue'), 'utf8')
 const ragAssistantSource = readFileSync(resolve(root, 'site/.vitepress/theme/components/RagAssistant.vue'), 'utf8')
+const accountSource = readFileSync(resolve(root, 'site/.vitepress/theme/components/CommunityAccount.vue'), 'utf8')
+const commentsSource = readFileSync(resolve(root, 'site/.vitepress/theme/components/ArticleComments.vue'), 'utf8')
+const forumSource = readFileSync(resolve(root, 'site/.vitepress/theme/components/ForumBoard.vue'), 'utf8')
+const userAdminSource = readFileSync(resolve(root, 'site/.vitepress/theme/components/UserAdmin.vue'), 'utf8')
+const communityServiceSource = readFileSync(resolve(root, 'scripts/community-service.mjs'), 'utf8')
 const ragServiceSource = readFileSync(resolve(root, 'scripts/rag-service.mjs'), 'utf8')
 const networkSecuritySource = readFileSync(resolve(root, 'scripts/network-security.mjs'), 'utf8')
 const adminServerSource = readFileSync(resolve(root, 'scripts/serve-with-admin.mjs'), 'utf8')
@@ -159,6 +174,19 @@ if (missingKnowledgeAdminAnchors.length) throw new Error(`Missing knowledge admi
 if (!ragAssistantSource.includes('/api/rag/query') || !ragAssistantSource.includes('/api/rag/feedback') || !ragAssistantSource.includes('引用的本地资料')) {
   throw new Error('RAG assistant must call the protected server endpoint and show local citations')
 }
+const requiredCommunityUiAnchors = [
+  [accountSource, ['/api/auth/register', '/api/auth/login', '/api/auth/profile', '/api/auth/password']],
+  [commentsSource, ['/api/comments', '/like', '注册或登录']],
+  [forumSource, ['/api/forum/categories', '/api/forum/posts', '/replies', '/like']],
+  [userAdminSource, ['/api/admin/users', '/api/admin/moderation', '/api/admin/community/stats']]
+]
+for (const [source, anchors] of requiredCommunityUiAnchors) {
+  const missing = anchors.filter(anchor => !source.includes(anchor))
+  if (missing.length) throw new Error(`Missing community UI behavior: ${missing.join(', ')}`)
+}
+if (!communityServiceSource.includes("from '@noble/hashes/scrypt.js'") || !communityServiceSource.includes("from 'marked'") || !communityServiceSource.includes("from 'sanitize-html'") || !communityServiceSource.includes('allowedSchemes')) {
+  throw new Error('Community passwords and user content must reuse audited cryptography, Markdown and HTML sanitization packages')
+}
 
 const requiredServerAnchors = [
   'CASE_ADMIN_PASSWORD',
@@ -177,6 +205,12 @@ const requiredServerAnchors = [
   '/api/admin/security-status',
   '/api/admin/export',
   '/api/rag/feedback',
+  '/api/auth/register',
+  '/api/auth/login',
+  '/api/comments',
+  '/api/forum/posts',
+  '/api/admin/users',
+  '/api/admin/moderation',
   'config/cases.json',
   '/api/health',
   'PortalDatabase',
@@ -205,6 +239,11 @@ const requiredDatabaseAnchors = [
   'CREATE TABLE IF NOT EXISTS knowledge_takeaways',
   'CREATE TABLE IF NOT EXISTS ai_settings',
   'CREATE TABLE IF NOT EXISTS rag_queries',
+  'CREATE TABLE IF NOT EXISTS community_users',
+  'CREATE TABLE IF NOT EXISTS community_sessions',
+  'CREATE TABLE IF NOT EXISTS article_comments',
+  'CREATE TABLE IF NOT EXISTS forum_posts',
+  'CREATE TABLE IF NOT EXISTS forum_replies',
   "createCipheriv('aes-256-gcm'",
   'CREATE INDEX IF NOT EXISTS',
   'await backup',
@@ -221,7 +260,7 @@ if (missingDockerAnchors.length) throw new Error(`Missing Docker behavior: ${mis
 if (!composeSource.includes('portal-data:/data') || !composeSource.includes('read_only: true') || !composeSource.includes('no-new-privileges:true')) {
   throw new Error('Compose must keep SQLite in a volume and apply container hardening')
 }
-if (packageMetadata.version !== '3.9.0' || packageMetadata.engines?.node !== '>=22.16' || packageMetadata.dependencies?.minisearch !== '^7.2.0') {
+if (packageMetadata.version !== '4.0.0' || packageMetadata.engines?.node !== '>=22.16' || packageMetadata.dependencies?.minisearch !== '^7.2.0' || packageMetadata.dependencies?.['@noble/hashes'] !== '^2.4.0' || packageMetadata.dependencies?.marked !== '^18.0.11' || packageMetadata.dependencies?.['sanitize-html'] !== '^2.17.7') {
   throw new Error('Package version or Node.js SQLite runtime requirement is incorrect')
 }
 if (!ragServiceSource.includes("from 'minisearch'") || !ragServiceSource.includes('new MiniSearch') || !networkSecuritySource.includes('assertSafeOutboundUrl')) {
@@ -332,7 +371,7 @@ const localRefs = [
 const missingAssets = localRefs.filter(ref => !existsSync(resolve(root, 'site/public', ref.slice(1))))
 if (missingAssets.length) throw new Error(`Missing local assets:\n${missingAssets.join('\n')}`)
 
-const pageCount = ['index', 'profile', 'cooperation', 'cases', 'insights', 'knowledge', 'knowledge/archive', 'life', 'contact'].length
+const pageCount = ['index', 'profile', 'cooperation', 'cases', 'insights', 'knowledge', 'knowledge/archive', 'forum', 'account', 'life', 'contact'].length
 console.log(`Content pages: ${pageCount}`)
 console.log(`Case entries: ${cases.length}`)
 console.log(`Configured NAS case links: ${cases.filter(item => item.nasUrl.trim()).length}`)
@@ -345,3 +384,4 @@ console.log(`Imported knowledge pages without external navigation/media: ${impor
 console.log(`Local asset references: ${localRefs.length}`)
 console.log(`Missing local assets: ${missingAssets.length}`)
 console.log('Critical career and contact facts: verified')
+console.log('Visitor, account, comments, forum and user administration: verified')

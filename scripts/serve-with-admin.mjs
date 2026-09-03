@@ -4,6 +4,11 @@ import { createServer } from 'node:http'
 import { extname, join, resolve, sep } from 'node:path'
 import { DatabaseConflictError, PortalDatabase } from './database.mjs'
 import { RagService } from './rag-service.mjs'
+import {
+  contentExcerpt, hashPassword, normalizeArticlePath, publicUser, renderCommunityContent, validateComment,
+  validateForumPost, validateForumReply, validateLogin, validatePasswordChange,
+  validateProfile, validateRegistration, verifyPassword
+} from './community-service.mjs'
 
 const root = resolve(import.meta.dirname, '..')
 const distRoot = resolve(root, 'dist')
@@ -12,9 +17,13 @@ const seedFile = resolve(root, 'config/cases.json')
 const siteConfigSeedFile = resolve(root, 'config/site-config.json')
 const knowledgeSeedFile = resolve(root, 'config/knowledge.json')
 const sessionCookieName = 'case_admin_session'
+const userSessionCookieName = 'portal_user_session'
 const sessions = new Map()
 const loginAttempts = new Map()
 const ragAttempts = new Map()
+const registrationAttempts = new Map()
+const userLoginAttempts = new Map()
+const communityWriteAttempts = new Map()
 
 if (existsSync(envFile)) {
   for (const rawLine of readFileSync(envFile, 'utf8').split(/\r?\n/)) {
@@ -36,6 +45,8 @@ const dataDir = resolve(root, process.env.CASE_DATA_DIR || 'data')
 const backupLimit = Number.parseInt(process.env.CASE_BACKUP_LIMIT || '10', 10)
 const sessionHours = Math.max(1, Math.min(Number.parseInt(process.env.CASE_SESSION_HOURS || '8', 10) || 8, 72))
 const sessionLifetimeMs = sessionHours * 60 * 60 * 1000
+const userSessionDays = Math.max(1, Math.min(Number.parseInt(process.env.COMMUNITY_SESSION_DAYS || '30', 10) || 30, 90))
+const userSessionLifetimeMs = userSessionDays * 24 * 60 * 60 * 1000
 const weakAdminPassword = ['admin123', 'password', '12345678', 'replace-with-at-least-8-characters'].includes(adminPassword.toLowerCase())
 const localOnlyHost = ['127.0.0.1', 'localhost', '::1'].includes(host.toLowerCase())
 
@@ -70,6 +81,7 @@ const portalDatabase = new PortalDatabase({
   backupLimit
 })
 const ragService = new RagService({ distRoot })
+const dummyPasswordHash = await hashPassword('Portal-Dummy-Password-1')
 
 const mimeTypes = {
   '.css': 'text/css; charset=utf-8',
@@ -190,6 +202,91 @@ const clearSessionCookie = request => [
   getProtocol(request) === 'https' ? 'Secure' : ''
 ].filter(Boolean).join('; ')
 
+const communitySessionTokenHash = token => createHash('sha256').update('community|' + token).digest('hex')
+const requestHash = (request, kind) => createHash('sha256')
+  .update(encryption.secret + '|' + kind + '|' + (request.socket.remoteAddress || 'unknown'))
+  .digest('hex')
+
+const createCommunitySession = (request, userId) => {
+  const token = randomBytes(32).toString('hex')
+  const tokenHash = communitySessionTokenHash(token)
+  portalDatabase.createCommunitySession({
+    tokenHash,
+    userId,
+    ipHash: requestHash(request, 'ip'),
+    userAgentHash: createHash('sha256').update(String(request.headers['user-agent'] || '')).digest('hex'),
+    expiresAt: new Date(Date.now() + userSessionLifetimeMs).toISOString()
+  })
+  return { token, tokenHash }
+}
+
+const createCommunitySessionCookie = (request, token) => [
+  userSessionCookieName + '=' + encodeURIComponent(token),
+  'HttpOnly',
+  'SameSite=Lax',
+  'Path=/',
+  'Max-Age=' + Math.floor(userSessionLifetimeMs / 1000),
+  getProtocol(request) === 'https' ? 'Secure' : ''
+].filter(Boolean).join('; ')
+
+const clearCommunitySessionCookie = request => [
+  userSessionCookieName + '=',
+  'HttpOnly',
+  'SameSite=Lax',
+  'Path=/',
+  'Max-Age=0',
+  getProtocol(request) === 'https' ? 'Secure' : ''
+].filter(Boolean).join('; ')
+
+const getCommunitySession = request => {
+  const token = parseCookies(request)[userSessionCookieName]
+  if (!token || !/^[a-f0-9]{64}$/.test(token)) return null
+  const session = portalDatabase.getCommunitySession(communitySessionTokenHash(token))
+  if (!session || session.user.status !== 'active') {
+    if (session) portalDatabase.deleteCommunitySession(session.tokenHash)
+    return null
+  }
+  return session
+}
+
+const publicSessionUser = user => user ? ({ ...publicUser(user), email: user.email }) : null
+const canModerate = session => session?.user?.role === 'moderator'
+
+const checkRateLimit = (store, key, limit, windowMs) => {
+  const now = Date.now()
+  const current = store.get(key)
+  const entry = current?.resetAt > now ? current : { count: 0, resetAt: now + windowMs }
+  if (entry.count >= limit) return { allowed: false, retryAfter: Math.ceil((entry.resetAt - now) / 1000) }
+  entry.count += 1
+  store.set(key, entry)
+  return { allowed: true, retryAfter: 0 }
+}
+
+const requireCommunityUser = (request, response) => {
+  const session = getCommunitySession(request)
+  if (!session) sendJson(response, 401, { error: '请先注册或登录后再参与互动。' })
+  return session
+}
+
+const commentPayload = comment => ({
+  ...comment,
+  bodyHtml: comment.status === 'deleted' ? '' : renderCommunityContent(comment.body),
+  body: undefined
+})
+
+const forumPostPayload = post => ({
+  ...post,
+  excerpt: contentExcerpt(post.excerpt ?? post.body, 220),
+  bodyHtml: post.body === undefined ? undefined : renderCommunityContent(post.body),
+  body: undefined
+})
+
+const forumReplyPayload = reply => ({
+  ...reply,
+  bodyHtml: reply.status === 'deleted' ? '' : renderCommunityContent(reply.body),
+  body: undefined
+})
+
 const serveStatic = (request, response, pathname) => {
   let decoded
   try {
@@ -287,6 +384,226 @@ const handleRequest = async (request, response) => {
       knowledgeEntries: portalDatabase.getHealth().knowledgeCount,
       retrievalEngine: 'MiniSearch 7.2.0'
     })
+    return
+  }
+
+  if (pathname === '/api/auth/session' && request.method === 'GET') {
+    const session = getCommunitySession(request)
+    sendJson(response, 200, { authenticated: Boolean(session), user: publicSessionUser(session?.user), sessionDays: userSessionDays })
+    return
+  }
+
+  if (pathname === '/api/auth/register' && request.method === 'POST') {
+    if (!sameOrigin(request)) { sendJson(response, 403, { error: '请求来源无效。' }); return }
+    const limit = checkRateLimit(registrationAttempts, requestHash(request, 'register'), 5, 60 * 60 * 1000)
+    if (!limit.allowed) { sendJson(response, 429, { error: '注册尝试过多，请稍后再试。' }, { 'retry-after': String(limit.retryAfter) }); return }
+    try {
+      const registration = validateRegistration(await readJsonBody(request, 32 * 1024))
+      const id = randomBytes(12).toString('hex')
+      const user = portalDatabase.createCommunityUser({
+        id, username: registration.username, email: registration.email, displayName: registration.displayName,
+        passwordHash: await hashPassword(registration.password)
+      })
+      const session = createCommunitySession(request, id)
+      sendJson(response, 201, { ok: true, user: publicSessionUser({ ...user, email: registration.email }) }, {
+        'set-cookie': createCommunitySessionCookie(request, session.token)
+      })
+    } catch (error) {
+      const message = String(error.message || '')
+      if (/community_users\.username|UNIQUE constraint failed: community_users\.username/i.test(message)) sendJson(response, 409, { error: '该用户名已被使用。' })
+      else if (/community_users\.email|UNIQUE constraint failed: community_users\.email/i.test(message)) sendJson(response, 409, { error: '该邮箱已注册。' })
+      else sendJson(response, 400, { error: message || '注册失败。' })
+    }
+    return
+  }
+
+  if (pathname === '/api/auth/login' && request.method === 'POST') {
+    if (!sameOrigin(request)) { sendJson(response, 403, { error: '请求来源无效。' }); return }
+    const addressKey = requestHash(request, 'user-login')
+    const limit = checkRateLimit(userLoginAttempts, addressKey, 10, 15 * 60 * 1000)
+    if (!limit.allowed) { sendJson(response, 429, { error: '登录尝试过多，请十五分钟后再试。' }, { 'retry-after': String(limit.retryAfter) }); return }
+    try {
+      const credentials = validateLogin(await readJsonBody(request, 16 * 1024))
+      const user = portalDatabase.getCommunityUserByIdentity(credentials.identity, { includePrivate: true })
+      const valid = await verifyPassword(credentials.password, user?.passwordHash || dummyPasswordHash)
+      if (!user || !valid) { sendJson(response, 401, { error: '账号或密码错误。' }); return }
+      if (user.status !== 'active') { sendJson(response, 403, { error: '账号已被停用，请联系管理员。' }); return }
+      userLoginAttempts.delete(addressKey)
+      portalDatabase.updateCommunityLastLogin(user.id)
+      const session = createCommunitySession(request, user.id)
+      sendJson(response, 200, { ok: true, user: publicSessionUser(user) }, { 'set-cookie': createCommunitySessionCookie(request, session.token) })
+    } catch (error) {
+      sendJson(response, 400, { error: error.message })
+    }
+    return
+  }
+
+  if (pathname === '/api/auth/logout' && request.method === 'POST') {
+    if (!sameOrigin(request)) { sendJson(response, 403, { error: '请求来源无效。' }); return }
+    const token = parseCookies(request)[userSessionCookieName]
+    if (token) portalDatabase.deleteCommunitySession(communitySessionTokenHash(token))
+    sendJson(response, 200, { ok: true }, { 'set-cookie': clearCommunitySessionCookie(request) })
+    return
+  }
+
+  if (pathname === '/api/auth/profile' && request.method === 'PUT') {
+    if (!sameOrigin(request)) { sendJson(response, 403, { error: '请求来源无效。' }); return }
+    const session = requireCommunityUser(request, response)
+    if (!session) return
+    try {
+      const profile = validateProfile(await readJsonBody(request, 16 * 1024))
+      const user = portalDatabase.updateCommunityProfile(session.user.id, profile)
+      sendJson(response, 200, { ok: true, user: publicSessionUser(user) })
+    } catch (error) { sendJson(response, 400, { error: error.message }) }
+    return
+  }
+
+  if (pathname === '/api/auth/password' && request.method === 'PUT') {
+    if (!sameOrigin(request)) { sendJson(response, 403, { error: '请求来源无效。' }); return }
+    const session = requireCommunityUser(request, response)
+    if (!session) return
+    try {
+      const passwords = validatePasswordChange(await readJsonBody(request, 16 * 1024))
+      if (!await verifyPassword(passwords.currentPassword, session.user.passwordHash)) { sendJson(response, 401, { error: '当前密码不正确。' }); return }
+      portalDatabase.updateCommunityPassword(session.user.id, await hashPassword(passwords.newPassword))
+      portalDatabase.deleteCommunitySessions(session.user.id, session.tokenHash)
+      sendJson(response, 200, { ok: true })
+    } catch (error) { sendJson(response, 400, { error: error.message }) }
+    return
+  }
+
+  if (pathname === '/api/comments' && request.method === 'GET') {
+    try {
+      const articlePath = normalizeArticlePath(url.searchParams.get('article') || '')
+      const viewer = getCommunitySession(request)
+      const comments = portalDatabase.listArticleComments(articlePath, viewer?.user.id || '').map(commentPayload)
+      sendJson(response, 200, { articlePath, count: comments.filter(item => item.status === 'active').length, comments })
+    } catch (error) { sendJson(response, 400, { error: error.message }) }
+    return
+  }
+
+  if (pathname === '/api/comments' && request.method === 'POST') {
+    if (!sameOrigin(request)) { sendJson(response, 403, { error: '请求来源无效。' }); return }
+    const session = requireCommunityUser(request, response)
+    if (!session) return
+    const limit = checkRateLimit(communityWriteAttempts, `comment|${session.user.id}`, 20, 10 * 60 * 1000)
+    if (!limit.allowed) { sendJson(response, 429, { error: '评论过于频繁，请稍后再试。' }); return }
+    try {
+      const comment = validateComment(await readJsonBody(request, 32 * 1024))
+      const id = randomBytes(12).toString('hex')
+      portalDatabase.createArticleComment({ id, ...comment, userId: session.user.id })
+      const created = portalDatabase.listArticleComments(comment.articlePath, session.user.id).find(item => item.id === id)
+      sendJson(response, 201, commentPayload(created))
+    } catch (error) { sendJson(response, 400, { error: error.message }) }
+    return
+  }
+
+  const commentLikeMatch = pathname.match(/^\/api\/comments\/([a-f0-9]{24})\/like$/)
+  if (commentLikeMatch && request.method === 'POST') {
+    if (!sameOrigin(request)) { sendJson(response, 403, { error: '请求来源无效。' }); return }
+    const session = requireCommunityUser(request, response)
+    if (!session) return
+    try { sendJson(response, 200, portalDatabase.toggleArticleCommentLike(commentLikeMatch[1], session.user.id)) }
+    catch (error) { sendJson(response, 400, { error: error.message }) }
+    return
+  }
+
+  const commentDeleteMatch = pathname.match(/^\/api\/comments\/([a-f0-9]{24})$/)
+  if (commentDeleteMatch && request.method === 'DELETE') {
+    if (!sameOrigin(request)) { sendJson(response, 403, { error: '请求来源无效。' }); return }
+    const session = requireCommunityUser(request, response)
+    if (!session) return
+    const comment = portalDatabase.getArticleComment(commentDeleteMatch[1])
+    if (!comment) { sendJson(response, 404, { error: '评论不存在。' }); return }
+    if (comment.user_id !== session.user.id && !canModerate(session)) { sendJson(response, 403, { error: '无权删除该评论。' }); return }
+    portalDatabase.setArticleCommentStatus(comment.id, 'deleted', { actorType: 'user', actorId: session.user.id })
+    sendJson(response, 200, { ok: true })
+    return
+  }
+
+  if (pathname === '/api/forum/categories' && request.method === 'GET') {
+    sendJson(response, 200, portalDatabase.getForumCategories())
+    return
+  }
+
+  if (pathname === '/api/forum/posts' && request.method === 'GET') {
+    const viewer = getCommunitySession(request)
+    const result = portalDatabase.listForumPosts({
+      categoryId: String(url.searchParams.get('category') || '').slice(0, 40),
+      query: String(url.searchParams.get('q') || '').slice(0, 100),
+      page: url.searchParams.get('page') || 1,
+      viewerUserId: viewer?.user.id || ''
+    })
+    sendJson(response, 200, { ...result, posts: result.posts.map(forumPostPayload) })
+    return
+  }
+
+  if (pathname === '/api/forum/posts' && request.method === 'POST') {
+    if (!sameOrigin(request)) { sendJson(response, 403, { error: '请求来源无效。' }); return }
+    const session = requireCommunityUser(request, response)
+    if (!session) return
+    const limit = checkRateLimit(communityWriteAttempts, `post|${session.user.id}`, 8, 60 * 60 * 1000)
+    if (!limit.allowed) { sendJson(response, 429, { error: '发帖过于频繁，请稍后再试。' }); return }
+    try {
+      const post = validateForumPost(await readJsonBody(request, 64 * 1024))
+      const id = randomBytes(12).toString('hex')
+      portalDatabase.createForumPost({ id, ...post, userId: session.user.id })
+      sendJson(response, 201, forumPostPayload(portalDatabase.getForumPost(id, session.user.id)))
+    } catch (error) { sendJson(response, 400, { error: error.message }) }
+    return
+  }
+
+  const forumPostMatch = pathname.match(/^\/api\/forum\/posts\/([a-f0-9]{24})$/)
+  if (forumPostMatch && request.method === 'GET') {
+    const viewer = getCommunitySession(request)
+    const post = portalDatabase.getForumPost(forumPostMatch[1], viewer?.user.id || '', { incrementView: true })
+    if (!post) { sendJson(response, 404, { error: '帖子不存在或已不可用。' }); return }
+    sendJson(response, 200, {
+      post: forumPostPayload(post),
+      replies: portalDatabase.listForumReplies(post.id, viewer?.user.id || '').map(forumReplyPayload)
+    })
+    return
+  }
+
+  const forumReplyCreateMatch = pathname.match(/^\/api\/forum\/posts\/([a-f0-9]{24})\/replies$/)
+  if (forumReplyCreateMatch && request.method === 'POST') {
+    if (!sameOrigin(request)) { sendJson(response, 403, { error: '请求来源无效。' }); return }
+    const session = requireCommunityUser(request, response)
+    if (!session) return
+    const limit = checkRateLimit(communityWriteAttempts, `reply|${session.user.id}`, 30, 10 * 60 * 1000)
+    if (!limit.allowed) { sendJson(response, 429, { error: '回复过于频繁，请稍后再试。' }); return }
+    try {
+      const reply = validateForumReply(await readJsonBody(request, 48 * 1024))
+      const id = randomBytes(12).toString('hex')
+      portalDatabase.createForumReply({ id, postId: forumReplyCreateMatch[1], userId: session.user.id, ...reply })
+      const created = portalDatabase.listForumReplies(forumReplyCreateMatch[1], session.user.id).find(item => item.id === id)
+      sendJson(response, 201, forumReplyPayload(created))
+    } catch (error) { sendJson(response, 400, { error: error.message }) }
+    return
+  }
+
+  const forumLikeMatch = pathname.match(/^\/api\/forum\/(posts|replies)\/([a-f0-9]{24})\/like$/)
+  if (forumLikeMatch && request.method === 'POST') {
+    if (!sameOrigin(request)) { sendJson(response, 403, { error: '请求来源无效。' }); return }
+    const session = requireCommunityUser(request, response)
+    if (!session) return
+    try { sendJson(response, 200, portalDatabase.toggleForumLike(forumLikeMatch[1] === 'posts' ? 'post' : 'reply', forumLikeMatch[2], session.user.id)) }
+    catch (error) { sendJson(response, 400, { error: error.message }) }
+    return
+  }
+
+  const forumContentDeleteMatch = pathname.match(/^\/api\/forum\/(posts|replies)\/([a-f0-9]{24})$/)
+  if (forumContentDeleteMatch && request.method === 'DELETE') {
+    if (!sameOrigin(request)) { sendJson(response, 403, { error: '请求来源无效。' }); return }
+    const session = requireCommunityUser(request, response)
+    if (!session) return
+    const type = forumContentDeleteMatch[1] === 'posts' ? 'post' : 'reply'
+    const record = type === 'post' ? portalDatabase.getForumPostRecord(forumContentDeleteMatch[2]) : portalDatabase.getForumReply(forumContentDeleteMatch[2])
+    if (!record) { sendJson(response, 404, { error: '内容不存在。' }); return }
+    if (record.user_id !== session.user.id && !canModerate(session)) { sendJson(response, 403, { error: '无权删除该内容。' }); return }
+    if (type === 'post') portalDatabase.setForumPostStatus(record.id, 'deleted', { actorType: 'user', actorId: session.user.id })
+    else portalDatabase.setForumReplyStatus(record.id, 'deleted', { actorType: 'user', actorId: session.user.id })
+    sendJson(response, 200, { ok: true })
     return
   }
 
@@ -607,6 +924,93 @@ const handleRequest = async (request, response) => {
     return
   }
 
+  if (pathname === '/api/admin/community/stats' && request.method === 'GET') {
+    if (!getSession(request)) {
+      sendJson(response, 401, { error: '请先登录。' })
+      return
+    }
+    sendJson(response, 200, portalDatabase.getCommunityStats())
+    return
+  }
+
+  if (pathname === '/api/admin/users' && request.method === 'GET') {
+    if (!getSession(request)) {
+      sendJson(response, 401, { error: '请先登录。' })
+      return
+    }
+    sendJson(response, 200, portalDatabase.listCommunityUsers({
+      search: url.searchParams.get('search') || '',
+      limit: url.searchParams.get('limit') || 100
+    }))
+    return
+  }
+
+  const adminUserMatch = pathname.match(/^\/api\/admin\/users\/([a-f0-9]{24})$/)
+  if (adminUserMatch && ['PATCH', 'DELETE'].includes(request.method || '')) {
+    const session = getSession(request)
+    if (!session) {
+      sendJson(response, 401, { error: '请先登录。' })
+      return
+    }
+    if (!sameOrigin(request)) {
+      sendJson(response, 403, { error: '请求来源无效。' })
+      return
+    }
+    try {
+      if (request.method === 'PATCH') {
+        const body = await readJsonBody(request, 8 * 1024)
+        const user = portalDatabase.updateCommunityUserByAdmin(adminUserMatch[1], {
+          role: String(body.role || ''),
+          status: String(body.status || '')
+        }, session.username)
+        sendJson(response, 200, user)
+      } else {
+        const user = portalDatabase.deleteCommunityUserByAdmin(adminUserMatch[1], session.username)
+        sendJson(response, 200, { ok: true, deleted: { id: user.id, username: user.username } })
+      }
+    } catch (error) {
+      sendJson(response, /不存在/.test(error.message) ? 404 : 400, { error: error.message })
+    }
+    return
+  }
+
+  if (pathname === '/api/admin/moderation' && request.method === 'GET') {
+    if (!getSession(request)) {
+      sendJson(response, 401, { error: '请先登录。' })
+      return
+    }
+    sendJson(response, 200, portalDatabase.getModerationItems(url.searchParams.get('limit') || 100))
+    return
+  }
+
+  const moderationMatch = pathname.match(/^\/api\/admin\/moderation\/(comment|post|reply)\/([a-f0-9]{24})$/)
+  if (moderationMatch && request.method === 'PATCH') {
+    const session = getSession(request)
+    if (!session) {
+      sendJson(response, 401, { error: '请先登录。' })
+      return
+    }
+    if (!sameOrigin(request)) {
+      sendJson(response, 403, { error: '请求来源无效。' })
+      return
+    }
+    try {
+      const body = await readJsonBody(request, 8 * 1024)
+      const type = moderationMatch[1]
+      const allowed = type === 'post' ? ['active', 'hidden', 'locked', 'deleted'] : ['active', 'hidden', 'deleted']
+      const status = String(body.status || '')
+      if (!allowed.includes(status)) throw new Error('内容状态无效。')
+      const options = { actorType: 'admin', actorId: session.username }
+      if (type === 'comment') portalDatabase.setArticleCommentStatus(moderationMatch[2], status, options)
+      else if (type === 'post') portalDatabase.setForumPostStatus(moderationMatch[2], status, options)
+      else portalDatabase.setForumReplyStatus(moderationMatch[2], status, options)
+      sendJson(response, 200, { ok: true, id: moderationMatch[2], type, status })
+    } catch (error) {
+      sendJson(response, /不存在/.test(error.message) ? 404 : 400, { error: error.message })
+    }
+    return
+  }
+
   if (pathname === '/api/admin/export' && request.method === 'GET') {
     if (!getSession(request)) {
       sendJson(response, 401, { error: '请先登录。' })
@@ -620,7 +1024,8 @@ const handleRequest = async (request, response) => {
       cases: portalDatabase.getSnapshot(),
       site: portalDatabase.getSiteConfigSnapshot(),
       knowledge: portalDatabase.getKnowledgeSnapshot(),
-      ai: { settings: safeAiSettings, revision: aiRevision, apiKeyIncluded: false, hadApiKey: apiKeySet }
+      ai: { settings: safeAiSettings, revision: aiRevision, apiKeyIncluded: false, hadApiKey: apiKeySet },
+      community: { statistics: portalDatabase.getCommunityStats(), personalDataIncluded: false }
     }, { 'content-disposition': `attachment; filename="portal-export-${new Date().toISOString().slice(0, 10)}.json"` })
     return
   }
@@ -647,6 +1052,10 @@ const cleanupTimer = setInterval(() => {
   for (const [token, session] of sessions) if (session.expiresAt <= now) sessions.delete(token)
   for (const [address, attempt] of loginAttempts) if (attempt.resetAt <= now) loginAttempts.delete(address)
   for (const [address, attempt] of ragAttempts) if (attempt.resetAt <= now) ragAttempts.delete(address)
+  for (const [address, attempt] of registrationAttempts) if (attempt.resetAt <= now) registrationAttempts.delete(address)
+  for (const [address, attempt] of userLoginAttempts) if (attempt.resetAt <= now) userLoginAttempts.delete(address)
+  for (const [address, attempt] of communityWriteAttempts) if (attempt.resetAt <= now) communityWriteAttempts.delete(address)
+  portalDatabase.pruneCommunitySessions()
 }, 10 * 60 * 1000)
 cleanupTimer.unref()
 
@@ -667,7 +1076,9 @@ server.listen(port, host, () => {
   console.log('Case admin: http://' + host + ':' + port + '/admin/cases')
   console.log('Site admin: http://' + host + ':' + port + '/admin/site')
   console.log('Knowledge admin: http://' + host + ':' + port + '/admin/knowledge')
+  console.log('Forum: http://' + host + ':' + port + '/forum')
+  console.log('User admin: http://' + host + ':' + port + '/admin/users')
   if (weakAdminPassword) console.warn('Security warning: default weak admin password is allowed only because the service listens locally.')
   console.log('Encryption key source: ' + encryption.source + '.')
-  console.log('SQLite ready: ' + health.caseCount + ' cases/' + health.knowledgeCount + ' knowledge entries, revisions cases=' + health.revision + '/site=' + health.siteConfigRevision + '/knowledge=' + health.knowledgeRevision + ', ' + health.journalMode + ' mode.')
+  console.log('SQLite ready: ' + health.caseCount + ' cases/' + health.knowledgeCount + ' knowledge entries/' + health.communityUserCount + ' users/' + health.forumPostCount + ' posts, revisions cases=' + health.revision + '/site=' + health.siteConfigRevision + '/knowledge=' + health.knowledgeRevision + ', ' + health.journalMode + ' mode.')
 })
