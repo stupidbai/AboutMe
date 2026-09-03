@@ -36,8 +36,8 @@ try {
   if (savedKnowledge.revision !== 2 || !savedKnowledge.entries[0].summary.endsWith('数据库测试。')) throw new Error('知识库更新事务失败。')
 
   const initialAi = database.getAiSettings()
-  if (database.getHealth().schemaVersion !== 5 || initialAi.dailyLimit !== 200 || initialAi.allowPrivateNetwork !== false) {
-    throw new Error('数据库 v5 或 AI 安全默认值迁移失败。')
+  if (database.getHealth().schemaVersion !== 6 || initialAi.dailyLimit !== 200 || initialAi.allowPrivateNetwork !== false) {
+    throw new Error('数据库 v6 或 AI 安全默认值迁移失败。')
   }
   const savedAi = await database.replaceAiSettings({
     ...initialAi, apiKey: 'test-secret-api-key', apiKeySet: undefined, clearApiKey: false,
@@ -70,7 +70,7 @@ try {
   database.createForumReply({ id: replyId, postId, userId, body: '数据库论坛回复' })
   if (!database.toggleForumLike('post', postId, userId).liked || database.getForumPost(postId, userId)?.replyCount !== 1) throw new Error('论坛发帖、回复或点赞事务失败。')
   const communityStats = database.getCommunityStats()
-  if (communityStats.users !== 1 || communityStats.comments !== 1 || communityStats.posts !== 1 || communityStats.replies !== 1) throw new Error('社区统计聚合失败。')
+  if (communityStats.users !== 1 || communityStats.comments !== 1 || communityStats.posts !== 5 || communityStats.replies !== 1) throw new Error('社区统计聚合失败。')
 
   const changedSiteConfig = structuredClone(initialSite.config)
   changedSiteConfig.identity.city = '上海 / 徐州 / 自动化测试'

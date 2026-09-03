@@ -1,6 +1,6 @@
 import DefaultTheme from 'vitepress/theme'
 import type { Theme } from 'vitepress'
-import { h } from 'vue'
+import { defineAsyncComponent, h } from 'vue'
 import { useData, useRoute } from 'vitepress'
 import HomePortal from './components/HomePortal.vue'
 import ProfileTimeline from './components/ProfileTimeline.vue'
@@ -15,10 +15,10 @@ import KnowledgeLibrary from './components/KnowledgeLibrary.vue'
 import ImportedKnowledge from './components/ImportedKnowledge.vue'
 import RagAssistant from './components/RagAssistant.vue'
 import KnowledgeAdmin from './components/KnowledgeAdmin.vue'
-import CommunityAccount from './components/CommunityAccount.vue'
 import ArticleComments from './components/ArticleComments.vue'
 import ForumBoard from './components/ForumBoard.vue'
 import UserAdmin from './components/UserAdmin.vue'
+import KnowledgeDetail from './components/KnowledgeDetail.vue'
 import './styles.css'
 
 export default {
@@ -46,8 +46,9 @@ export default {
     app.component('ImportedKnowledge', ImportedKnowledge)
     app.component('RagAssistant', RagAssistant)
     app.component('KnowledgeAdmin', KnowledgeAdmin)
-    app.component('CommunityAccount', CommunityAccount)
+    app.component('CommunityAccount', defineAsyncComponent(() => import('./components/CommunityAccount.vue')))
     app.component('ForumBoard', ForumBoard)
     app.component('UserAdmin', UserAdmin)
+    app.component('KnowledgeDetail', KnowledgeDetail)
   }
 } satisfies Theme

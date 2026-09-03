@@ -34,3 +34,19 @@ Copyright 2022 Luca Ongaro. Permission is hereby granted, free of charge, to any
 - 用途：以严格标签、属性和 URL 协议白名单清洗社区富文本，降低 XSS 风险。
 
 完整许可文本及其运行时依赖许可保存在安装包的 `node_modules/` 对应目录。
+
+## Nodemailer 9.1.1
+
+- 项目：https://github.com/nodemailer/nodemailer
+- 许可证：MIT-0
+- 用途：通过管理员配置的 SMTP 发送邮箱验证和密码重置邮件。
+
+完整许可文本保存在安装包的 `node_modules/nodemailer/LICENSE`。
+
+## zxcvbn-ts 4.x
+
+- 项目：https://github.com/zxcvbn-ts/zxcvbn
+- 许可证：MIT
+- 用途：在浏览器端估算注册与修改密码的强度并给出提示。
+
+完整许可文本保存在安装包的 `node_modules/@zxcvbn-ts/` 对应目录。

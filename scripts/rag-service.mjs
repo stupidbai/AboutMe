@@ -106,7 +106,7 @@ export class RagService {
     if (this.indexCache.fingerprint === fingerprint && this.indexCache.index) return this.indexCache
     const dynamic = knowledgeEntries.filter(item => item.published).map(item => ({
       ...item,
-      route: `/knowledge#${item.id}`,
+      route: `/knowledge/item?id=${encodeURIComponent(item.id)}`,
       body: [item.summary, item.body, ...(item.takeaways || [])].join('\n')
     }))
     const chunks = [...dynamic, ...this.staticDocuments].flatMap(document =>

@@ -91,6 +91,8 @@ const waitForHealth = async () => {
 
 let cookie = ''
 let userCookie = ''
+let csrfCookie = ''
+let csrfToken = ''
 let revision = ''
 const adminFetch = (path, options = {}) => fetch(baseUrl + path, {
   ...options,
@@ -111,14 +113,15 @@ const communityFetch = (path, options = {}) => fetch(baseUrl + path, {
   headers: {
     accept: 'application/json',
     ...(options.body ? { 'content-type': 'application/json' } : {}),
-    ...(userCookie ? { cookie: userCookie } : {}),
+    ...((userCookie || csrfCookie) ? { cookie: [userCookie, csrfCookie].filter(Boolean).join('; ') } : {}),
+    ...(csrfToken ? { 'x-csrf-token': csrfToken } : {}),
     ...options.headers
   }
 })
 
 try {
   const health = await waitForHealth()
-  if (health.status !== 'ok' || health.database.schemaVersion !== 5 || health.database.siteConfigRevision !== 1 || health.database.knowledgeCount !== 12 || health.database.ragQueryCount !== 0 || health.database.communityUserCount !== 0 || health.database.journalMode !== 'wal') {
+  if (health.status !== 'ok' || health.database.schemaVersion !== 6 || health.database.siteConfigRevision !== 1 || health.database.knowledgeCount !== 12 || health.database.ragQueryCount !== 0 || health.database.communityUserCount !== 0 || health.database.forumPostCount !== 4 || health.database.journalMode !== 'wal') {
     throw new Error('SQLite 健康状态不符合预期。')
   }
 
@@ -135,7 +138,7 @@ try {
   const publicSiteResponse = await expectStatus(await fetch(baseUrl + '/api/site-config'), 200, '公开读取站点配置')
   const publicSiteConfig = await publicSiteResponse.json()
   const publicSiteEtag = publicSiteResponse.headers.get('etag')
-  if (publicSiteConfig.identity?.name !== '白云飞' || !publicSiteEtag) throw new Error('公开站点配置或 ETag 缺失。')
+  if (publicSiteConfig.identity?.name !== '白云飞' || publicSiteConfig.routes?.length !== 8 || !publicSiteEtag) throw new Error('公开站点配置、社区入口或 ETag 缺失。')
   await expectStatus(await fetch(baseUrl + '/api/site-config', { headers: { 'if-none-match': publicSiteEtag } }), 304, '站点配置缓存协商')
 
   const publicKnowledgeResponse = await expectStatus(await fetch(baseUrl + '/api/knowledge'), 200, '公开读取知识库')
@@ -146,22 +149,29 @@ try {
   const aiStatus = await (await expectStatus(await fetch(baseUrl + '/api/ai/status'), 200, '公开读取 AI 状态')).json()
   if (aiStatus.enabled || aiStatus.knowledgeEntries !== 12 || aiStatus.localDocuments < 10) throw new Error('AI 初始状态或本地文档索引无效。')
 
-  const anonymousSession = await (await expectStatus(await communityFetch('/api/auth/session'), 200, '访客会话')).json()
+  const anonymousResponse = await expectStatus(await communityFetch('/api/auth/session'), 200, '访客会话')
+  const anonymousSession = await anonymousResponse.json()
+  csrfToken = anonymousSession.csrfToken
+  csrfCookie = (anonymousResponse.headers.get('set-cookie') || '').split(';', 1)[0]
+  if (!csrfToken || !csrfCookie.startsWith('portal_csrf=')) throw new Error('访客 CSRF 令牌未签发。')
   if (anonymousSession.authenticated || anonymousSession.user) throw new Error('访客不应被识别为注册用户。')
+  await expectStatus(await fetch(baseUrl + '/api/auth/register', {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({})
+  }), 403, '缺少 CSRF 令牌的注册请求')
   await expectStatus(await communityFetch('/api/comments', { method: 'POST', body: JSON.stringify({ articlePath: '/kb/blog/2025/vitepress-markdown', body: '未登录评论' }) }), 401, '访客禁止评论')
   await expectStatus(await communityFetch('/api/auth/register', {
     method: 'POST', headers: { origin: 'https://invalid.example' },
-    body: JSON.stringify({ username: 'portal_user', displayName: '门户测试用户', email: 'portal@example.com', password: 'Secure123', confirmPassword: 'Secure123', acceptedTerms: true })
+    body: JSON.stringify({ username: 'portal_user', displayName: '门户测试用户', email: 'portal@example.com', password: 'Secure-Portal-123', confirmPassword: 'Secure-Portal-123', acceptedTerms: true })
   }), 403, '跨来源注册')
   const register = await expectStatus(await communityFetch('/api/auth/register', {
-    method: 'POST', body: JSON.stringify({ username: 'portal_user', displayName: '门户测试用户', email: 'portal@example.com', password: 'Secure123', confirmPassword: 'Secure123', acceptedTerms: true, website: '' })
+    method: 'POST', body: JSON.stringify({ username: 'portal_user', displayName: '门户测试用户', email: 'portal@example.com', password: 'Secure-Portal-123', confirmPassword: 'Secure-Portal-123', acceptedTerms: true, website: '' })
   }), 201, '注册社区用户')
   const registeredUser = (await register.json()).user
   const userSetCookie = register.headers.get('set-cookie') || ''
   if (!registeredUser?.id || !userSetCookie.includes('HttpOnly') || !userSetCookie.includes('SameSite=Lax')) throw new Error('注册响应或用户会话 Cookie 无效。')
   userCookie = userSetCookie.split(';', 1)[0]
   await expectStatus(await communityFetch('/api/auth/register', {
-    method: 'POST', body: JSON.stringify({ username: 'portal_user', displayName: '重复用户', email: 'another@example.com', password: 'Secure123', confirmPassword: 'Secure123', acceptedTerms: true })
+    method: 'POST', body: JSON.stringify({ username: 'portal_user', displayName: '重复用户', email: 'another@example.com', password: 'Secure-Portal-123', confirmPassword: 'Secure-Portal-123', acceptedTerms: true })
   }), 409, '阻止重复用户名')
   const sessionAfterRegister = await (await expectStatus(await communityFetch('/api/auth/session'), 200, '注册后会话')).json()
   if (!sessionAfterRegister.authenticated || sessionAfterRegister.user.username !== 'portal_user') throw new Error('数据库用户会话未生效。')
@@ -194,6 +204,8 @@ try {
   await expectStatus(await adminFetch('/api/admin/export'), 401, '未登录访问导出 API')
   await expectStatus(await adminFetch('/api/admin/users'), 401, '未登录访问用户管理 API')
   await expectStatus(await adminFetch('/api/admin/moderation'), 401, '未登录访问内容审核 API')
+  await expectStatus(await adminFetch('/api/admin/community-settings'), 401, '未登录访问社区配置 API')
+  await expectStatus(await adminFetch('/api/admin/product-metrics'), 401, '未登录访问产品指标 API')
   await expectStatus(await adminFetch('/api/admin/login', {
     method: 'POST',
     headers: { origin: 'https://invalid.example' },
@@ -211,13 +223,25 @@ try {
   cookie = setCookie.split(';', 1)[0]
 
   const communityStats = await (await expectStatus(await adminFetch('/api/admin/community/stats'), 200, '读取社区统计')).json()
-  if (communityStats.users !== 1 || communityStats.comments !== 1 || communityStats.posts !== 1 || communityStats.replies !== 1) throw new Error('管理端社区统计无效。')
+  if (communityStats.users !== 1 || communityStats.comments !== 1 || communityStats.posts !== 5 || communityStats.replies !== 1) throw new Error('管理端社区统计无效。')
+  const productMetrics = await (await expectStatus(await adminFetch('/api/admin/product-metrics?days=30'), 200, '读取产品漏斗')).json()
+  if (productMetrics.registrations !== 1 || productMetrics.comments !== 1 || productMetrics.posts !== 1 || productMetrics.replies !== 1 || productMetrics.ragQueries < 1) throw new Error('产品漏斗统计无效。')
+  const communitySettingsResponse = await expectStatus(await adminFetch('/api/admin/community-settings'), 200, '读取社区配置')
+  const communitySettings = await communitySettingsResponse.json()
+  let communitySettingsRevision = communitySettingsResponse.headers.get('etag') || ''
+  if (!communitySettings.registrationEnabled || communitySettings.requireEmailVerification || !communitySettingsRevision || communitySettings.smtpPassword) throw new Error('社区安全配置默认值或脱敏无效。')
+  const settingsWrite = await expectStatus(await adminFetch('/api/admin/community-settings', { method:'PUT', headers:{ 'if-match':communitySettingsRevision }, body:JSON.stringify({ ...communitySettings, publicSiteUrl:baseUrl }) }), 200, '更新社区配置')
+  communitySettingsRevision = settingsWrite.headers.get('etag') || ''
   const managedUsers = await (await expectStatus(await adminFetch('/api/admin/users?search=portal'), 200, '搜索注册用户')).json()
   if (managedUsers.length !== 1 || managedUsers[0].id !== registeredUser.id) throw new Error('用户管理搜索失败。')
   const promoted = await (await expectStatus(await adminFetch(`/api/admin/users/${registeredUser.id}`, { method: 'PATCH', body: JSON.stringify({ role: 'moderator', status: 'active' }) }), 200, '授予版主权限')).json()
   if (promoted.role !== 'moderator') throw new Error('用户角色更新失败。')
   const moderation = await (await expectStatus(await adminFetch('/api/admin/moderation'), 200, '读取待审核内容')).json()
   if (!moderation.some(item => item.id === comment.id) || !moderation.some(item => item.id === post.id)) throw new Error('内容审核列表不完整。')
+  const managedPost = moderation.find(item => item.id === post.id)
+  await expectStatus(await adminFetch(`/api/admin/moderation/post/${post.id}`, { method:'PATCH', body:JSON.stringify({ status:'active', pinned:true, featured:true }) }), 200, '设置论坛置顶精选')
+  const pinnedPosts = await (await expectStatus(await communityFetch('/api/forum/posts'), 200, '读取置顶论坛列表')).json()
+  if (!pinnedPosts.posts.find(item => item.id === post.id)?.pinned || !managedPost) throw new Error('论坛置顶精选未生效。')
   await expectStatus(await adminFetch(`/api/admin/moderation/comment/${comment.id}`, { method: 'PATCH', body: JSON.stringify({ status: 'hidden' }) }), 200, '隐藏评论')
   const hiddenComments = await (await expectStatus(await communityFetch('/api/comments?article=%2Fkb%2Fblog%2F2025%2Fvitepress-markdown'), 200, '隐藏后读取评论')).json()
   if (hiddenComments.comments.some(item => item.id === comment.id)) throw new Error('隐藏评论仍出现在公开列表。')
@@ -344,7 +368,7 @@ try {
   if (suspendedSession.authenticated) throw new Error('停用账号未立即注销数据库会话。')
   userCookie = ''
   await expectStatus(await adminFetch(`/api/admin/users/${registeredUser.id}`, { method: 'DELETE' }), 200, '删除社区用户')
-  await expectStatus(await communityFetch('/api/auth/login', { method: 'POST', body: JSON.stringify({ identity: 'portal_user', password: 'Secure123' }) }), 401, '已删除用户不能登录')
+  await expectStatus(await communityFetch('/api/auth/login', { method: 'POST', body: JSON.stringify({ identity: 'portal_user', password: 'Secure-Portal-123' }) }), 401, '已删除用户不能登录')
 
   await expectStatus(await adminFetch('/api/admin/logout', { method: 'POST' }), 200, '退出登录')
   cookie = ''

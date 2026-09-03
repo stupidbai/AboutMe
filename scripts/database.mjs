@@ -5,8 +5,9 @@ import { basename, join, resolve } from 'node:path'
 import { validateCases } from './case-schema.mjs'
 import { validateSiteConfig } from './site-config-schema.mjs'
 import { defaultAiSettings, validateAiSettings, validateKnowledgeEntries } from './knowledge-schema.mjs'
+import { defaultCommunitySettings, validateCommunitySettings } from './community-settings.mjs'
 
-const SCHEMA_VERSION = 5
+const SCHEMA_VERSION = 6
 
 export class DatabaseConflictError extends Error {
   constructor(message = '配置已被其他管理员更新，请刷新后重试。') {
@@ -34,6 +35,7 @@ export class PortalDatabase {
     this.seedSiteConfigIfEmpty()
     this.seedKnowledgeIfEmpty()
     this.seedAiSettingsIfEmpty()
+    this.seedCommunitySettingsIfEmpty()
     this.seedCommunityIfEmpty()
   }
 
@@ -314,9 +316,96 @@ export class PortalDatabase {
         COMMIT;
       `)
     }
+    if (currentVersion < 6) {
+      this.database.exec(`
+        BEGIN IMMEDIATE;
+        ALTER TABLE community_users ADD COLUMN email_verified_at TEXT;
+        UPDATE community_users SET email_verified_at = created_at WHERE email_verified_at IS NULL;
+        ALTER TABLE forum_categories ADD COLUMN enabled INTEGER NOT NULL DEFAULT 1 CHECK (enabled IN (0, 1));
+        ALTER TABLE forum_posts ADD COLUMN is_pinned INTEGER NOT NULL DEFAULT 0 CHECK (is_pinned IN (0, 1));
+        ALTER TABLE forum_posts ADD COLUMN is_featured INTEGER NOT NULL DEFAULT 0 CHECK (is_featured IN (0, 1));
+        CREATE TABLE IF NOT EXISTS community_settings (
+          id INTEGER PRIMARY KEY CHECK (id = 1),
+          registration_enabled INTEGER NOT NULL DEFAULT 1 CHECK (registration_enabled IN (0, 1)),
+          require_email_verification INTEGER NOT NULL DEFAULT 0 CHECK (require_email_verification IN (0, 1)),
+          public_site_url TEXT NOT NULL,
+          smtp_host TEXT NOT NULL DEFAULT '',
+          smtp_port INTEGER NOT NULL DEFAULT 587 CHECK (smtp_port BETWEEN 1 AND 65535),
+          smtp_secure INTEGER NOT NULL DEFAULT 0 CHECK (smtp_secure IN (0, 1)),
+          smtp_user TEXT NOT NULL DEFAULT '',
+          smtp_from TEXT NOT NULL DEFAULT '',
+          smtp_password_cipher TEXT NOT NULL DEFAULT '',
+          smtp_password_iv TEXT NOT NULL DEFAULT '',
+          smtp_password_tag TEXT NOT NULL DEFAULT '',
+          turnstile_enabled INTEGER NOT NULL DEFAULT 0 CHECK (turnstile_enabled IN (0, 1)),
+          turnstile_site_key TEXT NOT NULL DEFAULT '',
+          turnstile_secret_cipher TEXT NOT NULL DEFAULT '',
+          turnstile_secret_iv TEXT NOT NULL DEFAULT '',
+          turnstile_secret_tag TEXT NOT NULL DEFAULT '',
+          revision INTEGER NOT NULL CHECK (revision > 0),
+          updated_at TEXT NOT NULL,
+          updated_by TEXT NOT NULL
+        ) STRICT;
+        CREATE TABLE IF NOT EXISTS community_tokens (
+          id TEXT PRIMARY KEY,
+          token_hash TEXT NOT NULL UNIQUE,
+          type TEXT NOT NULL CHECK (type IN ('verify_email', 'reset_password')),
+          user_id TEXT NOT NULL REFERENCES community_users(id) ON DELETE CASCADE,
+          expires_at TEXT NOT NULL,
+          used_at TEXT,
+          created_at TEXT NOT NULL
+        ) STRICT;
+        CREATE TABLE IF NOT EXISTS product_events (
+          id INTEGER PRIMARY KEY,
+          user_id TEXT REFERENCES community_users(id) ON DELETE SET NULL,
+          event_name TEXT NOT NULL,
+          context TEXT NOT NULL DEFAULT '',
+          created_at TEXT NOT NULL
+        ) STRICT;
+        CREATE INDEX IF NOT EXISTS idx_community_tokens_lookup ON community_tokens(token_hash, type, expires_at);
+        CREATE INDEX IF NOT EXISTS idx_product_events_name_created ON product_events(event_name, created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_product_events_user_created ON product_events(user_id, created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_forum_posts_pinned_activity ON forum_posts(is_pinned DESC, last_activity_at DESC);
+        PRAGMA user_version = 6;
+        COMMIT;
+      `)
+    }
+  }
+
+  seedCommunitySettingsIfEmpty() {
+    if (this.database.prepare('SELECT id FROM community_settings WHERE id = 1').get()) return
+    const settings = validateCommunitySettings(defaultCommunitySettings)
+    const now = new Date().toISOString()
+    this.database.prepare(`
+      INSERT INTO community_settings (
+        id, registration_enabled, require_email_verification, public_site_url,
+        smtp_host, smtp_port, smtp_secure, smtp_user, smtp_from,
+        turnstile_enabled, turnstile_site_key, revision, updated_at, updated_by
+      ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, 'default-seed')
+    `).run(settings.registrationEnabled ? 1 : 0, settings.requireEmailVerification ? 1 : 0,
+      settings.publicSiteUrl, settings.smtpHost, settings.smtpPort, settings.smtpSecure ? 1 : 0,
+      settings.smtpUser, settings.smtpFrom, settings.turnstileEnabled ? 1 : 0,
+      settings.turnstileSiteKey, now)
   }
 
   seedCommunityIfEmpty() {
+    const siteConfig = this.database.prepare('SELECT json_value, revision FROM site_config WHERE id = 1').get()
+    if (siteConfig) {
+      const config = JSON.parse(siteConfig.json_value)
+      if (!config.routes?.some(route => route.link === '/forum')) {
+        config.routes = (config.routes || []).map(route => route.link === '/contact' ? { ...route, code: '08 · CONTACT' } : route)
+        const forumRoute = {
+          code: '07 · FORUM', title: '交流论坛与社区共创',
+          description: '围绕企业 AI、工程实践、商业合作和生态连接持续讨论。',
+          link: '/forum', tags: ['开放讨论', '经验互助', '合作连接'], accent: 'violet', enabled: true
+        }
+        const contactIndex = config.routes.findIndex(route => route.link === '/contact')
+        if (contactIndex >= 0) config.routes.splice(contactIndex, 0, forumRoute)
+        else config.routes.push(forumRoute)
+        this.database.prepare('UPDATE site_config SET json_value = ?, revision = ?, updated_at = ?, updated_by = ? WHERE id = 1')
+          .run(JSON.stringify(validateSiteConfig(config)), Number(siteConfig.revision) + 1, new Date().toISOString(), 'v4.1-migration')
+      }
+    }
     const categories = [
       ['ai', '企业 AI', '讨论企业 AI 场景、RAG、Agent、模型治理与落地。'],
       ['engineering', '技术实践', '分享工程实现、架构设计、工具链和排障经验。'],
@@ -326,6 +415,24 @@ export class PortalDatabase {
     const insert = this.database.prepare('INSERT OR IGNORE INTO forum_categories (id, name, description, sort_order, created_at) VALUES (?, ?, ?, ?, ?)')
     const now = new Date().toISOString()
     categories.forEach((category, index) => insert.run(category[0], category[1], category[2], index, now))
+    if (Number(this.database.prepare('SELECT COUNT(*) AS count FROM forum_posts').get().count) === 0) {
+      const welcomePosts = [
+        ['100000000000000000000001', 'ai', '欢迎来到企业 AI 讨论区', '这里适合交流企业知识库、RAG、Agent、模型治理与业务落地。欢迎先介绍你的行业、场景与当前问题。', 1, 1],
+        ['100000000000000000000002', 'engineering', '工程实践：从可运行到可运营', '分享架构取舍、部署经验、质量保障和排障记录。请尽量补充环境、约束和验证结果，让经验能够复用。', 1, 1],
+        ['100000000000000000000003', 'cooperation', '如何发布一条高质量合作需求', '建议写明客户或行业、当前问题、已有资源、期望结果、时间窗口，以及希望合作方承担的角色。涉及敏感信息时请先脱敏。', 1, 0],
+        ['100000000000000000000004', 'chat', '社区共建建议收集', '你希望知识库、论坛和案例库下一步增加什么能力？欢迎提交具体使用场景与优先级建议。', 0, 1]
+      ]
+      const insertPost = this.database.prepare(`
+        INSERT INTO forum_posts (
+          id, category_id, user_id, title, body_md, status, view_count,
+          created_at, updated_at, last_activity_at, is_pinned, is_featured
+        ) VALUES (?, ?, NULL, ?, ?, 'active', 0, ?, ?, ?, ?, ?)
+      `)
+      welcomePosts.forEach((post, index) => {
+        const time = new Date(Date.now() - index * 60_000).toISOString()
+        insertPost.run(post[0], post[1], post[2], post[3], time, time, time, post[4], post[5])
+      })
+    }
   }
 
   seedIfEmpty() {
@@ -468,8 +575,70 @@ export class PortalDatabase {
       decipher.setAuthTag(Buffer.from(tagText, 'base64'))
       return Buffer.concat([decipher.update(Buffer.from(cipherText, 'base64')), decipher.final()]).toString('utf8')
     } catch {
-      throw new Error('AI API Key 无法解密，请在管理页重新填写。')
+      throw new Error('加密配置无法解密，请在管理页重新填写。')
     }
+  }
+
+  getCommunitySettings({ includeSecrets = false } = {}) {
+    const row = this.database.prepare('SELECT * FROM community_settings WHERE id = 1').get()
+    if (!row) throw new Error('社区配置尚未初始化。')
+    const settings = {
+      registrationEnabled: Boolean(row.registration_enabled),
+      requireEmailVerification: Boolean(row.require_email_verification),
+      publicSiteUrl: row.public_site_url,
+      smtpHost: row.smtp_host,
+      smtpPort: Number(row.smtp_port),
+      smtpSecure: Boolean(row.smtp_secure),
+      smtpUser: row.smtp_user,
+      smtpFrom: row.smtp_from,
+      smtpPasswordSet: Boolean(row.smtp_password_cipher),
+      turnstileEnabled: Boolean(row.turnstile_enabled),
+      turnstileSiteKey: row.turnstile_site_key,
+      turnstileSecretSet: Boolean(row.turnstile_secret_cipher),
+      revision: Number(row.revision)
+    }
+    if (includeSecrets) {
+      settings.smtpPassword = this.decryptSecret(row.smtp_password_cipher, row.smtp_password_iv, row.smtp_password_tag)
+      settings.turnstileSecret = this.decryptSecret(row.turnstile_secret_cipher, row.turnstile_secret_iv, row.turnstile_secret_tag)
+    }
+    return settings
+  }
+
+  async replaceCommunitySettings(payload, { expectedRevision, actor = 'admin' } = {}) {
+    const operation = async () => {
+      const settings = validateCommunitySettings(payload)
+      const current = this.getCommunitySettings({ includeSecrets: true })
+      if (expectedRevision !== undefined && Number(expectedRevision) !== current.revision) {
+        throw new DatabaseConflictError('社区配置已被其他管理员更新，请刷新后重试。')
+      }
+      const smtpPassword = settings.clearSmtpPassword ? '' : (settings.smtpPassword || current.smtpPassword)
+      const turnstileSecret = settings.clearTurnstileSecret ? '' : (settings.turnstileSecret || current.turnstileSecret)
+      if (settings.requireEmailVerification && !smtpPassword && settings.smtpUser) throw new Error('启用邮箱验证前，请填写 SMTP 密码。')
+      if (settings.turnstileEnabled && !turnstileSecret) throw new Error('启用 Turnstile 前，请填写服务端密钥。')
+      await this.createBackup()
+      const smtpEncrypted = this.encryptSecret(smtpPassword)
+      const turnstileEncrypted = this.encryptSecret(turnstileSecret)
+      const revision = current.revision + 1
+      const now = new Date().toISOString()
+      this.database.prepare(`
+        UPDATE community_settings SET
+          registration_enabled = ?, require_email_verification = ?, public_site_url = ?,
+          smtp_host = ?, smtp_port = ?, smtp_secure = ?, smtp_user = ?, smtp_from = ?,
+          smtp_password_cipher = ?, smtp_password_iv = ?, smtp_password_tag = ?,
+          turnstile_enabled = ?, turnstile_site_key = ?, turnstile_secret_cipher = ?,
+          turnstile_secret_iv = ?, turnstile_secret_tag = ?, revision = ?, updated_at = ?, updated_by = ?
+        WHERE id = 1
+      `).run(settings.registrationEnabled ? 1 : 0, settings.requireEmailVerification ? 1 : 0,
+        settings.publicSiteUrl, settings.smtpHost, settings.smtpPort, settings.smtpSecure ? 1 : 0,
+        settings.smtpUser, settings.smtpFrom, smtpEncrypted.cipher, smtpEncrypted.iv, smtpEncrypted.tag,
+        settings.turnstileEnabled ? 1 : 0, settings.turnstileSiteKey, turnstileEncrypted.cipher,
+        turnstileEncrypted.iv, turnstileEncrypted.tag, revision, now, String(actor).slice(0, 100))
+      this.recordCommunityAudit({ actorType: 'admin', actorId: actor, action: 'update_community_settings', targetType: 'settings', targetId: 'community' })
+      return this.getCommunitySettings()
+    }
+    const result = this.writeQueue.then(operation, operation)
+    this.writeQueue = result.catch(() => undefined)
+    return result
   }
 
   getAiSettings({ includeSecret = false } = {}) {
@@ -703,7 +872,8 @@ export class PortalDatabase {
     const user = {
       id: row.id, username: row.username, displayName: row.display_name, role: row.role,
       status: row.status, bio: row.bio || '', createdAt: row.created_at,
-      updatedAt: row.updated_at, lastLoginAt: row.last_login_at || ''
+      updatedAt: row.updated_at, lastLoginAt: row.last_login_at || '',
+      emailVerified: Boolean(row.email_verified_at)
     }
     if (includePrivate) {
       user.email = row.email
@@ -713,14 +883,14 @@ export class PortalDatabase {
     return user
   }
 
-  createCommunityUser({ id, username, email, displayName, passwordHash }) {
+  createCommunityUser({ id, username, email, displayName, passwordHash, emailVerified = true }) {
     const now = new Date().toISOString()
     this.database.prepare(`
       INSERT INTO community_users (
         id, username, email, display_name, password_hash, role, status, bio,
-        terms_accepted_at, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, 'member', 'active', '', ?, ?, ?)
-    `).run(id, username, email, displayName, passwordHash, now, now, now)
+        terms_accepted_at, created_at, updated_at, email_verified_at
+      ) VALUES (?, ?, ?, ?, ?, 'member', 'active', '', ?, ?, ?, ?)
+    `).run(id, username, email, displayName, passwordHash, now, now, now, emailVerified ? now : null)
     this.recordCommunityAudit({ actorType: 'user', actorId: id, action: 'register', targetType: 'user', targetId: id })
     return this.getCommunityUserById(id)
   }
@@ -752,6 +922,40 @@ export class PortalDatabase {
     this.recordCommunityAudit({ actorType: 'user', actorId: userId, action: 'change_password', targetType: 'user', targetId: userId })
   }
 
+  markCommunityEmailVerified(userId) {
+    const now = new Date().toISOString()
+    const result = this.database.prepare('UPDATE community_users SET email_verified_at = COALESCE(email_verified_at, ?), updated_at = ? WHERE id = ?')
+      .run(now, now, userId)
+    if (!result.changes) throw new Error('用户不存在。')
+    this.recordCommunityAudit({ actorType: 'user', actorId: userId, action: 'verify_email', targetType: 'user', targetId: userId })
+    return this.getCommunityUserById(userId, { includePrivate: true })
+  }
+
+  createCommunityToken({ id, tokenHash, type, userId, expiresAt }) {
+    if (!['verify_email', 'reset_password'].includes(type)) throw new Error('令牌类型无效。')
+    const now = new Date().toISOString()
+    this.database.prepare('DELETE FROM community_tokens WHERE user_id = ? AND type = ? AND used_at IS NULL').run(userId, type)
+    this.database.prepare(`
+      INSERT INTO community_tokens (id, token_hash, type, user_id, expires_at, created_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(id, tokenHash, type, userId, expiresAt, now)
+  }
+
+  consumeCommunityToken(type, tokenHash) {
+    const now = new Date().toISOString()
+    const row = this.database.prepare(`
+      SELECT id, user_id FROM community_tokens
+      WHERE type = ? AND token_hash = ? AND used_at IS NULL AND expires_at > ?
+    `).get(type, tokenHash, now)
+    if (!row) return null
+    const result = this.database.prepare('UPDATE community_tokens SET used_at = ? WHERE id = ? AND used_at IS NULL').run(now, row.id)
+    return result.changes ? this.getCommunityUserById(row.user_id, { includePrivate: true }) : null
+  }
+
+  pruneCommunityTokens() {
+    return Number(this.database.prepare('DELETE FROM community_tokens WHERE expires_at <= ? OR used_at IS NOT NULL').run(new Date().toISOString()).changes)
+  }
+
   createCommunitySession({ tokenHash, userId, ipHash = '', userAgentHash = '', expiresAt }) {
     const now = new Date().toISOString()
     this.database.prepare(`
@@ -764,7 +968,7 @@ export class PortalDatabase {
     const row = this.database.prepare(`
       SELECT s.token_hash, s.expires_at, s.last_seen_at,
              u.id, u.username, u.email, u.display_name, u.password_hash, u.role, u.status,
-             u.bio, u.terms_accepted_at, u.created_at, u.updated_at, u.last_login_at
+             u.bio, u.terms_accepted_at, u.created_at, u.updated_at, u.last_login_at, u.email_verified_at
       FROM community_sessions s
       JOIN community_users u ON u.id = s.user_id
       WHERE s.token_hash = ? AND s.expires_at > ?
@@ -887,10 +1091,10 @@ export class PortalDatabase {
 
   getForumCategories() {
     return this.database.prepare(`
-      SELECT c.id, c.name, c.description,
+      SELECT c.id, c.name, c.description, c.enabled,
         (SELECT COUNT(*) FROM forum_posts p WHERE p.category_id = c.id AND p.status IN ('active', 'locked')) AS post_count
-      FROM forum_categories c ORDER BY c.sort_order
-    `).all().map(row => ({ id: row.id, name: row.name, description: row.description, postCount: Number(row.post_count) }))
+      FROM forum_categories c WHERE c.enabled = 1 ORDER BY c.sort_order
+    `).all().map(row => ({ id: row.id, name: row.name, description: row.description, enabled: Boolean(row.enabled), postCount: Number(row.post_count) }))
   }
 
   listForumPosts({ categoryId = '', query = '', page = 1, pageSize = 20, viewerUserId = '' } = {}) {
@@ -905,6 +1109,7 @@ export class PortalDatabase {
     const total = Number(this.database.prepare(`SELECT COUNT(*) AS count FROM forum_posts p WHERE ${where}`).get(...params).count)
     const rows = this.database.prepare(`
       SELECT p.id, p.category_id, p.title, p.body_md, p.status, p.view_count, p.created_at, p.last_activity_at,
+             p.is_pinned, p.is_featured,
              c.name AS category_name, u.id AS user_id, u.username, u.display_name, u.role,
              (SELECT COUNT(*) FROM forum_replies r WHERE r.post_id = p.id AND r.status = 'active') AS reply_count,
              (SELECT COUNT(*) FROM forum_post_likes l WHERE l.post_id = p.id) AS like_count,
@@ -913,13 +1118,14 @@ export class PortalDatabase {
       JOIN forum_categories c ON c.id = p.category_id
       LEFT JOIN community_users u ON u.id = p.user_id
       WHERE ${where}
-      ORDER BY p.last_activity_at DESC LIMIT ? OFFSET ?
+      ORDER BY p.is_pinned DESC, p.last_activity_at DESC LIMIT ? OFFSET ?
     `).all(viewerUserId, ...params, safePageSize, (safePage - 1) * safePageSize)
     return {
       page: safePage, pageSize: safePageSize, total,
       posts: rows.map(row => ({
         id: row.id, categoryId: row.category_id, categoryName: row.category_name,
         title: row.title, excerpt: row.body_md.slice(0, 220), status: row.status,
+        pinned: Boolean(row.is_pinned), featured: Boolean(row.is_featured),
         viewCount: Number(row.view_count), replyCount: Number(row.reply_count), likeCount: Number(row.like_count), viewerLiked: Boolean(row.viewer_liked),
         createdAt: row.created_at, lastActivityAt: row.last_activity_at,
         author: row.user_id ? { id: row.user_id, username: row.username, displayName: row.display_name, role: row.role } : null
@@ -928,7 +1134,7 @@ export class PortalDatabase {
   }
 
   createForumPost({ id, categoryId, userId, title, body }) {
-    if (!this.database.prepare('SELECT id FROM forum_categories WHERE id = ?').get(categoryId)) throw new Error('论坛板块不存在。')
+    if (!this.database.prepare('SELECT id FROM forum_categories WHERE id = ? AND enabled = 1').get(categoryId)) throw new Error('论坛板块不存在或已停用。')
     const now = new Date().toISOString()
     this.database.prepare(`
       INSERT INTO forum_posts (id, category_id, user_id, title, body_md, status, created_at, updated_at, last_activity_at)
@@ -953,6 +1159,7 @@ export class PortalDatabase {
     return {
       id: row.id, categoryId: row.category_id, categoryName: row.category_name,
       title: row.title, body: row.body_md, status: row.status, viewCount: Number(row.view_count),
+      pinned: Boolean(row.is_pinned), featured: Boolean(row.is_featured),
       replyCount: Number(row.reply_count), likeCount: Number(row.like_count), viewerLiked: Boolean(row.viewer_liked),
       createdAt: row.created_at, updatedAt: row.updated_at, lastActivityAt: row.last_activity_at,
       author: row.author_id ? { id: row.author_id, username: row.username, displayName: row.display_name, role: row.role } : null
@@ -1013,6 +1220,13 @@ export class PortalDatabase {
     this.recordCommunityAudit({ actorType, actorId, action: 'set_post_status', targetType: 'post', targetId: id, detail: status })
   }
 
+  setForumPostFlags(id, { pinned, featured }, actor = 'admin') {
+    const result = this.database.prepare('UPDATE forum_posts SET is_pinned = ?, is_featured = ?, updated_at = ? WHERE id = ?')
+      .run(pinned ? 1 : 0, featured ? 1 : 0, new Date().toISOString(), id)
+    if (!result.changes) throw new Error('帖子不存在。')
+    this.recordCommunityAudit({ actorType: 'admin', actorId: actor, action: 'set_post_flags', targetType: 'post', targetId: id, detail: JSON.stringify({ pinned: Boolean(pinned), featured: Boolean(featured) }) })
+  }
+
   setForumReplyStatus(id, status, { actorType = 'user', actorId = '' } = {}) {
     if (!['active', 'hidden', 'deleted'].includes(status)) throw new Error('回复状态无效。')
     const result = this.database.prepare('UPDATE forum_replies SET status = ?, updated_at = ? WHERE id = ?').run(status, new Date().toISOString(), id)
@@ -1048,6 +1262,45 @@ export class PortalDatabase {
     }
   }
 
+  recordProductEvent(eventName, { userId = null, context = '' } = {}) {
+    const allowed = new Set(['register_complete', 'email_verified', 'login', 'comment_created', 'forum_post_created', 'forum_reply_created', 'rag_query'])
+    if (!allowed.has(eventName)) return
+    this.database.prepare('INSERT INTO product_events (user_id, event_name, context, created_at) VALUES (?, ?, ?, ?)')
+      .run(userId || null, eventName, String(context).slice(0, 500), new Date().toISOString())
+  }
+
+  getProductMetrics(days = 30) {
+    const safeDays = Math.max(1, Math.min(Number(days) || 30, 365))
+    const since = new Date(Date.now() - safeDays * 86_400_000).toISOString()
+    const eventCount = name => Number(this.database.prepare('SELECT COUNT(*) AS count FROM product_events WHERE event_name = ? AND created_at >= ?').get(name, since).count)
+    const newUsers = Number(this.database.prepare('SELECT COUNT(*) AS count FROM community_users WHERE created_at >= ?').get(since).count)
+    const activeUsers = Number(this.database.prepare('SELECT COUNT(DISTINCT user_id) AS count FROM product_events WHERE user_id IS NOT NULL AND created_at >= ?').get(since).count)
+    const activatedUsers = Number(this.database.prepare(`
+      SELECT COUNT(DISTINCT user_id) AS count FROM product_events
+      WHERE user_id IS NOT NULL AND event_name IN ('comment_created', 'forum_post_created', 'forum_reply_created') AND created_at >= ?
+    `).get(since).count)
+    const unansweredPosts = Number(this.database.prepare(`
+      SELECT COUNT(*) AS count FROM forum_posts p
+      WHERE p.status IN ('active', 'locked') AND NOT EXISTS (
+        SELECT 1 FROM forum_replies r WHERE r.post_id = p.id AND r.status = 'active'
+      )
+    `).get().count)
+    return {
+      days: safeDays,
+      newUsers,
+      activeUsers,
+      activatedUsers,
+      activationRate: newUsers ? Math.round((activatedUsers / newUsers) * 1000) / 10 : 0,
+      registrations: eventCount('register_complete'),
+      logins: eventCount('login'),
+      comments: eventCount('comment_created'),
+      posts: eventCount('forum_post_created'),
+      replies: eventCount('forum_reply_created'),
+      ragQueries: eventCount('rag_query'),
+      unansweredPosts
+    }
+  }
+
   getModerationItems(limit = 100) {
     const safeLimit = Math.max(1, Math.min(Number(limit) || 100, 300))
     const comments = this.database.prepare(`
@@ -1057,7 +1310,7 @@ export class PortalDatabase {
     `).all(safeLimit)
     const posts = this.database.prepare(`
       SELECT p.id, 'post' AS type, p.title || char(10) || p.body_md AS content, p.status, p.created_at, p.category_id AS context,
-             u.username, u.display_name FROM forum_posts p LEFT JOIN community_users u ON u.id = p.user_id
+             p.is_pinned, p.is_featured, u.username, u.display_name FROM forum_posts p LEFT JOIN community_users u ON u.id = p.user_id
       ORDER BY p.created_at DESC LIMIT ?
     `).all(safeLimit)
     const replies = this.database.prepare(`
@@ -1069,7 +1322,8 @@ export class PortalDatabase {
       .sort((left, right) => right.created_at.localeCompare(left.created_at))
       .slice(0, safeLimit)
       .map(row => ({ id: row.id, type: row.type, content: row.content.slice(0, 500), status: row.status, createdAt: row.created_at,
-        context: row.context, author: row.display_name || row.username || '已注销用户' }))
+        context: row.context, author: row.display_name || row.username || (row.type === 'post' ? '站点发起' : '已注销用户'),
+        pinned: Boolean(row.is_pinned), featured: Boolean(row.is_featured) }))
   }
 
   recordCommunityAudit({ actorType, actorId = '', action, targetType, targetId = '', detail = '' }) {

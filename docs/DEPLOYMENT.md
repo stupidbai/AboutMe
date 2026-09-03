@@ -1,6 +1,6 @@
 # 安装与部署
 
-本系统使用 Node.js 内置 SQLite。运行时不需要额外数据库服务，Windows、Linux 与 Docker 使用相同的数据结构和管理 API。v4.0.0 在知识库与 AI 问答基础上增加站内注册、持久会话、文章评论、点赞互动、交流论坛、用户管理和内容审核。
+本系统使用 Node.js 内置 SQLite。运行时不需要额外数据库服务，Windows、Linux 与 Docker 使用相同的数据结构和管理 API。v4.1.0 增加可选邮箱验证与密码找回、Turnstile、人机与 CSRF 防护、知识详情讨论、论坛冷启动/分页/置顶精选，以及产品漏斗指标。
 
 ## 系统要求
 
@@ -15,7 +15,7 @@
 
 ## Windows 安装包
 
-1. 解压 bai-yunfei-portal-v4.0.0.zip。
+1. 解压 bai-yunfei-portal-v4.1.0.zip。
 2. 在 PowerShell 中运行：
 
 ~~~powershell
@@ -39,8 +39,8 @@ powershell -ExecutionPolicy Bypass -File .\install\windows\install.ps1
 ## Linux 安装包
 
 ~~~bash
-tar -xzf bai-yunfei-portal-v4.0.0.tar.gz
-cd bai-yunfei-portal-v4.0.0
+tar -xzf bai-yunfei-portal-v4.1.0.tar.gz
+cd bai-yunfei-portal-v4.1.0
 chmod +x install/linux/install.sh
 ./install/linux/install.sh
 ~/.local/share/bai-yunfei-portal/bin/start-linux.sh
@@ -87,11 +87,11 @@ docker compose down
 - 数据库启用 WAL、外键、事务、唯一约束与查询索引。
 - 每次管理端保存前先创建 SQLite 一致性备份，再在单一事务中更新案例或站点配置。
 - 管理 API 使用 ETag/If-Match 防止两个管理页面互相覆盖。
-- AI API Key 使用 AES-256-GCM 加密后写入 SQLite。配置 `PORTAL_ENCRYPTION_KEY` 时使用该值；省略时会在数据目录生成权限受限的 `.portal-encryption-key`，部署后不要删除或修改。
+- AI API Key、SMTP 密码和 Turnstile 服务端密钥使用 AES-256-GCM 加密后写入 SQLite。配置 `PORTAL_ENCRYPTION_KEY` 时使用该值；省略时会在数据目录生成权限受限的 `.portal-encryption-key`，部署后不要删除或修改。
 - RAG 索引由 MiniSearch 在进程内构建并缓存，包含已发布的动态知识条目和安装包内的历史知识 HTML，不依赖外部向量数据库。
-- SQLite v5 保存注册用户、哈希后的社区会话、文章评论、点赞、论坛板块/帖子/回复与审核日志；密码只保存 scrypt 哈希，不保存明文。
+- SQLite v6 保存注册用户、哈希后的社区会话、单次邮箱令牌、文章评论、点赞、论坛板块/帖子/回复、产品事件与审核日志；密码只保存 scrypt 哈希，不保存明文。
 - 问答日志只保存问答编号、脱敏访问来源、问题、响应模式、命中数量、耗时与反馈，不保存访问者姓名或联系方式。
-- 评论和论坛 Markdown 先解析再按严格白名单清洗；写操作要求同源请求、有效账号并执行频率限制。
+- 评论和论坛 Markdown 先解析再按严格白名单清洗；社区写操作要求同源请求、有效的签名 CSRF 令牌，并执行账号与来源频率限制。
 
 健康检查：
 
@@ -124,5 +124,7 @@ npm run package:release
 | CASE_SESSION_HOURS | 8 | 管理会话有效小时数 |
 | COMMUNITY_SESSION_DAYS | 30 | 注册用户会话有效天数，范围 1-90 |
 | PORTAL_ENCRYPTION_KEY | 自动生成到数据目录 | AI API Key 加密密钥；安装脚本会自动生成，生产环境必须长期保持稳定 |
+
+邮箱验证、密码找回、注册开关、公开站点地址、SMTP 与 Turnstile 均在“用户与社区管理”页面配置。默认关闭邮箱验证与 Turnstile；启用前应先保存 SMTP 后执行连接测试，并确保公开站点地址可从邮件收件端访问。
 
 AI 接口默认禁止访问回环地址和内网地址，以降低服务端请求伪造风险。只有明确连接本地模型服务时，才在知识管理页开启“允许 AI 接口连接本机或内网地址”。

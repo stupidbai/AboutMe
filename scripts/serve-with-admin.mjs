@@ -1,4 +1,4 @@
-import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
+import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
 import { chmodSync, createReadStream, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { extname, join, resolve, sep } from 'node:path'
@@ -7,8 +7,10 @@ import { RagService } from './rag-service.mjs'
 import {
   contentExcerpt, hashPassword, normalizeArticlePath, publicUser, renderCommunityContent, validateComment,
   validateForumPost, validateForumReply, validateLogin, validatePasswordChange,
-  validateProfile, validateRegistration, verifyPassword
+  validateProfile, validateRegistration, validateResetPassword, verifyPassword
 } from './community-service.mjs'
+import { publicCommunitySettings } from './community-settings.mjs'
+import { sendPasswordResetEmail, sendVerificationEmail, testSmtpConnection } from './email-service.mjs'
 
 const root = resolve(import.meta.dirname, '..')
 const distRoot = resolve(root, 'dist')
@@ -18,6 +20,7 @@ const siteConfigSeedFile = resolve(root, 'config/site-config.json')
 const knowledgeSeedFile = resolve(root, 'config/knowledge.json')
 const sessionCookieName = 'case_admin_session'
 const userSessionCookieName = 'portal_user_session'
+const csrfCookieName = 'portal_csrf'
 const sessions = new Map()
 const loginAttempts = new Map()
 const ragAttempts = new Map()
@@ -238,6 +241,49 @@ const clearCommunitySessionCookie = request => [
   getProtocol(request) === 'https' ? 'Secure' : ''
 ].filter(Boolean).join('; ')
 
+const signCsrf = token => `${token}.${createHmac('sha256', encryption.secret).update('csrf|' + token).digest('base64url')}`
+const validCsrfCookie = value => {
+  const [token, signature] = String(value || '').split('.')
+  if (!/^[a-f0-9]{32}$/.test(token || '') || !signature) return false
+  return safeEqual(signature, signCsrf(token).split('.')[1])
+}
+const csrfForRequest = request => {
+  const existing = parseCookies(request)[csrfCookieName]
+  return validCsrfCookie(existing) ? existing : signCsrf(randomBytes(16).toString('hex'))
+}
+const createCsrfCookie = (request, value) => [
+  csrfCookieName + '=' + encodeURIComponent(value),
+  'SameSite=Strict',
+  'Path=/',
+  'Max-Age=' + Math.floor(userSessionLifetimeMs / 1000),
+  getProtocol(request) === 'https' ? 'Secure' : ''
+].filter(Boolean).join('; ')
+const validCommunityWrite = request => {
+  if (!sameOrigin(request)) return false
+  const cookie = parseCookies(request)[csrfCookieName]
+  return validCsrfCookie(cookie) && safeEqual(cookie, String(request.headers['x-csrf-token'] || ''))
+}
+
+const hashOneTimeToken = token => createHash('sha256').update('community-token|' + token).digest('hex')
+const issueCommunityToken = (type, userId) => {
+  const token = randomBytes(32).toString('base64url')
+  portalDatabase.createCommunityToken({
+    id: randomBytes(12).toString('hex'), tokenHash: hashOneTimeToken(token), type, userId,
+    expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString()
+  })
+  return token
+}
+
+const verifyTurnstile = async (settings, token, request) => {
+  if (!settings.turnstileEnabled) return true
+  if (!settings.turnstileSecret || !token) return false
+  const body = new URLSearchParams({ secret: settings.turnstileSecret, response: String(token), remoteip: request.socket.remoteAddress || '' })
+  const result = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+    method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body, signal: AbortSignal.timeout(10_000)
+  })
+  return result.ok && Boolean((await result.json()).success)
+}
+
 const getCommunitySession = request => {
   const token = parseCookies(request)[userSessionCookieName]
   if (!token || !/^[a-f0-9]{64}$/.test(token)) return null
@@ -389,21 +435,40 @@ const handleRequest = async (request, response) => {
 
   if (pathname === '/api/auth/session' && request.method === 'GET') {
     const session = getCommunitySession(request)
-    sendJson(response, 200, { authenticated: Boolean(session), user: publicSessionUser(session?.user), sessionDays: userSessionDays })
+    const csrfToken = csrfForRequest(request)
+    sendJson(response, 200, { authenticated: Boolean(session), user: publicSessionUser(session?.user), sessionDays: userSessionDays, csrfToken }, {
+      'set-cookie': createCsrfCookie(request, csrfToken)
+    })
+    return
+  }
+
+  if (pathname === '/api/community/status' && request.method === 'GET') {
+    sendJson(response, 200, publicCommunitySettings(portalDatabase.getCommunitySettings()))
     return
   }
 
   if (pathname === '/api/auth/register' && request.method === 'POST') {
-    if (!sameOrigin(request)) { sendJson(response, 403, { error: '请求来源无效。' }); return }
+    if (!validCommunityWrite(request)) { sendJson(response, 403, { error: '安全令牌无效，请刷新页面后重试。' }); return }
     const limit = checkRateLimit(registrationAttempts, requestHash(request, 'register'), 5, 60 * 60 * 1000)
     if (!limit.allowed) { sendJson(response, 429, { error: '注册尝试过多，请稍后再试。' }, { 'retry-after': String(limit.retryAfter) }); return }
     try {
-      const registration = validateRegistration(await readJsonBody(request, 32 * 1024))
+      const body = await readJsonBody(request, 32 * 1024)
+      const settings = portalDatabase.getCommunitySettings({ includeSecrets: true })
+      if (!settings.registrationEnabled) { sendJson(response, 403, { error: '当前暂未开放新用户注册。' }); return }
+      if (!await verifyTurnstile(settings, body.turnstileToken, request)) { sendJson(response, 400, { error: '人机验证未通过，请重试。' }); return }
+      const registration = validateRegistration(body)
       const id = randomBytes(12).toString('hex')
       const user = portalDatabase.createCommunityUser({
         id, username: registration.username, email: registration.email, displayName: registration.displayName,
-        passwordHash: await hashPassword(registration.password)
+        passwordHash: await hashPassword(registration.password), emailVerified: !settings.requireEmailVerification
       })
+      portalDatabase.recordProductEvent('register_complete', { userId: id })
+      if (settings.requireEmailVerification) {
+        const token = issueCommunityToken('verify_email', id)
+        await sendVerificationEmail(settings, { to: registration.email, displayName: registration.displayName, token })
+        sendJson(response, 201, { ok: true, requiresEmailVerification: true, message: '验证邮件已发送，请在 30 分钟内完成验证。' })
+        return
+      }
       const session = createCommunitySession(request, id)
       sendJson(response, 201, { ok: true, user: publicSessionUser({ ...user, email: registration.email }) }, {
         'set-cookie': createCommunitySessionCookie(request, session.token)
@@ -418,7 +483,7 @@ const handleRequest = async (request, response) => {
   }
 
   if (pathname === '/api/auth/login' && request.method === 'POST') {
-    if (!sameOrigin(request)) { sendJson(response, 403, { error: '请求来源无效。' }); return }
+    if (!validCommunityWrite(request)) { sendJson(response, 403, { error: '安全令牌无效，请刷新页面后重试。' }); return }
     const addressKey = requestHash(request, 'user-login')
     const limit = checkRateLimit(userLoginAttempts, addressKey, 10, 15 * 60 * 1000)
     if (!limit.allowed) { sendJson(response, 429, { error: '登录尝试过多，请十五分钟后再试。' }, { 'retry-after': String(limit.retryAfter) }); return }
@@ -428,8 +493,10 @@ const handleRequest = async (request, response) => {
       const valid = await verifyPassword(credentials.password, user?.passwordHash || dummyPasswordHash)
       if (!user || !valid) { sendJson(response, 401, { error: '账号或密码错误。' }); return }
       if (user.status !== 'active') { sendJson(response, 403, { error: '账号已被停用，请联系管理员。' }); return }
+      if (portalDatabase.getCommunitySettings().requireEmailVerification && !user.emailVerified) { sendJson(response, 403, { error: '请先通过验证邮件完成邮箱验证。', code: 'email_unverified' }); return }
       userLoginAttempts.delete(addressKey)
       portalDatabase.updateCommunityLastLogin(user.id)
+      portalDatabase.recordProductEvent('login', { userId: user.id })
       const session = createCommunitySession(request, user.id)
       sendJson(response, 200, { ok: true, user: publicSessionUser(user) }, { 'set-cookie': createCommunitySessionCookie(request, session.token) })
     } catch (error) {
@@ -438,8 +505,69 @@ const handleRequest = async (request, response) => {
     return
   }
 
+  if (pathname === '/api/auth/verify-email' && request.method === 'POST') {
+    if (!validCommunityWrite(request)) { sendJson(response, 403, { error: '安全令牌无效，请刷新页面后重试。' }); return }
+    try {
+      const body = await readJsonBody(request, 8 * 1024)
+      const token = typeof body.token === 'string' ? body.token.trim() : ''
+      const user = token && portalDatabase.consumeCommunityToken('verify_email', hashOneTimeToken(token))
+      if (!user) { sendJson(response, 400, { error: '验证链接无效或已过期。' }); return }
+      const verified = portalDatabase.markCommunityEmailVerified(user.id)
+      portalDatabase.recordProductEvent('email_verified', { userId: user.id })
+      const session = createCommunitySession(request, user.id)
+      sendJson(response, 200, { ok: true, user: publicSessionUser(verified) }, { 'set-cookie': createCommunitySessionCookie(request, session.token) })
+    } catch (error) { sendJson(response, 400, { error: error.message }) }
+    return
+  }
+
+  if (pathname === '/api/auth/resend-verification' && request.method === 'POST') {
+    if (!validCommunityWrite(request)) { sendJson(response, 403, { error: '安全令牌无效，请刷新页面后重试。' }); return }
+    const limit = checkRateLimit(registrationAttempts, requestHash(request, 'resend'), 3, 60 * 60 * 1000)
+    if (!limit.allowed) { sendJson(response, 429, { error: '发送过于频繁，请稍后再试。' }); return }
+    try {
+      const body = await readJsonBody(request, 8 * 1024)
+      const identity = String(body.identity || '').trim().toLowerCase()
+      const user = portalDatabase.getCommunityUserByIdentity(identity, { includePrivate: true })
+      const settings = portalDatabase.getCommunitySettings({ includeSecrets: true })
+      if (user && !user.emailVerified && settings.requireEmailVerification) {
+        await sendVerificationEmail(settings, { to: user.email, displayName: user.displayName, token: issueCommunityToken('verify_email', user.id) })
+      }
+      sendJson(response, 200, { ok: true, message: '如果账号需要验证，邮件将很快送达。' })
+    } catch (error) { console.error('[email-error] ' + error.message); sendJson(response, 200, { ok: true, message: '如果账号需要验证，邮件将很快送达。' }) }
+    return
+  }
+
+  if (pathname === '/api/auth/forgot-password' && request.method === 'POST') {
+    if (!validCommunityWrite(request)) { sendJson(response, 403, { error: '安全令牌无效，请刷新页面后重试。' }); return }
+    const limit = checkRateLimit(userLoginAttempts, requestHash(request, 'forgot'), 3, 60 * 60 * 1000)
+    if (!limit.allowed) { sendJson(response, 429, { error: '请求过于频繁，请稍后再试。' }); return }
+    try {
+      const body = await readJsonBody(request, 8 * 1024)
+      const user = portalDatabase.getCommunityUserByIdentity(String(body.identity || '').trim().toLowerCase(), { includePrivate: true })
+      const settings = portalDatabase.getCommunitySettings({ includeSecrets: true })
+      if (user && settings.smtpHost && settings.smtpFrom) {
+        await sendPasswordResetEmail(settings, { to: user.email, displayName: user.displayName, token: issueCommunityToken('reset_password', user.id) })
+      }
+    } catch (error) { console.error('[email-error] ' + error.message) }
+    sendJson(response, 200, { ok: true, message: '如果账号存在，重置邮件将很快送达。' })
+    return
+  }
+
+  if (pathname === '/api/auth/reset-password' && request.method === 'POST') {
+    if (!validCommunityWrite(request)) { sendJson(response, 403, { error: '安全令牌无效，请刷新页面后重试。' }); return }
+    try {
+      const reset = validateResetPassword(await readJsonBody(request, 16 * 1024))
+      const user = portalDatabase.consumeCommunityToken('reset_password', hashOneTimeToken(reset.token))
+      if (!user) { sendJson(response, 400, { error: '重置链接无效或已过期。' }); return }
+      portalDatabase.updateCommunityPassword(user.id, await hashPassword(reset.password))
+      portalDatabase.deleteCommunitySessions(user.id)
+      sendJson(response, 200, { ok: true, message: '密码已重置，请使用新密码登录。' })
+    } catch (error) { sendJson(response, 400, { error: error.message }) }
+    return
+  }
+
   if (pathname === '/api/auth/logout' && request.method === 'POST') {
-    if (!sameOrigin(request)) { sendJson(response, 403, { error: '请求来源无效。' }); return }
+    if (!validCommunityWrite(request)) { sendJson(response, 403, { error: '安全令牌无效，请刷新页面后重试。' }); return }
     const token = parseCookies(request)[userSessionCookieName]
     if (token) portalDatabase.deleteCommunitySession(communitySessionTokenHash(token))
     sendJson(response, 200, { ok: true }, { 'set-cookie': clearCommunitySessionCookie(request) })
@@ -447,7 +575,7 @@ const handleRequest = async (request, response) => {
   }
 
   if (pathname === '/api/auth/profile' && request.method === 'PUT') {
-    if (!sameOrigin(request)) { sendJson(response, 403, { error: '请求来源无效。' }); return }
+    if (!validCommunityWrite(request)) { sendJson(response, 403, { error: '安全令牌无效，请刷新页面后重试。' }); return }
     const session = requireCommunityUser(request, response)
     if (!session) return
     try {
@@ -459,7 +587,7 @@ const handleRequest = async (request, response) => {
   }
 
   if (pathname === '/api/auth/password' && request.method === 'PUT') {
-    if (!sameOrigin(request)) { sendJson(response, 403, { error: '请求来源无效。' }); return }
+    if (!validCommunityWrite(request)) { sendJson(response, 403, { error: '安全令牌无效，请刷新页面后重试。' }); return }
     const session = requireCommunityUser(request, response)
     if (!session) return
     try {
@@ -483,7 +611,7 @@ const handleRequest = async (request, response) => {
   }
 
   if (pathname === '/api/comments' && request.method === 'POST') {
-    if (!sameOrigin(request)) { sendJson(response, 403, { error: '请求来源无效。' }); return }
+    if (!validCommunityWrite(request)) { sendJson(response, 403, { error: '安全令牌无效，请刷新页面后重试。' }); return }
     const session = requireCommunityUser(request, response)
     if (!session) return
     const limit = checkRateLimit(communityWriteAttempts, `comment|${session.user.id}`, 20, 10 * 60 * 1000)
@@ -492,6 +620,7 @@ const handleRequest = async (request, response) => {
       const comment = validateComment(await readJsonBody(request, 32 * 1024))
       const id = randomBytes(12).toString('hex')
       portalDatabase.createArticleComment({ id, ...comment, userId: session.user.id })
+      portalDatabase.recordProductEvent('comment_created', { userId: session.user.id, context: comment.articlePath })
       const created = portalDatabase.listArticleComments(comment.articlePath, session.user.id).find(item => item.id === id)
       sendJson(response, 201, commentPayload(created))
     } catch (error) { sendJson(response, 400, { error: error.message }) }
@@ -500,7 +629,7 @@ const handleRequest = async (request, response) => {
 
   const commentLikeMatch = pathname.match(/^\/api\/comments\/([a-f0-9]{24})\/like$/)
   if (commentLikeMatch && request.method === 'POST') {
-    if (!sameOrigin(request)) { sendJson(response, 403, { error: '请求来源无效。' }); return }
+    if (!validCommunityWrite(request)) { sendJson(response, 403, { error: '安全令牌无效，请刷新页面后重试。' }); return }
     const session = requireCommunityUser(request, response)
     if (!session) return
     try { sendJson(response, 200, portalDatabase.toggleArticleCommentLike(commentLikeMatch[1], session.user.id)) }
@@ -510,7 +639,7 @@ const handleRequest = async (request, response) => {
 
   const commentDeleteMatch = pathname.match(/^\/api\/comments\/([a-f0-9]{24})$/)
   if (commentDeleteMatch && request.method === 'DELETE') {
-    if (!sameOrigin(request)) { sendJson(response, 403, { error: '请求来源无效。' }); return }
+    if (!validCommunityWrite(request)) { sendJson(response, 403, { error: '安全令牌无效，请刷新页面后重试。' }); return }
     const session = requireCommunityUser(request, response)
     if (!session) return
     const comment = portalDatabase.getArticleComment(commentDeleteMatch[1])
@@ -539,7 +668,7 @@ const handleRequest = async (request, response) => {
   }
 
   if (pathname === '/api/forum/posts' && request.method === 'POST') {
-    if (!sameOrigin(request)) { sendJson(response, 403, { error: '请求来源无效。' }); return }
+    if (!validCommunityWrite(request)) { sendJson(response, 403, { error: '安全令牌无效，请刷新页面后重试。' }); return }
     const session = requireCommunityUser(request, response)
     if (!session) return
     const limit = checkRateLimit(communityWriteAttempts, `post|${session.user.id}`, 8, 60 * 60 * 1000)
@@ -548,6 +677,7 @@ const handleRequest = async (request, response) => {
       const post = validateForumPost(await readJsonBody(request, 64 * 1024))
       const id = randomBytes(12).toString('hex')
       portalDatabase.createForumPost({ id, ...post, userId: session.user.id })
+      portalDatabase.recordProductEvent('forum_post_created', { userId: session.user.id, context: post.categoryId })
       sendJson(response, 201, forumPostPayload(portalDatabase.getForumPost(id, session.user.id)))
     } catch (error) { sendJson(response, 400, { error: error.message }) }
     return
@@ -567,7 +697,7 @@ const handleRequest = async (request, response) => {
 
   const forumReplyCreateMatch = pathname.match(/^\/api\/forum\/posts\/([a-f0-9]{24})\/replies$/)
   if (forumReplyCreateMatch && request.method === 'POST') {
-    if (!sameOrigin(request)) { sendJson(response, 403, { error: '请求来源无效。' }); return }
+    if (!validCommunityWrite(request)) { sendJson(response, 403, { error: '安全令牌无效，请刷新页面后重试。' }); return }
     const session = requireCommunityUser(request, response)
     if (!session) return
     const limit = checkRateLimit(communityWriteAttempts, `reply|${session.user.id}`, 30, 10 * 60 * 1000)
@@ -576,6 +706,7 @@ const handleRequest = async (request, response) => {
       const reply = validateForumReply(await readJsonBody(request, 48 * 1024))
       const id = randomBytes(12).toString('hex')
       portalDatabase.createForumReply({ id, postId: forumReplyCreateMatch[1], userId: session.user.id, ...reply })
+      portalDatabase.recordProductEvent('forum_reply_created', { userId: session.user.id, context: forumReplyCreateMatch[1] })
       const created = portalDatabase.listForumReplies(forumReplyCreateMatch[1], session.user.id).find(item => item.id === id)
       sendJson(response, 201, forumReplyPayload(created))
     } catch (error) { sendJson(response, 400, { error: error.message }) }
@@ -584,7 +715,7 @@ const handleRequest = async (request, response) => {
 
   const forumLikeMatch = pathname.match(/^\/api\/forum\/(posts|replies)\/([a-f0-9]{24})\/like$/)
   if (forumLikeMatch && request.method === 'POST') {
-    if (!sameOrigin(request)) { sendJson(response, 403, { error: '请求来源无效。' }); return }
+    if (!validCommunityWrite(request)) { sendJson(response, 403, { error: '安全令牌无效，请刷新页面后重试。' }); return }
     const session = requireCommunityUser(request, response)
     if (!session) return
     try { sendJson(response, 200, portalDatabase.toggleForumLike(forumLikeMatch[1] === 'posts' ? 'post' : 'reply', forumLikeMatch[2], session.user.id)) }
@@ -594,7 +725,7 @@ const handleRequest = async (request, response) => {
 
   const forumContentDeleteMatch = pathname.match(/^\/api\/forum\/(posts|replies)\/([a-f0-9]{24})$/)
   if (forumContentDeleteMatch && request.method === 'DELETE') {
-    if (!sameOrigin(request)) { sendJson(response, 403, { error: '请求来源无效。' }); return }
+    if (!validCommunityWrite(request)) { sendJson(response, 403, { error: '安全令牌无效，请刷新页面后重试。' }); return }
     const session = requireCommunityUser(request, response)
     if (!session) return
     const type = forumContentDeleteMatch[1] === 'posts' ? 'post' : 'reply'
@@ -651,6 +782,7 @@ const handleRequest = async (request, response) => {
         id: queryId, clientHash, question, mode: result.mode, sourceCount: result.sources.length,
         durationMs: Date.now() - startedAt, status: result.sources.length ? 'ok' : 'no_results'
       })
+      portalDatabase.recordProductEvent('rag_query', { userId: getCommunitySession(request)?.user.id || null, context: result.mode })
       sendJson(response, 200, { ...result, queryId })
     } catch (error) {
       console.error('[rag-error] ' + (error.stack || error.message))
@@ -933,6 +1065,48 @@ const handleRequest = async (request, response) => {
     return
   }
 
+  if (pathname === '/api/admin/community-settings') {
+    const session = getSession(request)
+    if (!session) { sendJson(response, 401, { error: '请先登录。' }); return }
+    if (request.method === 'GET') {
+      const settings = portalDatabase.getCommunitySettings()
+      const { revision, ...safeSettings } = settings
+      sendJson(response, 200, { ...safeSettings, smtpPassword: '', clearSmtpPassword: false, turnstileSecret: '', clearTurnstileSecret: false }, {
+        etag: revisionTag('community-settings', revision)
+      })
+      return
+    }
+    if (request.method === 'PUT') {
+      if (!sameOrigin(request)) { sendJson(response, 403, { error: '请求来源无效。' }); return }
+      const expectedRevision = parseRevisionTag(request.headers['if-match'], 'community-settings')
+      if (expectedRevision === undefined) { sendJson(response, 428, { error: '缺少有效的配置版本，请刷新后重试。' }); return }
+      try {
+        const saved = await portalDatabase.replaceCommunitySettings(await readJsonBody(request, 64 * 1024), { expectedRevision, actor: session.username })
+        const { revision, ...safeSettings } = saved
+        sendJson(response, 200, { ...safeSettings, smtpPassword: '', clearSmtpPassword: false, turnstileSecret: '', clearTurnstileSecret: false }, {
+          etag: revisionTag('community-settings', revision)
+        })
+      } catch (error) { sendJson(response, error instanceof DatabaseConflictError ? 409 : 400, { error: error.message }) }
+      return
+    }
+    sendJson(response, 405, { error: '请求方法不支持。' }, { allow: 'GET, PUT' })
+    return
+  }
+
+  if (pathname === '/api/admin/community-settings/test-smtp' && request.method === 'POST') {
+    if (!getSession(request)) { sendJson(response, 401, { error: '请先登录。' }); return }
+    if (!sameOrigin(request)) { sendJson(response, 403, { error: '请求来源无效。' }); return }
+    try { await testSmtpConnection(portalDatabase.getCommunitySettings({ includeSecrets: true })); sendJson(response, 200, { ok: true }) }
+    catch (error) { sendJson(response, 502, { error: error.message }) }
+    return
+  }
+
+  if (pathname === '/api/admin/product-metrics' && request.method === 'GET') {
+    if (!getSession(request)) { sendJson(response, 401, { error: '请先登录。' }); return }
+    sendJson(response, 200, portalDatabase.getProductMetrics(url.searchParams.get('days') || 30))
+    return
+  }
+
   if (pathname === '/api/admin/users' && request.method === 'GET') {
     if (!getSession(request)) {
       sendJson(response, 401, { error: '请先登录。' })
@@ -1002,7 +1176,16 @@ const handleRequest = async (request, response) => {
       if (!allowed.includes(status)) throw new Error('内容状态无效。')
       const options = { actorType: 'admin', actorId: session.username }
       if (type === 'comment') portalDatabase.setArticleCommentStatus(moderationMatch[2], status, options)
-      else if (type === 'post') portalDatabase.setForumPostStatus(moderationMatch[2], status, options)
+      else if (type === 'post') {
+        portalDatabase.setForumPostStatus(moderationMatch[2], status, options)
+        if (typeof body.pinned === 'boolean' || typeof body.featured === 'boolean') {
+          const existing = portalDatabase.getForumPostRecord(moderationMatch[2])
+          portalDatabase.setForumPostFlags(moderationMatch[2], {
+            pinned: typeof body.pinned === 'boolean' ? body.pinned : Boolean(existing.is_pinned),
+            featured: typeof body.featured === 'boolean' ? body.featured : Boolean(existing.is_featured)
+          }, session.username)
+        }
+      }
       else portalDatabase.setForumReplyStatus(moderationMatch[2], status, options)
       sendJson(response, 200, { ok: true, id: moderationMatch[2], type, status })
     } catch (error) {
@@ -1018,6 +1201,8 @@ const handleRequest = async (request, response) => {
     }
     const aiSettings = portalDatabase.getAiSettings()
     const { revision: aiRevision, apiKeySet, ...safeAiSettings } = aiSettings
+    const communitySettings = portalDatabase.getCommunitySettings()
+    const { smtpPasswordSet, turnstileSecretSet, ...safeCommunitySettings } = communitySettings
     sendJson(response, 200, {
       exportedAt: new Date().toISOString(),
       formatVersion: 1,
@@ -1025,7 +1210,12 @@ const handleRequest = async (request, response) => {
       site: portalDatabase.getSiteConfigSnapshot(),
       knowledge: portalDatabase.getKnowledgeSnapshot(),
       ai: { settings: safeAiSettings, revision: aiRevision, apiKeyIncluded: false, hadApiKey: apiKeySet },
-      community: { statistics: portalDatabase.getCommunityStats(), personalDataIncluded: false }
+      community: {
+        statistics: portalDatabase.getCommunityStats(),
+        configuration: { ...safeCommunitySettings, smtpPasswordIncluded: false, turnstileSecretIncluded: false },
+        secretStatus: { smtpPasswordSet, turnstileSecretSet },
+        personalDataIncluded: false
+      }
     }, { 'content-disposition': `attachment; filename="portal-export-${new Date().toISOString().slice(0, 10)}.json"` })
     return
   }
@@ -1056,6 +1246,7 @@ const cleanupTimer = setInterval(() => {
   for (const [address, attempt] of userLoginAttempts) if (attempt.resetAt <= now) userLoginAttempts.delete(address)
   for (const [address, attempt] of communityWriteAttempts) if (attempt.resetAt <= now) communityWriteAttempts.delete(address)
   portalDatabase.pruneCommunitySessions()
+  portalDatabase.pruneCommunityTokens()
 }, 10 * 60 * 1000)
 cleanupTimer.unref()
 

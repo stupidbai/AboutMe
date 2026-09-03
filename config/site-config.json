@@ -43,7 +43,8 @@
     { "code": "04 · INSIGHTS", "title": "主题地图与实践方法", "description": "把企业 AI 落地、可信系统、工程交付和生态建设组织成可进入的知识地图。", "link": "/insights", "tags": ["企业 AI", "可信系统", "FDE"], "accent": "orange", "enabled": true },
     { "code": "05 · KNOWLEDGE", "title": "知识库与实践笔记", "description": "围绕企业 AI、知识工程、可信系统、交付管理和生态协同沉淀原创知识条目。", "link": "/knowledge", "tags": ["原创条目", "分类检索", "持续更新"], "accent": "blue", "enabled": true },
     { "code": "06 · LIFE", "title": "工作之外的个人侧面", "description": "户外、骑行、摄影、口琴，以及持续表达与内容创作。", "link": "/life", "tags": ["户外影像", "公众号", "视频号"], "accent": "green", "enabled": true },
-    { "code": "07 · CONTACT", "title": "联系方式与合作入口", "description": "从一个具体问题开始，说明场景、资源、目标和希望共同承担的角色。", "link": "/contact", "tags": ["微信", "电话", "邮箱"], "accent": "cyan", "enabled": true }
+    { "code": "07 · FORUM", "title": "交流论坛与社区共创", "description": "围绕企业 AI、工程实践、商业合作和生态连接持续讨论。", "link": "/forum", "tags": ["开放讨论", "经验互助", "合作连接"], "accent": "violet", "enabled": true },
+    { "code": "08 · CONTACT", "title": "联系方式与合作入口", "description": "从一个具体问题开始，说明场景、资源、目标和希望共同承担的角色。", "link": "/contact", "tags": ["微信", "电话", "邮箱"], "accent": "cyan", "enabled": true }
   ],
   "focusAreas": [
     { "code": "TRUSTED DIGITAL", "title": "公证与可信数字化", "description": "把专业规则、业务流程和可信机制转化为可运行、可追溯、可持续演进的系统。" },

@@ -32,6 +32,8 @@ const copyEntries = [
   ['scripts/rag-service.mjs', 'scripts/rag-service.mjs'],
   ['scripts/network-security.mjs', 'scripts/network-security.mjs'],
   ['scripts/community-service.mjs', 'scripts/community-service.mjs'],
+  ['scripts/community-settings.mjs', 'scripts/community-settings.mjs'],
+  ['scripts/email-service.mjs', 'scripts/email-service.mjs'],
   ['install', 'install'],
   ['bin', 'bin'],
   ['THIRD_PARTY_NOTICES.md', 'THIRD_PARTY_NOTICES.md'],

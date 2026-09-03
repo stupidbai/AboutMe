@@ -16,6 +16,10 @@ const requiredFiles = [
   'site/insights.md',
   'site/knowledge.md',
   'site/knowledge/archive.md',
+  'site/knowledge/item.md',
+  'site/privacy.md',
+  'site/terms.md',
+  'site/community-guidelines.md',
   'site/life.md',
   'site/contact.md',
   'site/.vitepress/config.mts',
@@ -31,6 +35,7 @@ const requiredFiles = [
   'site/.vitepress/theme/components/ArticleComments.vue',
   'site/.vitepress/theme/components/ForumBoard.vue',
   'site/.vitepress/theme/components/UserAdmin.vue',
+  'site/.vitepress/theme/components/KnowledgeDetail.vue',
   'site/.vitepress/theme/useCommunityAuth.ts',
   'site/.vitepress/theme/useSiteConfig.ts',
   'site/data/siteConfig.ts',
@@ -52,6 +57,8 @@ const requiredFiles = [
   'scripts/rag-service.mjs',
   'scripts/network-security.mjs',
   'scripts/community-service.mjs',
+  'scripts/community-settings.mjs',
+  'scripts/email-service.mjs',
   'scripts/test-community-service.mjs',
   'scripts/test-rag-service.mjs',
   'scripts/test-database.mjs',
@@ -175,10 +182,10 @@ if (!ragAssistantSource.includes('/api/rag/query') || !ragAssistantSource.includ
   throw new Error('RAG assistant must call the protected server endpoint and show local citations')
 }
 const requiredCommunityUiAnchors = [
-  [accountSource, ['/api/auth/register', '/api/auth/login', '/api/auth/profile', '/api/auth/password']],
+  [accountSource, ['/api/auth/register', '/api/auth/login', '/api/auth/profile', '/api/auth/password', '/api/auth/forgot-password', 'ZxcvbnFactory']],
   [commentsSource, ['/api/comments', '/like', '注册或登录']],
   [forumSource, ['/api/forum/categories', '/api/forum/posts', '/replies', '/like']],
-  [userAdminSource, ['/api/admin/users', '/api/admin/moderation', '/api/admin/community/stats']]
+  [userAdminSource, ['/api/admin/users', '/api/admin/moderation', '/api/admin/community/stats', '/api/admin/community-settings', '/api/admin/product-metrics']]
 ]
 for (const [source, anchors] of requiredCommunityUiAnchors) {
   const missing = anchors.filter(anchor => !source.includes(anchor))
@@ -207,10 +214,15 @@ const requiredServerAnchors = [
   '/api/rag/feedback',
   '/api/auth/register',
   '/api/auth/login',
+  '/api/auth/reset-password',
+  '/api/community/status',
   '/api/comments',
   '/api/forum/posts',
   '/api/admin/users',
   '/api/admin/moderation',
+  '/api/admin/community-settings',
+  '/api/admin/product-metrics',
+  'x-csrf-token',
   'config/cases.json',
   '/api/health',
   'PortalDatabase',
@@ -244,6 +256,9 @@ const requiredDatabaseAnchors = [
   'CREATE TABLE IF NOT EXISTS article_comments',
   'CREATE TABLE IF NOT EXISTS forum_posts',
   'CREATE TABLE IF NOT EXISTS forum_replies',
+  'CREATE TABLE IF NOT EXISTS community_tokens',
+  'CREATE TABLE IF NOT EXISTS product_events',
+  'CREATE TABLE IF NOT EXISTS community_settings',
   "createCipheriv('aes-256-gcm'",
   'CREATE INDEX IF NOT EXISTS',
   'await backup',
@@ -260,7 +275,7 @@ if (missingDockerAnchors.length) throw new Error(`Missing Docker behavior: ${mis
 if (!composeSource.includes('portal-data:/data') || !composeSource.includes('read_only: true') || !composeSource.includes('no-new-privileges:true')) {
   throw new Error('Compose must keep SQLite in a volume and apply container hardening')
 }
-if (packageMetadata.version !== '4.0.0' || packageMetadata.engines?.node !== '>=22.16' || packageMetadata.dependencies?.minisearch !== '^7.2.0' || packageMetadata.dependencies?.['@noble/hashes'] !== '^2.4.0' || packageMetadata.dependencies?.marked !== '^18.0.11' || packageMetadata.dependencies?.['sanitize-html'] !== '^2.17.7') {
+if (packageMetadata.version !== '4.1.0' || packageMetadata.engines?.node !== '>=22.16' || packageMetadata.dependencies?.minisearch !== '^7.2.0' || packageMetadata.dependencies?.['@noble/hashes'] !== '^2.4.0' || packageMetadata.dependencies?.marked !== '^18.0.11' || packageMetadata.dependencies?.['sanitize-html'] !== '^2.17.7' || packageMetadata.dependencies?.nodemailer !== '^9.1.1' || packageMetadata.dependencies?.['@zxcvbn-ts/core'] !== '^4.2.0') {
   throw new Error('Package version or Node.js SQLite runtime requirement is incorrect')
 }
 if (!ragServiceSource.includes("from 'minisearch'") || !ragServiceSource.includes('new MiniSearch') || !networkSecuritySource.includes('assertSafeOutboundUrl')) {

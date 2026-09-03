@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { withBase } from 'vitepress'
 import { knowledgeEntries as fallbackEntries, type KnowledgeEntry } from '../../../data/knowledge'
 
 const entries = ref<KnowledgeEntry[]>(fallbackEntries.map(entry => ({ ...entry, takeaways: [...entry.takeaways] })))
@@ -62,7 +63,7 @@ onMounted(async () => {
         <ul>
           <li v-for="takeaway in entry.takeaways" :key="takeaway">{{ takeaway }}</li>
         </ul>
-        <details class="knowledge-card__body"><summary>展开正文</summary><p>{{ entry.body }}</p></details>
+        <a class="knowledge-card__link" :href="`${withBase('/knowledge/item')}?id=${encodeURIComponent(entry.id)}`">阅读全文与参与讨论 →</a>
         <footer><span>{{ entry.id.toUpperCase() }}</span><time>{{ entry.updated }}</time></footer>
       </article>
     </div>

@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue'
 import { useRoute, withBase } from 'vitepress'
-import { useCommunityAuth } from '../useCommunityAuth'
+import { communityFetch, useCommunityAuth } from '../useCommunityAuth'
 
 interface CommentItem { id: string; parentId: string; bodyHtml: string; status: string; createdAt: string; likeCount: number; viewerLiked: boolean; author: null | { id: string; username: string; displayName: string; role: string } }
 const route = useRoute()
+const props = defineProps<{ articlePath?: string }>()
 const { state, refresh } = useCommunityAuth()
 const comments = ref<CommentItem[]>([])
 const body = ref('')
@@ -12,36 +13,36 @@ const parentId = ref('')
 const busy = ref(false)
 const error = ref('')
 const available = ref(true)
-const articlePath = () => route.path.replace(/\.html$/, '').replace(/\/$/, '')
+const resolvedArticlePath = () => props.articlePath || route.path.replace(/\.html$/, '').replace(/\/$/, '')
 const formatDate = (value: string) => new Intl.DateTimeFormat('zh-CN', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
 const readError = async (response: Response) => { try { return (await response.json()).error || `请求失败（${response.status}）` } catch { return `请求失败（${response.status}）` } }
 const load = async () => {
   error.value = ''
   try {
-    const response = await fetch(`/api/comments?article=${encodeURIComponent(articlePath())}`, { credentials: 'same-origin' })
+    const response = await fetch(`/api/comments?article=${encodeURIComponent(resolvedArticlePath())}`, { credentials: 'same-origin' })
     if (!response.ok || !response.headers.get('content-type')?.includes('application/json')) { available.value = false; return }
     comments.value = (await response.json()).comments; available.value = true
   } catch { available.value = false }
 }
 onMounted(async () => { await Promise.all([refresh(), load()]) })
-watch(() => route.path, load)
+watch(() => [route.path, props.articlePath], load)
 const submit = async () => {
   if (!state.user) return
   busy.value = true; error.value = ''
   try {
-    const response = await fetch('/api/comments', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ articlePath: articlePath(), parentId: parentId.value, body: body.value }) })
+    const response = await communityFetch('/api/comments', { method: 'POST', body: JSON.stringify({ articlePath: resolvedArticlePath(), parentId: parentId.value, body: body.value }) })
     if (!response.ok) { error.value = await readError(response); return }
     body.value = ''; parentId.value = ''; await load()
   } finally { busy.value = false }
 }
 const like = async (item: CommentItem) => {
   if (!state.user) return
-  const response = await fetch(`/api/comments/${item.id}/like`, { method: 'POST', credentials: 'same-origin' })
+  const response = await communityFetch(`/api/comments/${item.id}/like`, { method: 'POST' })
   if (response.ok) Object.assign(item, await response.json())
 }
 const remove = async (item: CommentItem) => {
   if (!confirm('确认删除这条评论？')) return
-  const response = await fetch(`/api/comments/${item.id}`, { method: 'DELETE', credentials: 'same-origin' })
+  const response = await communityFetch(`/api/comments/${item.id}`, { method: 'DELETE' })
   if (response.ok) await load(); else error.value = await readError(response)
 }
 </script>
@@ -61,4 +62,3 @@ const remove = async (item: CommentItem) => {
     <p v-if="error" class="case-admin-feedback case-admin-feedback--error">{{ error }}</p>
   </section>
 </template>
-

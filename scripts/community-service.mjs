@@ -27,8 +27,7 @@ export const validateRegistration = payload => {
   if (!USERNAME_PATTERN.test(username)) throw new Error('用户名仅支持中文、字母、数字、下划线和短横线。')
   const displayName = text(payload?.displayName, '昵称', 2, 40)
   const email = normalizeEmail(payload?.email)
-  const password = text(payload?.password, '密码', 8, 128)
-  if (!/[A-Za-z\p{L}]/u.test(password) || !/\d/.test(password)) throw new Error('密码至少需要同时包含字母或文字与数字。')
+  const password = text(payload?.password, '密码', 12, 128)
   if (payload?.confirmPassword !== password) throw new Error('两次输入的密码不一致。')
   if (payload?.acceptedTerms !== true) throw new Error('请先同意社区规则与隐私说明。')
   if (payload?.website) throw new Error('注册请求无效。')
@@ -37,7 +36,7 @@ export const validateRegistration = payload => {
 
 export const validateLogin = payload => ({
   identity: text(payload?.identity, '账号', 3, 254).normalize('NFKC').toLowerCase(),
-  password: text(payload?.password, '密码', 8, 128)
+  password: text(payload?.password, '密码', 1, 128)
 })
 
 export const validateProfile = payload => ({
@@ -46,9 +45,8 @@ export const validateProfile = payload => ({
 })
 
 export const validatePasswordChange = payload => {
-  const currentPassword = text(payload?.currentPassword, '当前密码', 8, 128)
-  const newPassword = text(payload?.newPassword, '新密码', 8, 128)
-  if (!/[A-Za-z\p{L}]/u.test(newPassword) || !/\d/.test(newPassword)) throw new Error('新密码至少需要同时包含字母或文字与数字。')
+  const currentPassword = text(payload?.currentPassword, '当前密码', 1, 128)
+  const newPassword = text(payload?.newPassword, '新密码', 12, 128)
   if (payload?.confirmPassword !== newPassword) throw new Error('两次输入的新密码不一致。')
   if (currentPassword === newPassword) throw new Error('新密码不能与当前密码相同。')
   return { currentPassword, newPassword }
@@ -74,8 +72,15 @@ export const validateForumReply = payload => ({
 export const normalizeArticlePath = value => {
   if (typeof value !== 'string') throw new Error('文章路径无效。')
   const path = value.trim().replace(/\?.*$/, '').replace(/#.*$/, '').replace(/\/+$/, '') || '/'
-  if (!/^\/kb\/[a-zA-Z0-9/_-]{1,240}$/.test(path)) throw new Error('仅知识库文章支持评论。')
+  if (!/^\/(?:kb\/[a-zA-Z0-9/_-]{1,240}|knowledge\/item\/[a-zA-Z0-9_-]{1,80})$/.test(path)) throw new Error('仅知识库文章支持评论。')
   return path
+}
+
+export const validateResetPassword = payload => {
+  const token = text(payload?.token, '重置令牌', 32, 256)
+  const password = text(payload?.password, '新密码', 12, 128)
+  if (payload?.confirmPassword !== password) throw new Error('两次输入的新密码不一致。')
+  return { token, password }
 }
 
 export const hashPassword = async password => {
