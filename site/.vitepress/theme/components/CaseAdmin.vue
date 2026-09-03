@@ -284,6 +284,10 @@ onMounted(loadCases)
           </div>
         </article>
       </div>
+      <div class="admin-save-dock" role="region" aria-label="案例配置保存">
+        <span>修改后点击保存，公开案例页刷新后立即生效</span>
+        <button type="button" class="case-admin-primary" :disabled="busy" @click="saveCases">{{ busy ? '保存中…' : '保存并生效' }}</button>
+      </div>
     </template>
   </section>
 </template>

@@ -137,6 +137,10 @@ const insights = computed(() => {
       <section class="analytics-panel analytics-insights"><header><div><h2>自动分析提示</h2><p>基于当前周期的实际访问数据生成，便于决定下一轮内容与渠道优化重点。</p></div></header><ul><li v-for="item in insights" :key="item">{{ item }}</li></ul></section>
 
       <section class="analytics-panel analytics-settings"><header><div><h2>监控隐私与保留</h2><p>仅使用第一方匿名 Cookie 的单向摘要进行去重；不保存 IP、账号信息或完整来源 URL。</p></div></header><form class="community-form" @submit.prevent="saveSettings"><label class="community-consent"><input v-model="settings.enabled" type="checkbox"><span>启用站内访问监控</span></label><label class="community-consent"><input v-model="settings.respectDnt" type="checkbox"><span>遵守浏览器“禁止跟踪”偏好</span></label><label><span>事件保留天数</span><input v-model.number="settings.retentionDays" type="number" min="30" max="1825" required></label><div class="wide admin-form-actions"><button type="submit" :disabled="busy === 'settings'">保存监控配置</button></div></form></section>
+      <div class="admin-save-dock" role="region" aria-label="访问监控配置保存">
+        <span>修改监控配置后点击保存，设置立即生效</span>
+        <button type="button" class="case-admin-primary" :disabled="busy === 'settings'" @click="saveSettings">{{ busy === 'settings' ? '保存中…' : '保存并生效' }}</button>
+      </div>
     </template>
   </section>
 </template>

@@ -136,6 +136,10 @@ onMounted(loadConfig)
         <h3>优先合作方向</h3><div class="site-admin-repeat"><article v-for="(item, index) in config.cooperation.directions" :key="index" class="case-admin-card"><header><strong>{{ item.title }}</strong><div class="case-admin-card__actions"><button @click="move(config.cooperation.directions, index, -1)">↑</button><button @click="move(config.cooperation.directions, index, 1)">↓</button><button class="danger" @click="remove(config.cooperation.directions, index)">删除</button></div></header><div class="case-admin-fields"><label class="wide"><span>标题</span><input v-model="item.title"></label><label class="wide"><span>说明</span><textarea v-model="item.description" rows="2"></textarea></label><label class="wide"><span>要点（每行或顿号分隔）</span><textarea :value="item.items.join('\n')" rows="3" @input="setDirectionItems(item, $event)"></textarea></label></div></article><button class="site-admin-add" @click="addDirection">＋ 新增方向</button></div>
         <h3>合作流程</h3><div class="site-admin-repeat"><article v-for="(item, index) in config.cooperation.process" :key="index" class="case-admin-card"><header><strong>{{ item.title }}</strong><div class="case-admin-card__actions"><button @click="move(config.cooperation.process, index, -1)">↑</button><button @click="move(config.cooperation.process, index, 1)">↓</button><button class="danger" @click="remove(config.cooperation.process, index)">删除</button></div></header><div class="case-admin-fields"><label><span>标题</span><input v-model="item.title"></label><label><span>说明</span><input v-model="item.description"></label></div></article><button class="site-admin-add" @click="addProcess">＋ 新增流程</button></div>
       </details>
+      <div class="admin-save-dock" role="region" aria-label="站点配置保存">
+        <span>修改后点击保存，公开页面刷新后立即生效</span>
+        <button type="button" class="case-admin-primary" :disabled="busy" @click="save">{{ busy ? '保存中…' : '保存并生效' }}</button>
+      </div>
     </template>
   </section>
 </template>

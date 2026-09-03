@@ -166,6 +166,7 @@ const requiredAdminAnchors = [
   '新增案例',
   '删除',
   '保存全部修改',
+  '保存并生效',
   "'if-match': revision.value",
   'response.status === 409'
 ]
@@ -176,14 +177,14 @@ if (missingAdminAnchors.length) {
 if (caseAdminSource.includes('localStorage')) {
   throw new Error('Case admin must use server persistence, not browser localStorage')
 }
-const requiredSiteAdminAnchors = ['/api/admin/site-config', '首页目录与版块显隐', '职业时间线', '保存全部修改', "'if-match': revision.value"]
+const requiredSiteAdminAnchors = ['/api/admin/site-config', '首页目录与版块显隐', '职业时间线', '保存全部修改', '保存并生效', "'if-match': revision.value"]
 const missingSiteAdminAnchors = requiredSiteAdminAnchors.filter(anchor => !siteAdminSource.includes(anchor))
 if (missingSiteAdminAnchors.length) throw new Error(`Missing site admin behavior: ${missingSiteAdminAnchors.join(', ')}`)
 if (siteAdminSource.includes('localStorage')) throw new Error('Site admin must use server persistence, not browser localStorage')
 if (!Array.isArray(siteConfig.routes) || !Array.isArray(siteConfig.timeline) || !Array.isArray(siteConfig.cooperation?.directions)) {
   throw new Error('Site configuration seed is incomplete')
 }
-const requiredKnowledgeAdminAnchors = ['/api/admin/knowledge', '/api/admin/ai-settings', '/api/admin/ai-test', '/api/admin/rag-stats', '/api/admin/export', '导入 Markdown/TXT', '保存知识库', 'API Key']
+const requiredKnowledgeAdminAnchors = ['/api/admin/knowledge', '/api/admin/ai-settings', '/api/admin/ai-test', '/api/admin/rag-stats', '/api/admin/export', '导入 Markdown/TXT', '保存知识库', '保存 AI 配置', 'API Key']
 const missingKnowledgeAdminAnchors = requiredKnowledgeAdminAnchors.filter(anchor => !knowledgeAdminSource.includes(anchor))
 if (missingKnowledgeAdminAnchors.length) throw new Error(`Missing knowledge admin behavior: ${missingKnowledgeAdminAnchors.join(', ')}`)
 if (!ragAssistantSource.includes('/api/rag/query') || !ragAssistantSource.includes('/api/rag/feedback') || !ragAssistantSource.includes('引用的本地资料')) {
@@ -193,7 +194,7 @@ const requiredCommunityUiAnchors = [
   [accountSource, ['/api/auth/register', '/api/auth/login', '/api/auth/profile', '/api/auth/password', '/api/auth/forgot-password', 'ZxcvbnFactory']],
   [commentsSource, ['/api/comments', '/like', '注册或登录']],
   [forumSource, ['/api/forum/categories', '/api/forum/posts', '/replies', '/like']],
-  [userAdminSource, ['/api/admin/users', '/api/admin/moderation', '/api/admin/community/stats', '/api/admin/community-settings', '/api/admin/product-metrics']]
+  [userAdminSource, ['/api/admin/users', '/api/admin/moderation', '/api/admin/community/stats', '/api/admin/community-settings', '/api/admin/product-metrics', '保存并生效']]
 ]
 for (const [source, anchors] of requiredCommunityUiAnchors) {
   const missing = anchors.filter(anchor => !source.includes(anchor))
@@ -201,7 +202,7 @@ for (const [source, anchors] of requiredCommunityUiAnchors) {
 }
 const requiredAnalyticsUiAnchors = [
   [analyticsAdminPageSource, ['<AnalyticsDashboard />', 'noindex, nofollow']],
-  [analyticsDashboardSource, ['/api/admin/analytics', '/api/admin/analytics-settings', '页面浏览 PV', '独立访客 UV', '每日访问趋势', '行动转化', '体验性能', '监控隐私与保留', 'P95']],
+  [analyticsDashboardSource, ['/api/admin/analytics', '/api/admin/analytics-settings', '页面浏览 PV', '独立访客 UV', '每日访问趋势', '行动转化', '体验性能', '监控隐私与保留', '保存并生效', 'P95']],
   [analyticsTrackerSource, ['/api/telemetry', 'page_view', 'page_engaged', 'navigator.sendBeacon', 'portal:analytics', 'data-analytics-event', '15_000']],
   [themeSource, ['SiteAnalyticsTracker', "app.component('AnalyticsDashboard'", "route.path.startsWith('/kb/')"]]
 ]
