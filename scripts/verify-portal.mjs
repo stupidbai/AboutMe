@@ -322,7 +322,7 @@ if (missingDockerAnchors.length) throw new Error(`Missing Docker behavior: ${mis
 if (!composeSource.includes('portal-data:/data') || !composeSource.includes('read_only: true') || !composeSource.includes('no-new-privileges:true')) {
   throw new Error('Compose must keep SQLite in a volume and apply container hardening')
 }
-if (packageMetadata.version !== '4.2.0' || packageMetadata.engines?.node !== '>=22.16' || packageMetadata.dependencies?.minisearch !== '^7.2.0' || packageMetadata.dependencies?.['@noble/hashes'] !== '^2.4.0' || packageMetadata.dependencies?.marked !== '^18.0.11' || packageMetadata.dependencies?.['sanitize-html'] !== '^2.17.7' || packageMetadata.dependencies?.nodemailer !== '^9.1.1' || packageMetadata.dependencies?.['@zxcvbn-ts/core'] !== '^4.2.0') {
+if (packageMetadata.version !== '4.2.1' || packageMetadata.engines?.node !== '>=22.16' || packageMetadata.dependencies?.minisearch !== '^7.2.0' || packageMetadata.dependencies?.['@noble/hashes'] !== '^2.4.0' || packageMetadata.dependencies?.marked !== '^18.0.11' || packageMetadata.dependencies?.['sanitize-html'] !== '^2.17.7' || packageMetadata.dependencies?.nodemailer !== '^9.1.1' || packageMetadata.dependencies?.['@zxcvbn-ts/core'] !== '^4.2.0') {
   throw new Error('Package version or Node.js SQLite runtime requirement is incorrect')
 }
 if (!ragServiceSource.includes("from 'minisearch'") || !ragServiceSource.includes('new MiniSearch') || !networkSecuritySource.includes('assertSafeOutboundUrl')) {

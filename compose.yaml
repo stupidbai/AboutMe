@@ -5,7 +5,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: bai-yunfei-portal:4.2.0
+    image: bai-yunfei-portal:4.2.1
     init: true
     restart: unless-stopped
     read_only: true
