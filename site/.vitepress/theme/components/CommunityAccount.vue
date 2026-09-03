@@ -27,6 +27,19 @@ const strength = computed(() => {
 })
 
 const readError = async (response: Response) => { try { return (await response.json()).error || `请求失败（${response.status}）` } catch { return `请求失败（${response.status}）` } }
+const registrationValidationError = () => {
+  const username = form.username.trim()
+  const displayName = form.displayName.trim()
+  const email = form.email.trim()
+  if (username.length < 3 || username.length > 24) return '请填写 3–24 个字符的用户名。'
+  if (!/^[\p{L}\p{N}_-]+$/u.test(username)) return '用户名仅支持中文、字母、数字、下划线和短横线。'
+  if (displayName.length < 2 || displayName.length > 40) return '请填写 2–40 个字符的显示名称。'
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return '请输入有效的邮箱地址。'
+  if (form.password.length < 12) return '请设置至少 12 个字符的密码。'
+  if (form.password !== form.confirmPassword) return '两次输入的密码不一致。'
+  if (!form.acceptedTerms) return '请先勾选并同意服务条款、隐私说明和社区规则。'
+  return ''
+}
 const renderTurnstile = async () => {
   if (!settings.turnstileEnabled || mode.value !== 'register') return
   await nextTick()
@@ -66,7 +79,15 @@ onMounted(async () => {
 })
 
 const submit = async () => {
-  error.value = ''; message.value = ''; busy.value = true
+  error.value = ''; message.value = ''
+  if (mode.value === 'register') {
+    const validationError = registrationValidationError()
+    if (validationError) { error.value = validationError; return }
+  }
+  if (mode.value === 'login' && (!form.identity.trim() || !form.password)) {
+    error.value = '请填写用户名或邮箱以及密码。'; return
+  }
+  busy.value = true
   try {
     const endpoint = mode.value === 'login' ? '/api/auth/login' : '/api/auth/register'
     const payload = mode.value === 'login'
@@ -90,13 +111,13 @@ const changePassword = async () => { error.value = ''; message.value = ''; busy.
 </script>
 
 <template>
-  <section class="community-account">
+  <section class="community-account" :class="{ 'community-account--register': !state.user && mode === 'register' }">
     <div v-if="state.loading" class="community-empty">正在读取账号状态…</div>
     <div v-else-if="!state.available" class="community-empty">当前为静态预览，注册与登录需要通过 Node 或 Docker 服务访问。</div>
     <template v-else-if="!state.user">
       <header class="community-heading"><div><span>COMMUNITY ACCOUNT</span><h2>{{ title }}</h2><p>访客可浏览公开内容；注册用户可以评论知识文章、点赞互动并参与论坛讨论。</p></div></header>
-      <div v-if="mode === 'login' || mode === 'register'" class="community-tabs"><button :class="{ active: mode === 'login' }" @click="mode = 'login'">登录</button><button v-if="settings.registrationEnabled" :class="{ active: mode === 'register' }" @click="mode = 'register'">注册</button></div>
-      <form v-if="mode === 'login' || mode === 'register'" class="community-form" @submit.prevent="submit">
+      <div v-if="mode === 'login' || mode === 'register'" class="community-tabs"><button type="button" :class="{ active: mode === 'login' }" @click="mode = 'login'">登录</button><button v-if="settings.registrationEnabled" type="button" :class="{ active: mode === 'register' }" @click="mode = 'register'">注册</button></div>
+      <form v-if="mode === 'login' || mode === 'register'" id="community-account-auth-form" class="community-form" novalidate @submit.prevent="submit">
         <label v-if="mode === 'login'"><span>用户名或邮箱</span><input v-model="form.identity" autocomplete="username" required maxlength="254"></label>
         <template v-else>
           <label><span>用户名</span><input v-model="form.username" autocomplete="username" required minlength="3" maxlength="24" placeholder="中文、字母或数字"></label>
@@ -109,10 +130,12 @@ const changePassword = async () => { error.value = ''; message.value = ''; busy.
         <label v-if="mode === 'register'"><span>确认密码</span><input v-model="form.confirmPassword" type="password" autocomplete="new-password" required minlength="12" maxlength="128"></label>
         <div v-if="mode === 'register'" class="password-strength wide"><span>密码强度：{{ strength.label }}</span><progress :value="strength.score + 1" max="5"></progress><small>{{ strength.warning || '建议使用长且独特的密码短语。' }}</small></div>
         <div v-if="mode === 'register' && settings.turnstileEnabled" id="community-turnstile" class="wide"></div>
+        <p v-if="error" class="case-admin-feedback case-admin-feedback--error community-form-feedback" role="alert">{{ error }}</p>
         <button class="community-primary wide" :disabled="busy">{{ busy ? '请稍候…' : (mode === 'login' ? '登录' : (settings.requireEmailVerification ? '注册并验证邮箱' : '注册并登录')) }}</button>
         <button v-if="mode === 'login'" type="button" class="community-quiet wide" @click="mode = 'forgot'">忘记密码？</button>
         <button v-if="mode === 'login' && settings.requireEmailVerification" type="button" class="community-quiet wide" @click="resendVerification">未收到验证邮件？重新发送</button>
       </form>
+      <div v-if="mode === 'register'" class="community-register-dock" role="region" aria-label="注册操作"><span>填写完成后点击注册</span><button type="submit" form="community-account-auth-form" class="community-primary" :disabled="busy">{{ busy ? '请稍候…' : (settings.requireEmailVerification ? '注册并验证邮箱' : '注册并登录') }}</button></div>
       <form v-else-if="mode === 'forgot'" class="community-form" @submit.prevent="requestReset"><label class="wide"><span>用户名或邮箱</span><input v-model="form.identity" required maxlength="254"></label><button class="community-primary wide" :disabled="busy">发送重置邮件</button><button type="button" class="community-quiet wide" @click="mode = 'login'">返回登录</button></form>
       <form v-else class="community-form" @submit.prevent="resetPassword"><label><span>新密码</span><input v-model="passwords.newPassword" type="password" required minlength="12" maxlength="128"></label><label><span>确认新密码</span><input v-model="passwords.confirmPassword" type="password" required minlength="12" maxlength="128"></label><div class="password-strength wide"><span>密码强度：{{ strength.label }}</span><progress :value="strength.score + 1" max="5"></progress><small>{{ strength.warning || '建议使用长且独特的密码短语。' }}</small></div><button class="community-primary wide" :disabled="busy">重置密码</button></form>
     </template>

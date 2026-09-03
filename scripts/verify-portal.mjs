@@ -191,7 +191,7 @@ if (!ragAssistantSource.includes('/api/rag/query') || !ragAssistantSource.includ
   throw new Error('RAG assistant must call the protected server endpoint and show local citations')
 }
 const requiredCommunityUiAnchors = [
-  [accountSource, ['/api/auth/register', '/api/auth/login', '/api/auth/profile', '/api/auth/password', '/api/auth/forgot-password', 'ZxcvbnFactory']],
+  [accountSource, ['/api/auth/register', '/api/auth/login', '/api/auth/profile', '/api/auth/password', '/api/auth/forgot-password', 'ZxcvbnFactory', 'registrationValidationError', 'community-register-dock']],
   [commentsSource, ['/api/comments', '/like', '注册或登录']],
   [forumSource, ['/api/forum/categories', '/api/forum/posts', '/replies', '/like']],
   [userAdminSource, ['/api/admin/users', '/api/admin/moderation', '/api/admin/community/stats', '/api/admin/community-settings', '/api/admin/product-metrics', '保存并生效']]

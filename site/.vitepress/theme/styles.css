@@ -380,6 +380,8 @@
 .community-form input:focus, .community-form select:focus, .community-form textarea:focus, .comment-form textarea:focus, .forum-search input:focus { border-color: var(--portal-teal); outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--portal-teal) 15%, transparent); }
 .community-primary { min-height: 42px; padding: 0 18px; border: 1px solid var(--vp-c-brand-1); border-radius: 999px; color: white; background: var(--vp-c-brand-1); cursor: pointer; font-weight: 850; }
 .community-primary:disabled { cursor: wait; opacity: .55; }
+.community-register-dock { display: none; }
+.community-form-feedback { margin: 0; }
 .community-honeypot { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
 .community-form .community-consent { display: flex; flex-direction: row; align-items: flex-start; gap: 9px; font-weight: 600; }
 .community-consent input { width: 17px; height: 17px; margin-top: 2px; }
@@ -574,6 +576,10 @@
   .rag-form { grid-template-columns: 1fr; }
   .community-form, .account-grid { grid-template-columns: 1fr; }
   .community-form .wide { grid-column: auto; }
+  .community-account--register { padding-bottom: 84px; }
+  .community-register-dock { position: fixed; right: 12px; bottom: max(12px, env(safe-area-inset-bottom)); left: 12px; z-index: 20; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--vp-c-brand-1) 45%, var(--portal-line)); border-radius: 14px; background: color-mix(in srgb, var(--vp-c-bg) 94%, transparent); box-shadow: 0 12px 30px rgba(2, 21, 31, .2); backdrop-filter: blur(14px); }
+  .community-register-dock span { flex: 1; color: var(--vp-c-text-2); font-size: 11px; font-weight: 700; line-height: 1.35; }
+  .community-register-dock button { flex: 0 0 auto; min-height: 38px; padding: 0 14px; font-size: 12px; white-space: nowrap; }
   .community-heading, .forum-hero, .user-admin-section > header { align-items: stretch; flex-direction: column; }
   .forum-categories { grid-template-columns: repeat(2, 1fr); }
   .forum-post { grid-template-columns: 1fr; }
