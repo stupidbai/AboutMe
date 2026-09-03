@@ -59,5 +59,6 @@ Write-Host '白云飞个人门户安装完成。' -ForegroundColor Green
 Write-Host "安装目录：$targetRoot"
 Write-Host "知识与 AI 管理：http://127.0.0.1:$Port/admin/knowledge"
 Write-Host "用户与社区管理：http://127.0.0.1:$Port/admin/users"
+Write-Host "访问监控与数据分析：http://127.0.0.1:$Port/admin/analytics"
 Write-Host "启动命令：$launcher"
 Write-Host '首次登录后建议根据部署范围调整管理员密码。'

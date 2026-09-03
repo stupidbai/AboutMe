@@ -48,6 +48,7 @@ onMounted(async () => {
         :rel="item.nasUrl ? 'noopener noreferrer' : undefined"
         :aria-label="item.nasUrl ? `${item.title}：打开 NAS 资料` : undefined"
         :data-nas-link="item.nasUrl ? 'configured' : 'pending'"
+        :data-analytics-event="item.nasUrl ? 'case_open' : undefined"
       >
         <div class="case-card__media" :class="{ 'case-card__media--contain': item.contain }">
           <div v-if="item.partners" class="partner-grid" aria-label="合作伙伴">

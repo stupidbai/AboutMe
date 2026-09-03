@@ -21,12 +21,15 @@ const knowledgeSeedFile = resolve(root, 'config/knowledge.json')
 const sessionCookieName = 'case_admin_session'
 const userSessionCookieName = 'portal_user_session'
 const csrfCookieName = 'portal_csrf'
+const analyticsVisitorCookieName = 'portal_visitor'
+const analyticsSessionCookieName = 'portal_visit_session'
 const sessions = new Map()
 const loginAttempts = new Map()
 const ragAttempts = new Map()
 const registrationAttempts = new Map()
 const userLoginAttempts = new Map()
 const communityWriteAttempts = new Map()
+const telemetryAttempts = new Map()
 
 if (existsSync(envFile)) {
   for (const rawLine of readFileSync(envFile, 'utf8').split(/\r?\n/)) {
@@ -50,6 +53,7 @@ const sessionHours = Math.max(1, Math.min(Number.parseInt(process.env.CASE_SESSI
 const sessionLifetimeMs = sessionHours * 60 * 60 * 1000
 const userSessionDays = Math.max(1, Math.min(Number.parseInt(process.env.COMMUNITY_SESSION_DAYS || '30', 10) || 30, 90))
 const userSessionLifetimeMs = userSessionDays * 24 * 60 * 60 * 1000
+const analyticsSessionLifetimeSeconds = 30 * 60
 const weakAdminPassword = ['admin123', 'password', '12345678', 'replace-with-at-least-8-characters'].includes(adminPassword.toLowerCase())
 const localOnlyHost = ['127.0.0.1', 'localhost', '::1'].includes(host.toLowerCase())
 
@@ -117,7 +121,7 @@ const sendJson = (response, status, payload, headers = {}) => {
     ...securityHeaders,
     ...headers
   })
-  response.end(status === 304 ? undefined : JSON.stringify(payload))
+  response.end([204, 304].includes(status) ? undefined : JSON.stringify(payload))
 }
 
 const readJsonBody = (request, limit = 1024 * 1024) => new Promise((resolveBody, rejectBody) => {
@@ -165,6 +169,12 @@ const sameOrigin = request => {
   return origin === getProtocol(request) + '://' + request.headers.host
 }
 
+const trustedTelemetryOrigin = request => {
+  const expectedOrigin = getProtocol(request) + '://' + request.headers.host
+  if (request.headers.origin) return request.headers.origin === expectedOrigin
+  try { return new URL(String(request.headers.referer || '')).origin === expectedOrigin } catch { return false }
+}
+
 const parseCookies = request => Object.fromEntries(
   String(request.headers.cookie || '')
     .split(';')
@@ -209,6 +219,75 @@ const communitySessionTokenHash = token => createHash('sha256').update('communit
 const requestHash = (request, kind) => createHash('sha256')
   .update(encryption.secret + '|' + kind + '|' + (request.socket.remoteAddress || 'unknown'))
   .digest('hex')
+
+const analyticsTokenHash = (kind, token) => createHash('sha256')
+  .update(encryption.secret + '|analytics|' + kind + '|' + token)
+  .digest('hex')
+const validAnalyticsToken = token => /^[a-f0-9]{64}$/.test(String(token || ''))
+const createAnalyticsCookie = (request, name, value, maxAge, httpOnly = true) => [
+  name + '=' + encodeURIComponent(value),
+  ...(httpOnly ? ['HttpOnly'] : []),
+  'SameSite=Lax',
+  'Path=/',
+  'Max-Age=' + maxAge,
+  getProtocol(request) === 'https' ? 'Secure' : ''
+].filter(Boolean).join('; ')
+const analyticsIdentity = request => {
+  const cookies = parseCookies(request)
+  const visitor = validAnalyticsToken(cookies[analyticsVisitorCookieName]) ? cookies[analyticsVisitorCookieName] : randomBytes(32).toString('hex')
+  const session = validAnalyticsToken(cookies[analyticsSessionCookieName]) ? cookies[analyticsSessionCookieName] : randomBytes(32).toString('hex')
+  return {
+    visitorHash: analyticsTokenHash('visitor', visitor),
+    sessionHash: analyticsTokenHash('session', session),
+    cookies: [
+      createAnalyticsCookie(request, analyticsVisitorCookieName, visitor, 365 * 24 * 60 * 60),
+      createAnalyticsCookie(request, analyticsSessionCookieName, session, analyticsSessionLifetimeSeconds)
+    ]
+  }
+}
+
+const normalizeTrackedPath = value => {
+  const path = String(value || '').trim().split(/[?#]/, 1)[0]
+  if (!path.startsWith('/') || path.startsWith('/api/') || path.startsWith('/admin/') || path.length > 300) return ''
+  if (!/^\/[a-zA-Z0-9_./-]*$/.test(path)) return ''
+  return path || '/'
+}
+const normalizeReferrerDomain = (value, request) => {
+  if (!value) return ''
+  try {
+    const hostname = new URL(String(value)).hostname.toLowerCase().slice(0, 253)
+    return hostname === String(request.headers.host || '').split(':')[0].toLowerCase() ? '' : hostname
+  } catch { return '' }
+}
+const normalizeUtmSource = value => String(value || '').trim().toLowerCase().replace(/[^a-z0-9._-]/g, '').slice(0, 80)
+const classifyAcquisition = (domain, utmSource) => {
+  if (utmSource) return 'utm:' + utmSource
+  if (!domain) return 'direct'
+  if (/(baidu|google|bing|sogou|so\.com|yandex)/.test(domain)) return 'search'
+  if (/(weixin|wechat|douyin|xiaohongshu|zhihu|weibo|bilibili|linkedin|twitter|x\.com|github)/.test(domain)) return 'social'
+  return 'referral'
+}
+const likelyBot = request => /bot|crawler|spider|slurp|facebookexternalhit|lighthouse|headlesschrome/i.test(String(request.headers['user-agent'] || ''))
+const normalizeTelemetry = (payload, request) => {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw new Error('监控事件格式无效。')
+  const eventId = String(payload.eventId || '')
+  const eventName = String(payload.eventName || '')
+  const pagePath = normalizeTrackedPath(payload.pagePath)
+  if (!/^[A-Za-z0-9_-]{16,80}$/.test(eventId)) throw new Error('监控事件标识无效。')
+  if (!pagePath) throw new Error('监控页面地址无效。')
+  if (!['page_view', 'page_engaged', 'contact_intent', 'case_open', 'forum_open', 'rag_query', 'account_open', 'knowledge_open'].includes(eventName)) {
+    throw new Error('监控事件类型无效。')
+  }
+  const deviceType = ['desktop', 'mobile', 'tablet', 'other'].includes(payload.deviceType) ? payload.deviceType : 'other'
+  const numeric = value => Math.max(0, Math.min(120000, Math.round(Number(value) || 0)))
+  const referrerDomain = normalizeReferrerDomain(payload.referrer, request)
+  const utmSource = normalizeUtmSource(payload.utmSource)
+  return {
+    eventId, eventName, pagePath, deviceType, referrerDomain: '',
+    acquisitionSource: classifyAcquisition(referrerDomain, utmSource),
+    loadMs: numeric(payload.loadMs), ttfbMs: numeric(payload.ttfbMs), fcpMs: numeric(payload.fcpMs)
+  }
+}
 
 const createCommunitySession = (request, userId) => {
   const token = randomBytes(32).toString('hex')
@@ -430,6 +509,33 @@ const handleRequest = async (request, response) => {
       knowledgeEntries: portalDatabase.getHealth().knowledgeCount,
       retrievalEngine: 'MiniSearch 7.2.0'
     })
+    return
+  }
+
+  if (pathname === '/api/analytics/status' && request.method === 'GET') {
+    const settings = portalDatabase.getAnalyticsSettings()
+    sendJson(response, 200, { enabled: settings.enabled, respectDnt: settings.respectDnt })
+    return
+  }
+
+  if (pathname === '/api/telemetry' && request.method === 'POST') {
+    if (!trustedTelemetryOrigin(request)) { sendJson(response, 403, { error: '请求来源无效。' }); return }
+    const settings = portalDatabase.getAnalyticsSettings()
+    if (!settings.enabled || (settings.respectDnt && String(request.headers.dnt || '') === '1') || likelyBot(request)) {
+      sendJson(response, 204, null)
+      return
+    }
+    const limit = checkRateLimit(telemetryAttempts, requestHash(request, 'telemetry'), 180, 10 * 60 * 1000)
+    if (!limit.allowed) { sendJson(response, 429, { error: '访问事件过多，请稍后再试。' }, { 'retry-after': String(limit.retryAfter) }); return }
+    try {
+      const event = normalizeTelemetry(await readJsonBody(request, 8 * 1024), request)
+      const identity = analyticsIdentity(request)
+      portalDatabase.recordSiteEvent({ ...event, visitorHash: identity.visitorHash, sessionHash: identity.sessionHash })
+      portalDatabase.maybePruneAnalyticsEvents()
+      sendJson(response, 204, null, { 'set-cookie': identity.cookies })
+    } catch (error) {
+      sendJson(response, 400, { error: error.message || '访问事件无效。' })
+    }
     return
   }
 
@@ -1107,6 +1213,36 @@ const handleRequest = async (request, response) => {
     return
   }
 
+  if (pathname === '/api/admin/analytics' && request.method === 'GET') {
+    if (!getSession(request)) { sendJson(response, 401, { error: '请先登录。' }); return }
+    sendJson(response, 200, portalDatabase.getSiteAnalytics(url.searchParams.get('days') || 30))
+    return
+  }
+
+  if (pathname === '/api/admin/analytics-settings') {
+    const session = getSession(request)
+    if (!session) { sendJson(response, 401, { error: '请先登录。' }); return }
+    if (request.method === 'GET') {
+      const settings = portalDatabase.getAnalyticsSettings()
+      const { revision, ...publicSettings } = settings
+      sendJson(response, 200, publicSettings, { etag: revisionTag('analytics-settings', revision) })
+      return
+    }
+    if (request.method === 'PUT') {
+      if (!sameOrigin(request)) { sendJson(response, 403, { error: '请求来源无效。' }); return }
+      const expectedRevision = parseRevisionTag(request.headers['if-match'], 'analytics-settings')
+      if (expectedRevision === undefined) { sendJson(response, 428, { error: '缺少有效的监控配置版本，请刷新后重试。' }); return }
+      try {
+        const saved = await portalDatabase.replaceAnalyticsSettings(await readJsonBody(request, 8 * 1024), { expectedRevision, actor: session.username })
+        const { revision, ...publicSettings } = saved
+        sendJson(response, 200, publicSettings, { etag: revisionTag('analytics-settings', revision) })
+      } catch (error) { sendJson(response, error instanceof DatabaseConflictError ? 409 : 400, { error: error.message }) }
+      return
+    }
+    sendJson(response, 405, { error: '请求方法不支持。' }, { allow: 'GET, PUT' })
+    return
+  }
+
   if (pathname === '/api/admin/users' && request.method === 'GET') {
     if (!getSession(request)) {
       sendJson(response, 401, { error: '请先登录。' })
@@ -1203,6 +1339,8 @@ const handleRequest = async (request, response) => {
     const { revision: aiRevision, apiKeySet, ...safeAiSettings } = aiSettings
     const communitySettings = portalDatabase.getCommunitySettings()
     const { smtpPasswordSet, turnstileSecretSet, ...safeCommunitySettings } = communitySettings
+    const analyticsSettings = portalDatabase.getAnalyticsSettings()
+    const { revision: analyticsRevision, ...safeAnalyticsSettings } = analyticsSettings
     sendJson(response, 200, {
       exportedAt: new Date().toISOString(),
       formatVersion: 1,
@@ -1215,6 +1353,12 @@ const handleRequest = async (request, response) => {
         configuration: { ...safeCommunitySettings, smtpPasswordIncluded: false, turnstileSecretIncluded: false },
         secretStatus: { smtpPasswordSet, turnstileSecretSet },
         personalDataIncluded: false
+      },
+      analytics: {
+        configuration: safeAnalyticsSettings,
+        revision: analyticsRevision,
+        dataIncluded: false,
+        privacy: 'first-party anonymous event aggregates; no IP address or full referrer URL is exported'
       }
     }, { 'content-disposition': `attachment; filename="portal-export-${new Date().toISOString().slice(0, 10)}.json"` })
     return
@@ -1245,8 +1389,10 @@ const cleanupTimer = setInterval(() => {
   for (const [address, attempt] of registrationAttempts) if (attempt.resetAt <= now) registrationAttempts.delete(address)
   for (const [address, attempt] of userLoginAttempts) if (attempt.resetAt <= now) userLoginAttempts.delete(address)
   for (const [address, attempt] of communityWriteAttempts) if (attempt.resetAt <= now) communityWriteAttempts.delete(address)
+  for (const [address, attempt] of telemetryAttempts) if (attempt.resetAt <= now) telemetryAttempts.delete(address)
   portalDatabase.pruneCommunitySessions()
   portalDatabase.pruneCommunityTokens()
+  portalDatabase.maybePruneAnalyticsEvents()
 }, 10 * 60 * 1000)
 cleanupTimer.unref()
 
@@ -1269,7 +1415,8 @@ server.listen(port, host, () => {
   console.log('Knowledge admin: http://' + host + ':' + port + '/admin/knowledge')
   console.log('Forum: http://' + host + ':' + port + '/forum')
   console.log('User admin: http://' + host + ':' + port + '/admin/users')
+  console.log('Analytics admin: http://' + host + ':' + port + '/admin/analytics')
   if (weakAdminPassword) console.warn('Security warning: default weak admin password is allowed only because the service listens locally.')
   console.log('Encryption key source: ' + encryption.source + '.')
-  console.log('SQLite ready: ' + health.caseCount + ' cases/' + health.knowledgeCount + ' knowledge entries/' + health.communityUserCount + ' users/' + health.forumPostCount + ' posts, revisions cases=' + health.revision + '/site=' + health.siteConfigRevision + '/knowledge=' + health.knowledgeRevision + ', ' + health.journalMode + ' mode.')
+  console.log('SQLite ready: ' + health.caseCount + ' cases/' + health.knowledgeCount + ' knowledge entries/' + health.communityUserCount + ' users/' + health.forumPostCount + ' posts/' + health.siteEventCount + ' anonymous events, revisions cases=' + health.revision + '/site=' + health.siteConfigRevision + '/knowledge=' + health.knowledgeRevision + ', ' + health.journalMode + ' mode.')
 })

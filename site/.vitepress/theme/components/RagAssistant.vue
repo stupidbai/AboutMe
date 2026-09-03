@@ -40,6 +40,7 @@ const ask = async () => {
     const payload = await response.json()
     if (!response.ok) throw new Error(payload.error || `请求失败（${response.status}）`)
     result.value = payload
+    window.dispatchEvent(new CustomEvent('portal:analytics', { detail: { eventName: 'rag_query' } }))
   } catch (caught) { error.value = caught instanceof Error ? caught.message : '问答请求失败。' }
   finally { busy.value = false }
 }

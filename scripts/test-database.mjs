@@ -36,8 +36,18 @@ try {
   if (savedKnowledge.revision !== 2 || !savedKnowledge.entries[0].summary.endsWith('数据库测试。')) throw new Error('知识库更新事务失败。')
 
   const initialAi = database.getAiSettings()
-  if (database.getHealth().schemaVersion !== 6 || initialAi.dailyLimit !== 200 || initialAi.allowPrivateNetwork !== false) {
-    throw new Error('数据库 v6 或 AI 安全默认值迁移失败。')
+  const analyticsSettings = database.getAnalyticsSettings()
+  if (database.getHealth().schemaVersion !== 7 || initialAi.dailyLimit !== 200 || initialAi.allowPrivateNetwork !== false || !analyticsSettings.enabled || !analyticsSettings.respectDnt || analyticsSettings.retentionDays !== 365) {
+    throw new Error('数据库 v7、AI 安全或访问监控默认值迁移失败。')
+  }
+  const savedAnalyticsSettings = await database.replaceAnalyticsSettings({ enabled: true, respectDnt: true, retentionDays: 90 }, { expectedRevision: analyticsSettings.revision, actor: 'database-test' })
+  if (savedAnalyticsSettings.revision !== 2 || savedAnalyticsSettings.retentionDays !== 90) throw new Error('访问监控配置更新失败。')
+  database.recordSiteEvent({ eventId: 'database-analytics-event-0001', visitorHash: 'visitor-a', sessionHash: 'session-a', eventName: 'page_view', pagePath: '/knowledge', deviceType: 'desktop', loadMs: 820, ttfbMs: 110, fcpMs: 310 })
+  database.recordSiteEvent({ eventId: 'database-analytics-event-0002', visitorHash: 'visitor-a', sessionHash: 'session-a', eventName: 'page_engaged', pagePath: '/knowledge', deviceType: 'desktop' })
+  database.recordSiteEvent({ eventId: 'database-analytics-event-0003', visitorHash: 'visitor-b', sessionHash: 'session-b', eventName: 'contact_intent', pagePath: '/contact', acquisitionSource: 'search', deviceType: 'mobile' })
+  const analytics = database.getSiteAnalytics(1)
+  if (analytics.summary.pageViews !== 1 || analytics.summary.visitors !== 1 || analytics.summary.engagedSessions !== 1 || analytics.summary.contactIntents !== 1 || analytics.performance.averageLoadMs !== 820 || analytics.devices.find(item => item.device === 'desktop')?.visitors !== 1) {
+    throw new Error('访问监控事件或统计聚合失败。')
   }
   const savedAi = await database.replaceAiSettings({
     ...initialAi, apiKey: 'test-secret-api-key', apiKeySet: undefined, clearApiKey: false,
@@ -113,6 +123,7 @@ try {
   console.log('Encrypted AI configuration persistence: verified')
   console.log('RAG query statistics and feedback persistence: verified')
   console.log('Community users, sessions, comments, likes and forum persistence: verified')
+  console.log('Anonymous traffic monitoring settings and daily aggregates: verified')
 } finally {
   database?.close()
   rmSync(dataDir, { recursive: true, force: true })

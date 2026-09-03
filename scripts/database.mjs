@@ -7,7 +7,7 @@ import { validateSiteConfig } from './site-config-schema.mjs'
 import { defaultAiSettings, validateAiSettings, validateKnowledgeEntries } from './knowledge-schema.mjs'
 import { defaultCommunitySettings, validateCommunitySettings } from './community-settings.mjs'
 
-const SCHEMA_VERSION = 6
+const SCHEMA_VERSION = 7
 
 export class DatabaseConflictError extends Error {
   constructor(message = '配置已被其他管理员更新，请刷新后重试。') {
@@ -29,6 +29,7 @@ export class PortalDatabase {
     mkdirSync(this.backupDir, { recursive: true })
     this.database = new DatabaseSync(this.databaseFile, { timeout: 5000 })
     this.writeQueue = Promise.resolve()
+    this.lastAnalyticsPruneAt = 0
     this.configure()
     this.migrate()
     this.seedIfEmpty()
@@ -36,6 +37,7 @@ export class PortalDatabase {
     this.seedKnowledgeIfEmpty()
     this.seedAiSettingsIfEmpty()
     this.seedCommunitySettingsIfEmpty()
+    this.seedAnalyticsSettingsIfEmpty()
     this.seedCommunityIfEmpty()
   }
 
@@ -370,6 +372,52 @@ export class PortalDatabase {
         COMMIT;
       `)
     }
+    if (currentVersion < 7) {
+      this.database.exec(`
+        BEGIN IMMEDIATE;
+        CREATE TABLE IF NOT EXISTS analytics_settings (
+          id INTEGER PRIMARY KEY CHECK (id = 1),
+          enabled INTEGER NOT NULL DEFAULT 1 CHECK (enabled IN (0, 1)),
+          respect_dnt INTEGER NOT NULL DEFAULT 1 CHECK (respect_dnt IN (0, 1)),
+          retention_days INTEGER NOT NULL DEFAULT 365 CHECK (retention_days BETWEEN 30 AND 1825),
+          revision INTEGER NOT NULL CHECK (revision > 0),
+          updated_at TEXT NOT NULL,
+          updated_by TEXT NOT NULL
+        ) STRICT;
+        CREATE TABLE IF NOT EXISTS analytics_settings_changes (
+          id INTEGER PRIMARY KEY,
+          revision INTEGER NOT NULL,
+          changed_at TEXT NOT NULL,
+          actor TEXT NOT NULL
+        ) STRICT;
+        CREATE TABLE IF NOT EXISTS site_events (
+          id INTEGER PRIMARY KEY,
+          event_id TEXT NOT NULL UNIQUE,
+          visitor_hash TEXT NOT NULL,
+          session_hash TEXT NOT NULL,
+          event_name TEXT NOT NULL CHECK (event_name IN (
+            'page_view', 'page_engaged', 'contact_intent', 'case_open',
+            'forum_open', 'rag_query', 'account_open', 'knowledge_open'
+          )),
+          page_path TEXT NOT NULL,
+          referrer_domain TEXT NOT NULL DEFAULT '',
+          acquisition_source TEXT NOT NULL DEFAULT 'direct',
+          device_type TEXT NOT NULL DEFAULT 'other' CHECK (device_type IN ('desktop', 'mobile', 'tablet', 'other')),
+          load_ms INTEGER NOT NULL DEFAULT 0 CHECK (load_ms BETWEEN 0 AND 120000),
+          ttfb_ms INTEGER NOT NULL DEFAULT 0 CHECK (ttfb_ms BETWEEN 0 AND 120000),
+          fcp_ms INTEGER NOT NULL DEFAULT 0 CHECK (fcp_ms BETWEEN 0 AND 120000),
+          created_at TEXT NOT NULL
+        ) STRICT;
+        CREATE INDEX IF NOT EXISTS idx_analytics_settings_changes_revision ON analytics_settings_changes(revision DESC);
+        CREATE INDEX IF NOT EXISTS idx_site_events_created ON site_events(created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_site_events_name_created ON site_events(event_name, created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_site_events_visitor_created ON site_events(visitor_hash, created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_site_events_session_created ON site_events(session_hash, created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_site_events_page_created ON site_events(page_path, created_at DESC);
+        PRAGMA user_version = 7;
+        COMMIT;
+      `)
+    }
   }
 
   seedCommunitySettingsIfEmpty() {
@@ -386,6 +434,17 @@ export class PortalDatabase {
       settings.publicSiteUrl, settings.smtpHost, settings.smtpPort, settings.smtpSecure ? 1 : 0,
       settings.smtpUser, settings.smtpFrom, settings.turnstileEnabled ? 1 : 0,
       settings.turnstileSiteKey, now)
+  }
+
+  seedAnalyticsSettingsIfEmpty() {
+    if (this.database.prepare('SELECT id FROM analytics_settings WHERE id = 1').get()) return
+    const now = new Date().toISOString()
+    this.database.prepare(`
+      INSERT INTO analytics_settings (id, enabled, respect_dnt, retention_days, revision, updated_at, updated_by)
+      VALUES (1, 1, 1, 365, 1, ?, 'default-seed')
+    `).run(now)
+    this.database.prepare('INSERT INTO analytics_settings_changes (revision, changed_at, actor) VALUES (1, ?, ?)')
+      .run(now, 'default-seed')
   }
 
   seedCommunityIfEmpty() {
@@ -604,6 +663,194 @@ export class PortalDatabase {
     return settings
   }
 
+  getAnalyticsSettings() {
+    const row = this.database.prepare('SELECT * FROM analytics_settings WHERE id = 1').get()
+    if (!row) throw new Error('访问监控配置尚未初始化。')
+    return {
+      enabled: Boolean(row.enabled),
+      respectDnt: Boolean(row.respect_dnt),
+      retentionDays: Number(row.retention_days),
+      revision: Number(row.revision),
+      updatedAt: row.updated_at,
+      updatedBy: row.updated_by
+    }
+  }
+
+  validateAnalyticsSettings(payload) {
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw new Error('访问监控配置格式无效。')
+    const retentionDays = Number(payload.retentionDays)
+    if (!Number.isInteger(retentionDays) || retentionDays < 30 || retentionDays > 1825) {
+      throw new Error('统计数据保留天数必须是 30-1825 之间的整数。')
+    }
+    return {
+      enabled: Boolean(payload.enabled),
+      respectDnt: Boolean(payload.respectDnt),
+      retentionDays
+    }
+  }
+
+  async replaceAnalyticsSettings(payload, { expectedRevision, actor = 'admin' } = {}) {
+    const operation = async () => {
+      const settings = this.validateAnalyticsSettings(payload)
+      const current = this.getAnalyticsSettings()
+      if (expectedRevision !== undefined && Number(expectedRevision) !== current.revision) {
+        throw new DatabaseConflictError('访问监控配置已被其他管理员更新，请刷新后重试。')
+      }
+      await this.createBackup()
+      const revision = current.revision + 1
+      const now = new Date().toISOString()
+      this.database.exec('BEGIN IMMEDIATE')
+      try {
+        this.database.prepare(`
+          UPDATE analytics_settings
+          SET enabled = ?, respect_dnt = ?, retention_days = ?, revision = ?, updated_at = ?, updated_by = ?
+          WHERE id = 1
+        `).run(settings.enabled ? 1 : 0, settings.respectDnt ? 1 : 0, settings.retentionDays,
+          revision, now, String(actor).slice(0, 100))
+        this.database.prepare('INSERT INTO analytics_settings_changes (revision, changed_at, actor) VALUES (?, ?, ?)')
+          .run(revision, now, String(actor).slice(0, 100))
+        this.database.exec('COMMIT')
+      } catch (error) {
+        this.database.exec('ROLLBACK')
+        throw error
+      }
+      this.pruneAnalyticsEvents()
+      return this.getAnalyticsSettings()
+    }
+    const result = this.writeQueue.then(operation, operation)
+    this.writeQueue = result.catch(() => undefined)
+    return result
+  }
+
+  recordSiteEvent({ eventId, visitorHash, sessionHash, eventName, pagePath, referrerDomain = '', acquisitionSource = 'direct', deviceType = 'other', loadMs = 0, ttfbMs = 0, fcpMs = 0 }) {
+    const allowedEvents = new Set(['page_view', 'page_engaged', 'contact_intent', 'case_open', 'forum_open', 'rag_query', 'account_open', 'knowledge_open'])
+    if (!allowedEvents.has(eventName)) throw new Error('访问事件类型无效。')
+    const normalized = value => Math.max(0, Math.min(120000, Math.round(Number(value) || 0)))
+    const result = this.database.prepare(`
+      INSERT OR IGNORE INTO site_events (
+        event_id, visitor_hash, session_hash, event_name, page_path, referrer_domain,
+        acquisition_source, device_type, load_ms, ttfb_ms, fcp_ms, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      eventId, visitorHash, sessionHash, eventName, pagePath, referrerDomain,
+      acquisitionSource, deviceType, normalized(loadMs), normalized(ttfbMs), normalized(fcpMs), new Date().toISOString()
+    )
+    return Boolean(result.changes)
+  }
+
+  pruneAnalyticsEvents() {
+    const settings = this.getAnalyticsSettings()
+    const cutoff = new Date(Date.now() - settings.retentionDays * 86_400_000).toISOString()
+    this.lastAnalyticsPruneAt = Date.now()
+    return Number(this.database.prepare('DELETE FROM site_events WHERE created_at < ?').run(cutoff).changes)
+  }
+
+  maybePruneAnalyticsEvents() {
+    if (Date.now() - this.lastAnalyticsPruneAt < 60 * 60 * 1000) return 0
+    return this.pruneAnalyticsEvents()
+  }
+
+  getSiteAnalytics(days = 30) {
+    const safeDays = Math.max(1, Math.min(Number(days) || 30, 365))
+    const currentSince = new Date(Date.now() - safeDays * 86_400_000).toISOString()
+    const previousSince = new Date(Date.now() - safeDays * 2 * 86_400_000).toISOString()
+    const dayExpression = "strftime('%Y-%m-%d', created_at, '+8 hours')"
+    const aggregate = (from, until = null, returnBefore = from) => {
+      const range = until ? 'created_at >= ? AND created_at < ?' : 'created_at >= ?'
+      const params = until ? [from, until] : [from]
+      const row = this.database.prepare(`
+        SELECT
+          SUM(CASE WHEN event_name = 'page_view' THEN 1 ELSE 0 END) AS page_views,
+          COUNT(DISTINCT CASE WHEN event_name = 'page_view' THEN visitor_hash END) AS visitors,
+          COUNT(DISTINCT CASE WHEN event_name = 'page_view' THEN session_hash END) AS sessions,
+          COUNT(DISTINCT CASE WHEN event_name = 'page_engaged' THEN session_hash END) AS engaged_sessions,
+          SUM(CASE WHEN event_name = 'contact_intent' THEN 1 ELSE 0 END) AS contact_intents,
+          SUM(CASE WHEN event_name = 'case_open' THEN 1 ELSE 0 END) AS case_opens,
+          SUM(CASE WHEN event_name = 'rag_query' THEN 1 ELSE 0 END) AS rag_queries,
+          COUNT(DISTINCT CASE WHEN event_name = 'page_view' AND visitor_hash IN (
+            SELECT DISTINCT visitor_hash FROM site_events WHERE event_name = 'page_view' AND created_at < ?
+          ) THEN visitor_hash END) AS returning_visitors
+        FROM site_events WHERE ${range}
+      `).get(returnBefore, ...params)
+      return {
+        pageViews: Number(row.page_views || 0), visitors: Number(row.visitors || 0), sessions: Number(row.sessions || 0),
+        engagedSessions: Number(row.engaged_sessions || 0), contactIntents: Number(row.contact_intents || 0),
+        caseOpens: Number(row.case_opens || 0), ragQueries: Number(row.rag_queries || 0), returningVisitors: Number(row.returning_visitors || 0)
+      }
+    }
+    const current = aggregate(currentSince)
+    const previous = aggregate(previousSince, currentSince)
+    const percent = (value, base) => base ? Math.round(((value - base) / base) * 1000) / 10 : null
+    const daily = this.database.prepare(`
+      SELECT ${dayExpression} AS date,
+        SUM(CASE WHEN event_name = 'page_view' THEN 1 ELSE 0 END) AS page_views,
+        COUNT(DISTINCT CASE WHEN event_name = 'page_view' THEN visitor_hash END) AS visitors,
+        COUNT(DISTINCT CASE WHEN event_name = 'page_view' THEN session_hash END) AS sessions,
+        COUNT(DISTINCT CASE WHEN event_name = 'page_engaged' THEN session_hash END) AS engaged_sessions,
+        SUM(CASE WHEN event_name = 'contact_intent' THEN 1 ELSE 0 END) AS contact_intents
+      FROM site_events WHERE created_at >= ? GROUP BY ${dayExpression} ORDER BY date
+    `).all(currentSince).map(row => ({
+      date: row.date, pageViews: Number(row.page_views || 0), visitors: Number(row.visitors || 0),
+      sessions: Number(row.sessions || 0), engagedSessions: Number(row.engaged_sessions || 0), contactIntents: Number(row.contact_intents || 0)
+    }))
+    const topPages = this.database.prepare(`
+      SELECT page_path, SUM(CASE WHEN event_name = 'page_view' THEN 1 ELSE 0 END) AS page_views,
+        COUNT(DISTINCT CASE WHEN event_name = 'page_view' THEN visitor_hash END) AS visitors,
+        COUNT(DISTINCT CASE WHEN event_name = 'page_engaged' THEN session_hash END) AS engaged_sessions
+      FROM site_events WHERE created_at >= ? AND event_name IN ('page_view', 'page_engaged')
+      GROUP BY page_path ORDER BY page_views DESC, visitors DESC LIMIT 12
+    `).all(currentSince).map(row => ({
+      pagePath: row.page_path, pageViews: Number(row.page_views || 0), visitors: Number(row.visitors || 0),
+      engagedSessions: Number(row.engaged_sessions || 0)
+    }))
+    const sources = this.database.prepare(`
+      SELECT acquisition_source, COUNT(DISTINCT visitor_hash) AS visitors,
+        SUM(CASE WHEN event_name = 'page_view' THEN 1 ELSE 0 END) AS page_views
+      FROM site_events WHERE created_at >= ? AND event_name = 'page_view'
+      GROUP BY acquisition_source ORDER BY visitors DESC, page_views DESC LIMIT 12
+    `).all(currentSince).map(row => ({ source: row.acquisition_source, visitors: Number(row.visitors || 0), pageViews: Number(row.page_views || 0) }))
+    const devices = this.database.prepare(`
+      SELECT device_type, COUNT(DISTINCT visitor_hash) AS visitors,
+        SUM(CASE WHEN event_name = 'page_view' THEN 1 ELSE 0 END) AS page_views
+      FROM site_events WHERE created_at >= ? AND event_name = 'page_view'
+      GROUP BY device_type ORDER BY visitors DESC
+    `).all(currentSince).map(row => ({ device: row.device_type, visitors: Number(row.visitors || 0), pageViews: Number(row.page_views || 0) }))
+    const conversions = this.database.prepare(`
+      SELECT event_name, COUNT(*) AS events, COUNT(DISTINCT visitor_hash) AS visitors
+      FROM site_events WHERE created_at >= ? AND event_name IN ('contact_intent', 'case_open', 'forum_open', 'rag_query', 'account_open', 'knowledge_open')
+      GROUP BY event_name ORDER BY events DESC
+    `).all(currentSince).map(row => ({ eventName: row.event_name, events: Number(row.events || 0), visitors: Number(row.visitors || 0) }))
+    const performanceRows = this.database.prepare(`
+      SELECT load_ms, ttfb_ms, fcp_ms FROM site_events
+      WHERE created_at >= ? AND event_name = 'page_view' AND load_ms > 0
+      ORDER BY created_at DESC LIMIT 10000
+    `).all(currentSince)
+    const average = field => performanceRows.length ? Math.round(performanceRows.reduce((total, row) => total + Number(row[field] || 0), 0) / performanceRows.length) : 0
+    const percentile = field => {
+      if (!performanceRows.length) return 0
+      const values = performanceRows.map(row => Number(row[field] || 0)).sort((left, right) => left - right)
+      return values[Math.min(values.length - 1, Math.ceil(values.length * 0.95) - 1)]
+    }
+    return {
+      days: safeDays, timezone: 'Asia/Shanghai', collectedAt: new Date().toISOString(),
+      summary: {
+        ...current,
+        engagementRate: current.sessions ? Math.round((current.engagedSessions / current.sessions) * 1000) / 10 : 0,
+        contactRate: current.visitors ? Math.round((current.contactIntents / current.visitors) * 1000) / 10 : 0,
+        pagesPerSession: current.sessions ? Math.round((current.pageViews / current.sessions) * 100) / 100 : 0
+      },
+      comparison: {
+        previous,
+        pageViewsChange: percent(current.pageViews, previous.pageViews),
+        visitorsChange: percent(current.visitors, previous.visitors),
+        sessionsChange: percent(current.sessions, previous.sessions),
+        contactIntentsChange: percent(current.contactIntents, previous.contactIntents)
+      },
+      daily, topPages, sources, devices, conversions,
+      performance: { samples: performanceRows.length, averageLoadMs: average('load_ms'), p95LoadMs: percentile('load_ms'), averageTtfbMs: average('ttfb_ms'), averageFcpMs: average('fcp_ms') }
+    }
+  }
+
   async replaceCommunitySettings(payload, { expectedRevision, actor = 'admin' } = {}) {
     const operation = async () => {
       const settings = validateCommunitySettings(payload)
@@ -666,6 +913,8 @@ export class PortalDatabase {
       knowledgeRevision: this.getKnowledgeRevision(),
       aiEnabled: Boolean(this.database.prepare('SELECT enabled FROM ai_settings WHERE id = 1').get()?.enabled),
       ragQueryCount: Number(this.database.prepare('SELECT COUNT(*) AS count FROM rag_queries').get().count),
+      siteEventCount: Number(this.database.prepare('SELECT COUNT(*) AS count FROM site_events').get().count),
+      analyticsEnabled: Boolean(this.database.prepare('SELECT enabled FROM analytics_settings WHERE id = 1').get()?.enabled),
       communityUserCount: Number(this.database.prepare('SELECT COUNT(*) AS count FROM community_users').get().count),
       forumPostCount: Number(this.database.prepare("SELECT COUNT(*) AS count FROM forum_posts WHERE status IN ('active', 'locked')").get().count),
       articleCommentCount: Number(this.database.prepare("SELECT COUNT(*) AS count FROM article_comments WHERE status = 'active'").get().count),

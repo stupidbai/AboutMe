@@ -1,6 +1,6 @@
 # 白云飞个人知识与合作门户
 
-这是一个基于 VitePress、Vue 3、Node.js 和 SQLite 的数据驱动个人网站，面向企业客户、方案商、AI 产品团队及产业生态伙伴。网站将职业履历、合作方向、项目案例、主题方法、原创知识库、交流论坛、个人侧面和联系方式拆分为独立入口，并提供站内搜索、访客浏览、用户注册、文章评论、社区互动和管理后台。
+这是一个基于 VitePress、Vue 3、Node.js 和 SQLite 的数据驱动个人网站，面向企业客户、方案商、AI 产品团队及产业生态伙伴。网站将职业履历、合作方向、项目案例、主题方法、原创知识库、交流论坛、个人侧面和联系方式拆分为独立入口，并提供站内搜索、访客浏览、用户注册、文章评论、社区互动、第一方匿名访问监控和管理后台。
 
 ## 本地启动
 
@@ -34,6 +34,7 @@ npm run build
 - `site/admin/site.md`：受账号保护的站点内容管理页，可配置身份、首页、联系、目录、履历和合作内容。
 - `site/admin/knowledge.md`：知识条目、RAG 和 AI 接口配置管理页。
 - `site/admin/users.md`：注册用户、角色、状态以及社区内容审核管理页。
+- `site/admin/analytics.md`：受账号保护的访问监控与数据分析页，可查看 PV、UV、会话、来源、转化与性能。
 - `site/account.md`：社区账号注册、登录、资料与密码管理。
 - `site/forum.md`：可发帖、回复、搜索和点赞的站内交流论坛。
 - `site/insights.md`：企业 AI、可信数字化、FDE 与生态建设主题地图。
@@ -46,7 +47,7 @@ npm run build
 - `docs/knowledge-migration-manifest.json`：源仓库提交、迁移边界、路径映射和 SHA-256 清单。
 - `scripts/import-arch3rpro-knowledge.mjs`：从指定源仓库快照重新生成历史知识归档。
 - `scripts/serve-with-admin.mjs`：提供静态站点、用户认证、评论、论坛以及受保护的管理 API。
-- `scripts/database.mjs`：SQLite 架构、事务、索引、版本控制、用户/社区数据、问答统计和轮换备份。
+- `scripts/database.mjs`：SQLite 架构、事务、索引、版本控制、用户/社区数据、匿名访问事件、问答统计和轮换备份。
 - `scripts/community-service.mjs`：注册字段校验、scrypt 密码哈希、Markdown 解析和 HTML 安全清洗。
 - `scripts/rag-service.mjs`：基于 MiniSearch 的中文分段全文检索和 OpenAI 兼容问答编排。
 - `THIRD_PARTY_NOTICES.md`：集成开源组件的项目、版本、用途与许可说明。
@@ -79,7 +80,7 @@ npm run build
 | 精简版 | 企业 AI 商业合作伙伴介绍（精简背书标签） | `versions/index-v2.0.1-商业合作版.html` | `v2.0.1` |
 | 单页归档版 | 上海莲证科技 CIO 商业合作介绍 | `versions/index-v2.1.0-CIO商业合作版.html` | `v2.1.0` |
 | 多页面静态版 | 九案例图文商业合作主页 | `index.html` + `pages/` | `v2.3.2` |
-| 当前工作版 | 安全账号 + 可运营社区 + SQLite RAG 的个人知识门户 | `site/` | 本地版本 `v4.1.0` |
+| 当前工作版 | 安全账号 + 可运营社区 + SQLite RAG + 第一方访问分析的个人知识门户 | `site/` | 本地版本 `v4.2.0` |
 
 `v1.0.0` 与 `v1.1.0` 的 `index.html` 内容相同，因此只保留一份物理快照；两个 Git 标签仍完整存在。
 
@@ -89,7 +90,7 @@ npm run build
 git status
 git add site scripts config install bin docs Dockerfile compose.yaml .dockerignore .env.example .gitignore .github package.json package-lock.json CHANGELOG.md README.md
 git commit -m "重构个人知识与合作门户"
-git tag -a v4.1.0 -m "发布 v4.1.0"
+git tag -a v4.2.0 -m "发布 v4.2.0"
 ```
 
 ## 案例配置管理
@@ -107,12 +108,13 @@ npm run admin
 - 站点内容管理页：<http://127.0.0.1:4173/admin/site>
 - 知识库与 AI 管理页：<http://127.0.0.1:4173/admin/knowledge>
 - 用户与社区管理页：<http://127.0.0.1:4173/admin/users>
+- 访问监控与数据分析页：<http://127.0.0.1:4173/admin/analytics>
 - 管理端使用服务端会话认证，登录 Cookie 设置为 `HttpOnly` 与 `SameSite=Strict`，并限制连续登录失败次数。
 - 首次启动自动把案例与站点默认配置迁移到 SQLite；用户、数据库会话、评论、论坛及后续配置全部写入 `data/portal.sqlite`。
 - 案例、标签、合作伙伴采用关联表存储；启用 WAL、外键、唯一约束、事务和查询索引。
 - 每次保存前生成一致性数据库备份，并用 ETag 防止多个管理页面互相覆盖。
 - 默认仅监听本机 `127.0.0.1`。如需在 NAS 或局域网部署，可在 `.env.local` 将 `CASE_ADMIN_HOST` 改为 `0.0.0.0`，并建议通过 HTTPS 反向代理开放管理端。
-- GitHub Pages 是纯静态部署，只展示构建时的默认配置，不提供注册、评论、论坛或管理 API；完整社区功能需通过 Node/Docker 运行。
+- GitHub Pages 是纯静态部署，只展示构建时的默认配置，不提供注册、评论、论坛、访问监控或管理 API；完整社区和数据分析功能需通过 Node/Docker 运行。
 
 ## 用户、评论与论坛
 
@@ -121,6 +123,14 @@ npm run admin
 - 评论、帖子和回复支持受限 Markdown，使用 `marked` 解析并由 `sanitize-html` 严格清洗，不允许图片、脚本或危险 URL 协议。
 - 注册、登录和社区写操作均有同源检查与频率限制；停用用户会立即注销其全部会话。
 - 管理员可在 `/admin/users` 搜索用户、授予版主、停用/删除账号，以及恢复、隐藏、锁定或删除内容。
+
+## 访问监控与数据分析
+
+通过 <http://127.0.0.1:4173/admin/analytics> 登录管理端后，可查看近 7、30 或 90 天的每日 PV、独立访客 UV、访问会话、互动率、联系意向、回访访客、内容页面表现、来源、设备、行动转化和浏览器性能数据。仪表盘的自动提示基于当前筛选周期内的实际事件生成，适合用于判断内容、渠道和体验优化优先级。
+
+- 监控默认启用，使用本站第一方匿名 Cookie 生成的单向摘要完成访客和 30 分钟会话去重；不保存 IP、账号标识、原始 User-Agent 或完整来源 URL。
+- 管理端可随时暂停采集、启用浏览器“禁止跟踪”（DNT）尊重模式，并设置 30–1825 天的数据保留期；到期事件会自动清理。
+- 只统计公开页面。管理端与 API 页面、已识别爬虫和启用 DNT 的访问不会写入分析数据。详细说明见[隐私说明](/privacy)。
 
 ## 知识库 RAG 与 AI 问答
 

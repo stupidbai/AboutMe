@@ -11,6 +11,7 @@ const requiredFiles = [
   'site/admin/site.md',
   'site/admin/knowledge.md',
   'site/admin/users.md',
+  'site/admin/analytics.md',
   'site/account.md',
   'site/forum.md',
   'site/insights.md',
@@ -36,6 +37,8 @@ const requiredFiles = [
   'site/.vitepress/theme/components/ForumBoard.vue',
   'site/.vitepress/theme/components/UserAdmin.vue',
   'site/.vitepress/theme/components/KnowledgeDetail.vue',
+  'site/.vitepress/theme/components/AnalyticsDashboard.vue',
+  'site/.vitepress/theme/components/SiteAnalyticsTracker.vue',
   'site/.vitepress/theme/useCommunityAuth.ts',
   'site/.vitepress/theme/useSiteConfig.ts',
   'site/data/siteConfig.ts',
@@ -94,6 +97,11 @@ const commentsSource = readFileSync(resolve(root, 'site/.vitepress/theme/compone
 const forumSource = readFileSync(resolve(root, 'site/.vitepress/theme/components/ForumBoard.vue'), 'utf8')
 const userAdminSource = readFileSync(resolve(root, 'site/.vitepress/theme/components/UserAdmin.vue'), 'utf8')
 const communityServiceSource = readFileSync(resolve(root, 'scripts/community-service.mjs'), 'utf8')
+const analyticsDashboardSource = readFileSync(resolve(root, 'site/.vitepress/theme/components/AnalyticsDashboard.vue'), 'utf8')
+const analyticsTrackerSource = readFileSync(resolve(root, 'site/.vitepress/theme/components/SiteAnalyticsTracker.vue'), 'utf8')
+const analyticsAdminPageSource = readFileSync(resolve(root, 'site/admin/analytics.md'), 'utf8')
+const themeSource = readFileSync(resolve(root, 'site/.vitepress/theme/index.ts'), 'utf8')
+const privacySource = readFileSync(resolve(root, 'site/privacy.md'), 'utf8')
 const ragServiceSource = readFileSync(resolve(root, 'scripts/rag-service.mjs'), 'utf8')
 const networkSecuritySource = readFileSync(resolve(root, 'scripts/network-security.mjs'), 'utf8')
 const adminServerSource = readFileSync(resolve(root, 'scripts/serve-with-admin.mjs'), 'utf8')
@@ -191,6 +199,16 @@ for (const [source, anchors] of requiredCommunityUiAnchors) {
   const missing = anchors.filter(anchor => !source.includes(anchor))
   if (missing.length) throw new Error(`Missing community UI behavior: ${missing.join(', ')}`)
 }
+const requiredAnalyticsUiAnchors = [
+  [analyticsAdminPageSource, ['<AnalyticsDashboard />', 'noindex, nofollow']],
+  [analyticsDashboardSource, ['/api/admin/analytics', '/api/admin/analytics-settings', '页面浏览 PV', '独立访客 UV', '每日访问趋势', '行动转化', '体验性能', '监控隐私与保留', 'P95']],
+  [analyticsTrackerSource, ['/api/telemetry', 'page_view', 'page_engaged', 'navigator.sendBeacon', 'portal:analytics', 'data-analytics-event', '15_000']],
+  [themeSource, ['SiteAnalyticsTracker', "app.component('AnalyticsDashboard'", "route.path.startsWith('/kb/')"]]
+]
+for (const [source, anchors] of requiredAnalyticsUiAnchors) {
+  const missing = anchors.filter(anchor => !source.includes(anchor))
+  if (missing.length) throw new Error(`Missing analytics UI behavior: ${missing.join(', ')}`)
+}
 if (!communityServiceSource.includes("from '@noble/hashes/scrypt.js'") || !communityServiceSource.includes("from 'marked'") || !communityServiceSource.includes("from 'sanitize-html'") || !communityServiceSource.includes('allowedSchemes')) {
   throw new Error('Community passwords and user content must reuse audited cryptography, Markdown and HTML sanitization packages')
 }
@@ -222,6 +240,20 @@ const requiredServerAnchors = [
   '/api/admin/moderation',
   '/api/admin/community-settings',
   '/api/admin/product-metrics',
+  '/api/analytics/status',
+  '/api/telemetry',
+  '/api/admin/analytics',
+  '/api/admin/analytics-settings',
+  'trustedTelemetryOrigin',
+  'analyticsIdentity',
+  'normalizeTelemetry',
+  'normalizeTrackedPath',
+  'portal_visitor',
+  'portal_visit_session',
+  'telemetryAttempts',
+  'maybePruneAnalyticsEvents',
+  'String(request.headers.dnt',
+  'likelyBot',
   'x-csrf-token',
   'config/cases.json',
   '/api/health',
@@ -259,6 +291,21 @@ const requiredDatabaseAnchors = [
   'CREATE TABLE IF NOT EXISTS community_tokens',
   'CREATE TABLE IF NOT EXISTS product_events',
   'CREATE TABLE IF NOT EXISTS community_settings',
+  'CREATE TABLE IF NOT EXISTS analytics_settings',
+  'CREATE TABLE IF NOT EXISTS analytics_settings_changes',
+  'CREATE TABLE IF NOT EXISTS site_events',
+  'SCHEMA_VERSION = 7',
+  'PRAGMA user_version = 7',
+  'retention_days',
+  'visitor_hash',
+  'session_hash',
+  'acquisition_source',
+  'device_type',
+  'getAnalyticsSettings',
+  'replaceAnalyticsSettings',
+  'recordSiteEvent',
+  'getSiteAnalytics',
+  'maybePruneAnalyticsEvents',
   "createCipheriv('aes-256-gcm'",
   'CREATE INDEX IF NOT EXISTS',
   'await backup',
@@ -275,7 +322,7 @@ if (missingDockerAnchors.length) throw new Error(`Missing Docker behavior: ${mis
 if (!composeSource.includes('portal-data:/data') || !composeSource.includes('read_only: true') || !composeSource.includes('no-new-privileges:true')) {
   throw new Error('Compose must keep SQLite in a volume and apply container hardening')
 }
-if (packageMetadata.version !== '4.1.0' || packageMetadata.engines?.node !== '>=22.16' || packageMetadata.dependencies?.minisearch !== '^7.2.0' || packageMetadata.dependencies?.['@noble/hashes'] !== '^2.4.0' || packageMetadata.dependencies?.marked !== '^18.0.11' || packageMetadata.dependencies?.['sanitize-html'] !== '^2.17.7' || packageMetadata.dependencies?.nodemailer !== '^9.1.1' || packageMetadata.dependencies?.['@zxcvbn-ts/core'] !== '^4.2.0') {
+if (packageMetadata.version !== '4.2.0' || packageMetadata.engines?.node !== '>=22.16' || packageMetadata.dependencies?.minisearch !== '^7.2.0' || packageMetadata.dependencies?.['@noble/hashes'] !== '^2.4.0' || packageMetadata.dependencies?.marked !== '^18.0.11' || packageMetadata.dependencies?.['sanitize-html'] !== '^2.17.7' || packageMetadata.dependencies?.nodemailer !== '^9.1.1' || packageMetadata.dependencies?.['@zxcvbn-ts/core'] !== '^4.2.0') {
   throw new Error('Package version or Node.js SQLite runtime requirement is incorrect')
 }
 if (!ragServiceSource.includes("from 'minisearch'") || !ragServiceSource.includes('new MiniSearch') || !networkSecuritySource.includes('assertSafeOutboundUrl')) {
@@ -320,6 +367,17 @@ if (knowledgePage.includes('内容与来源边界') || knowledgePage.includes('�
 }
 if (/原文入口|原文链接/.test(`${knowledgePage}\n${importedKnowledgeComponent}`)) {
   throw new Error('Knowledge index must describe sources as local records, not outbound links')
+}
+
+const privacyRequirements = [
+  /访问监控/,
+  /第一方.*(?:匿名|Cookie)|匿名.*Cookie/,
+  /(?:不(?:在.*)?保存|不会保存|不存储).*IP|IP.*(?:不保存|不会保存|不存储)/,
+  /(?:完整来源 URL|完整来源地址|完整来源网址)/,
+  /(?:DNT|禁止跟踪)/
+]
+if (privacyRequirements.some(requirement => !requirement.test(privacySource))) {
+  throw new Error('Privacy notice must disclose first-party analytics, anonymization, no IP/full referrer retention, and DNT handling')
 }
 
 const importedMarkdownFiles = []
@@ -400,3 +458,4 @@ console.log(`Local asset references: ${localRefs.length}`)
 console.log(`Missing local assets: ${missingAssets.length}`)
 console.log('Critical career and contact facts: verified')
 console.log('Visitor, account, comments, forum and user administration: verified')
+console.log('First-party anonymous traffic monitoring, analytics dashboard and privacy controls: verified')

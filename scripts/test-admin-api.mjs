@@ -94,6 +94,7 @@ let userCookie = ''
 let csrfCookie = ''
 let csrfToken = ''
 let revision = ''
+let analyticsCookie = ''
 const adminFetch = (path, options = {}) => fetch(baseUrl + path, {
   ...options,
   headers: {
@@ -118,10 +119,28 @@ const communityFetch = (path, options = {}) => fetch(baseUrl + path, {
     ...options.headers
   }
 })
+const responseCookies = response => {
+  const values = typeof response.headers.getSetCookie === 'function'
+    ? response.headers.getSetCookie()
+    : [response.headers.get('set-cookie') || '']
+  return values.flatMap(value => String(value).split(/,(?=\s*[A-Za-z0-9_-]+=)/)).filter(Boolean)
+}
+const telemetryFetch = (payload, options = {}) => fetch(baseUrl + '/api/telemetry', {
+  method: 'POST',
+  ...options,
+  headers: {
+    accept: 'application/json',
+    'content-type': 'application/json',
+    origin: baseUrl,
+    ...(analyticsCookie ? { cookie: analyticsCookie } : {}),
+    ...options.headers
+  },
+  body: JSON.stringify(payload)
+})
 
 try {
   const health = await waitForHealth()
-  if (health.status !== 'ok' || health.database.schemaVersion !== 6 || health.database.siteConfigRevision !== 1 || health.database.knowledgeCount !== 12 || health.database.ragQueryCount !== 0 || health.database.communityUserCount !== 0 || health.database.forumPostCount !== 4 || health.database.journalMode !== 'wal') {
+  if (health.status !== 'ok' || health.database.schemaVersion !== 7 || health.database.siteConfigRevision !== 1 || health.database.knowledgeCount !== 12 || health.database.ragQueryCount !== 0 || health.database.siteEventCount !== 0 || !health.database.analyticsEnabled || health.database.communityUserCount !== 0 || health.database.forumPostCount !== 4 || health.database.journalMode !== 'wal') {
     throw new Error('SQLite 健康状态不符合预期。')
   }
 
@@ -148,6 +167,45 @@ try {
   await expectStatus(await fetch(baseUrl + '/api/knowledge', { headers: { 'if-none-match': publicKnowledgeEtag } }), 304, '知识库缓存协商')
   const aiStatus = await (await expectStatus(await fetch(baseUrl + '/api/ai/status'), 200, '公开读取 AI 状态')).json()
   if (aiStatus.enabled || aiStatus.knowledgeEntries !== 12 || aiStatus.localDocuments < 10) throw new Error('AI 初始状态或本地文档索引无效。')
+
+  const publicAnalyticsStatus = await (await expectStatus(await fetch(baseUrl + '/api/analytics/status'), 200, '公开读取访问监控状态')).json()
+  if (!publicAnalyticsStatus.enabled || !publicAnalyticsStatus.respectDnt || Object.hasOwn(publicAnalyticsStatus, 'retentionDays')) {
+    throw new Error('公开访问监控状态未正确脱敏或默认值无效。')
+  }
+  const trackedView = {
+    eventId: 'analytics-view-0001', eventName: 'page_view', pagePath: '/knowledge', deviceType: 'desktop',
+    referrer: 'https://www.baidu.com/s?wd=AI', loadMs: 840, ttfbMs: 120, fcpMs: 310
+  }
+  await expectStatus(await fetch(baseUrl + '/api/telemetry', {
+    method: 'POST', headers: { 'content-type': 'application/json', origin: 'https://invalid.example' }, body: JSON.stringify(trackedView)
+  }), 403, '跨来源访问监控')
+  const firstTelemetry = await expectStatus(await telemetryFetch(trackedView), 204, '记录匿名页面访问')
+  const analyticsSetCookies = responseCookies(firstTelemetry)
+  if (!analyticsSetCookies.some(value => value.startsWith('portal_visitor=') && value.includes('HttpOnly') && value.includes('SameSite=Lax')) ||
+      !analyticsSetCookies.some(value => value.startsWith('portal_visit_session=') && value.includes('HttpOnly') && value.includes('SameSite=Lax'))) {
+    throw new Error('匿名访问监控未签发受保护的访客与会话 Cookie。')
+  }
+  analyticsCookie = analyticsSetCookies.map(value => value.split(';', 1)[0]).join('; ')
+  if (!analyticsCookie.includes('portal_visitor=') || !analyticsCookie.includes('portal_visit_session=')) throw new Error('匿名访问 Cookie 无法用于连续会话。')
+  await expectStatus(await telemetryFetch(trackedView), 204, '访问事件幂等去重')
+  await expectStatus(await telemetryFetch({
+    eventId: 'analytics-engaged-001', eventName: 'page_engaged', pagePath: '/knowledge', deviceType: 'desktop'
+  }), 204, '记录页面有效停留')
+  await expectStatus(await telemetryFetch({
+    eventId: 'analytics-contact-001', eventName: 'contact_intent', pagePath: '/contact', deviceType: 'desktop'
+  }), 204, '记录联系意向')
+  const secondTelemetry = await expectStatus(await fetch(baseUrl + '/api/telemetry', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', origin: baseUrl },
+    body: JSON.stringify({
+      eventId: 'analytics-view-0002', eventName: 'page_view', pagePath: '/cases', deviceType: 'mobile',
+      referrer: 'https://github.com/example/project', loadMs: 1220, ttfbMs: 210, fcpMs: 460
+    })
+  }), 204, '记录第二位匿名访客')
+  if (responseCookies(secondTelemetry).filter(value => value.startsWith('portal_')).length !== 2) throw new Error('第二位访客未获得独立匿名 Cookie。')
+  await expectStatus(await telemetryFetch({
+    eventId: 'analytics-case-open01', eventName: 'case_open', pagePath: '/cases', deviceType: 'desktop'
+  }), 204, '记录案例访问意向')
 
   const anonymousResponse = await expectStatus(await communityFetch('/api/auth/session'), 200, '访客会话')
   const anonymousSession = await anonymousResponse.json()
@@ -206,6 +264,8 @@ try {
   await expectStatus(await adminFetch('/api/admin/moderation'), 401, '未登录访问内容审核 API')
   await expectStatus(await adminFetch('/api/admin/community-settings'), 401, '未登录访问社区配置 API')
   await expectStatus(await adminFetch('/api/admin/product-metrics'), 401, '未登录访问产品指标 API')
+  await expectStatus(await adminFetch('/api/admin/analytics'), 401, '未登录访问访问分析 API')
+  await expectStatus(await adminFetch('/api/admin/analytics-settings'), 401, '未登录访问监控配置 API')
   await expectStatus(await adminFetch('/api/admin/login', {
     method: 'POST',
     headers: { origin: 'https://invalid.example' },
@@ -221,6 +281,39 @@ try {
     throw new Error('管理会话 Cookie 缺少 HttpOnly 或 SameSite=Strict。')
   }
   cookie = setCookie.split(';', 1)[0]
+
+  const analyticsSettingsResponse = await expectStatus(await adminFetch('/api/admin/analytics-settings'), 200, '读取访问监控配置')
+  const originalAnalyticsSettings = await analyticsSettingsResponse.json()
+  let analyticsSettingsRevision = analyticsSettingsResponse.headers.get('etag') || ''
+  if (!originalAnalyticsSettings.enabled || !originalAnalyticsSettings.respectDnt || originalAnalyticsSettings.retentionDays !== 365 || !analyticsSettingsRevision) {
+    throw new Error('访问监控配置默认值或 ETag 无效。')
+  }
+  const saveAnalyticsSettings = (payload, match = analyticsSettingsRevision) => adminFetch('/api/admin/analytics-settings', {
+    method: 'PUT', headers: match ? { 'if-match': match } : {}, body: JSON.stringify(payload)
+  })
+  await expectStatus(await saveAnalyticsSettings(originalAnalyticsSettings, ''), 428, '访问监控配置缺少并发版本保护')
+  const changedAnalyticsSettings = { ...originalAnalyticsSettings, retentionDays: 90 }
+  const analyticsSettingsWrite = await expectStatus(await saveAnalyticsSettings(changedAnalyticsSettings), 200, '更新访问监控配置')
+  analyticsSettingsRevision = analyticsSettingsWrite.headers.get('etag') || ''
+  const savedAnalyticsSettings = await analyticsSettingsWrite.json()
+  if (savedAnalyticsSettings.retentionDays !== 90 || !analyticsSettingsRevision || analyticsSettingsRevision === analyticsSettingsResponse.headers.get('etag')) {
+    throw new Error('访问监控配置更新或 ETag 递增失败。')
+  }
+  await expectStatus(await saveAnalyticsSettings(originalAnalyticsSettings, analyticsSettingsResponse.headers.get('etag')), 409, '访问监控配置旧版本写入冲突')
+  const analyticsReport = await (await expectStatus(await adminFetch('/api/admin/analytics?days=30'), 200, '读取访问分析')).json()
+  if (analyticsReport.days !== 30 || analyticsReport.timezone !== 'Asia/Shanghai' || analyticsReport.summary.pageViews !== 2 ||
+      analyticsReport.summary.visitors !== 2 || analyticsReport.summary.sessions !== 2 || analyticsReport.summary.engagedSessions !== 1 ||
+      analyticsReport.summary.contactIntents !== 1 || analyticsReport.summary.caseOpens !== 1 || analyticsReport.performance.samples !== 2 ||
+      analyticsReport.performance.averageLoadMs !== 1030 || analyticsReport.performance.p95LoadMs !== 1220 ||
+      !analyticsReport.daily.some(item => item.pageViews === 2 && item.visitors === 2) ||
+      !analyticsReport.topPages.some(item => item.pagePath === '/knowledge' && item.pageViews === 1) ||
+      !analyticsReport.sources.some(item => item.source === 'search' && item.visitors === 1) ||
+      !analyticsReport.sources.some(item => item.source === 'social' && item.visitors === 1) ||
+      !analyticsReport.devices.some(item => item.device === 'desktop' && item.visitors === 1) ||
+      !analyticsReport.devices.some(item => item.device === 'mobile' && item.visitors === 1) ||
+      !analyticsReport.conversions.some(item => item.eventName === 'contact_intent' && item.events === 1)) {
+    throw new Error('访问监控聚合、来源、设备、性能或转化分析无效。')
+  }
 
   const communityStats = await (await expectStatus(await adminFetch('/api/admin/community/stats'), 200, '读取社区统计')).json()
   if (communityStats.users !== 1 || communityStats.comments !== 1 || communityStats.posts !== 5 || communityStats.replies !== 1) throw new Error('管理端社区统计无效。')
@@ -321,8 +414,10 @@ try {
   if (securityStatus.encryptionKeySource !== 'environment' || securityStatus.localOnlyHost !== true) throw new Error('安全状态信息不符合预期。')
   const exportResponse = await expectStatus(await adminFetch('/api/admin/export'), 200, '导出站点配置')
   const exported = await exportResponse.json()
-  if (exported.formatVersion !== 1 || exported.ai.apiKeyIncluded !== false || exported.community.personalDataIncluded !== false || JSON.stringify(exported).includes('encrypted-api-test-key') || JSON.stringify(exported).includes('portal@example.com')) {
-    throw new Error('配置导出必须完整且不能包含 API Key。')
+  if (exported.formatVersion !== 1 || exported.ai.apiKeyIncluded !== false || exported.community.personalDataIncluded !== false || exported.analytics?.dataIncluded !== false ||
+      Object.hasOwn(exported.analytics || {}, 'events') || JSON.stringify(exported).includes('encrypted-api-test-key') ||
+      JSON.stringify(exported).includes('portal@example.com') || JSON.stringify(exported).includes('analytics-view-0001')) {
+    throw new Error('配置导出必须完整且不能包含密钥、个人信息或匿名访问明细。')
   }
   const restoreAi = await expectStatus(await saveAi({ ...originalAi, clearApiKey: true }), 200, '恢复 AI 配置')
   aiRevision = restoreAi.headers.get('etag') || ''
@@ -395,6 +490,7 @@ try {
   console.log('Knowledge CRUD and live RAG retrieval: verified')
   console.log('RAG query log, statistics and feedback: verified')
   console.log('Security status and secret-free export: verified')
+  console.log('First-party anonymous analytics, aggregate dashboard and secret-free export: verified')
   console.log('Private-network AI endpoint opt-in: verified')
   console.log('Encrypted AI configuration and mock completion: verified')
   console.log('Transactional create/delete: verified (9 -> 10 -> 9)')

@@ -13,7 +13,7 @@ RUN npm run build && npm prune --omit=dev
 FROM node:24-bookworm-slim AS runtime
 
 LABEL org.opencontainers.image.title="白云飞个人知识与合作门户" \
-      org.opencontainers.image.version="4.1.0"
+      org.opencontainers.image.version="4.2.0"
 
 ENV NODE_ENV=production \
     CASE_ADMIN_HOST=0.0.0.0 \

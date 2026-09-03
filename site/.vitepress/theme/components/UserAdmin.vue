@@ -42,7 +42,7 @@ const testSmtp = async () => { busy.value = 'smtp'; const response = await fetch
     <form v-else-if="state === 'login'" class="case-admin-login" @submit.prevent="login"><span>USER ADMIN</span><h1>用户与社区管理</h1><p>使用站点管理员账号登录。</p><label>账号<input v-model="username" autocomplete="username" required></label><label>密码<input v-model="password" type="password" autocomplete="current-password" required></label><button :disabled="busy === 'login'">登录管理后台</button><p v-if="error" class="case-admin-feedback case-admin-feedback--error">{{ error }}</p></form>
     <div v-else-if="state === 'unavailable'" class="case-admin-state"><h1>管理服务未连接</h1><p>请运行 <code>npm run admin</code> 后重试。</p></div>
     <template v-else>
-      <header class="case-admin__hero"><div><span>COMMUNITY OPERATIONS</span><h1>用户与社区管理</h1><p>管理注册、账号、内容审核、安全开关与产品漏斗。</p></div><div class="site-admin__links"><a :href="withBase('/forum')" target="_blank">查看论坛 ↗</a><a :href="withBase('/admin/knowledge')">知识与 AI →</a></div></header>
+      <header class="case-admin__hero"><div><span>COMMUNITY OPERATIONS</span><h1>用户与社区管理</h1><p>管理注册、账号、内容审核、安全开关与产品漏斗。</p></div><div class="site-admin__links"><a :href="withBase('/forum')" target="_blank">查看论坛 ↗</a><a :href="withBase('/admin/knowledge')">知识与 AI →</a><a :href="withBase('/admin/analytics')">访问分析 →</a></div></header>
       <div v-if="stats" class="community-stats"><article v-for="(value,key) in stats" :key="key"><strong>{{ value }}</strong><span>{{ statName[key] }}</span></article></div>
       <p v-if="error" class="case-admin-feedback case-admin-feedback--error">{{ error }}</p><p v-if="message" class="case-admin-feedback">{{ message }}</p>
 

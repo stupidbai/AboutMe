@@ -19,6 +19,8 @@ import ArticleComments from './components/ArticleComments.vue'
 import ForumBoard from './components/ForumBoard.vue'
 import UserAdmin from './components/UserAdmin.vue'
 import KnowledgeDetail from './components/KnowledgeDetail.vue'
+import SiteAnalyticsTracker from './components/SiteAnalyticsTracker.vue'
+import AnalyticsDashboard from './components/AnalyticsDashboard.vue'
 import './styles.css'
 
 export default {
@@ -27,6 +29,7 @@ export default {
     const { frontmatter } = useData()
     const route = useRoute()
     return h('div', { class: frontmatter.value.layoutClass || undefined }, [
+      h(SiteAnalyticsTracker),
       h(DefaultTheme.Layout, null, {
         'doc-after': () => route.path.startsWith('/kb/') ? h(ArticleComments) : null
       })
@@ -50,5 +53,6 @@ export default {
     app.component('ForumBoard', ForumBoard)
     app.component('UserAdmin', UserAdmin)
     app.component('KnowledgeDetail', KnowledgeDetail)
+    app.component('AnalyticsDashboard', AnalyticsDashboard)
   }
 } satisfies Theme
