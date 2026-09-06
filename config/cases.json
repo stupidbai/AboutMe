@@ -162,5 +162,21 @@
       "复制交付"
     ],
     "nasUrl": ""
+  },
+  {
+    "id": "10",
+    "category": "ecosystem",
+    "title": "AAIA AIGC 委员会理事",
+    "kicker": "行业组织 · AIGC 生态",
+    "description": "获聘担任亚太人工智能学会（AAIA）AIGC 委员会理事，聘期为 2023 年 3 月至 2028 年 3 月，持续参与 AIGC 技术、产业应用与生态合作交流。",
+    "image": "/assets/cases/aaia-aigc-appointment.jpg",
+    "imageAlt": "白云飞担任亚太人工智能学会 AIGC 委员会理事的聘书",
+    "tags": [
+      "AAIA",
+      "AIGC",
+      "行业生态"
+    ],
+    "nasUrl": "",
+    "contain": true
   }
 ]

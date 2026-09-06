@@ -14,6 +14,8 @@ release/
 site/.vitepress/cache/
 site/.vitepress/dist/
 .tmp/
+.playwright-cli/
+output/playwright/
 
 # Local server and temporary files
 *.log

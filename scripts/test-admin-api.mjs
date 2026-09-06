@@ -147,8 +147,8 @@ try {
   const publicResponse = await expectStatus(await fetch(baseUrl + '/api/cases'), 200, '公开读取')
   const publicCases = await publicResponse.json()
   const publicEtag = publicResponse.headers.get('etag')
-  if (!Array.isArray(publicCases) || publicCases.length !== 9 || !publicEtag) {
-    throw new Error('公开 API 未返回 9 个迁移案例或缺少 ETag。')
+  if (!Array.isArray(publicCases) || publicCases.length !== 10 || !publicEtag) {
+    throw new Error('公开 API 未返回 10 个迁移案例或缺少 ETag。')
   }
   await expectStatus(await fetch(baseUrl + '/api/cases', {
     headers: { 'if-none-match': publicEtag }
@@ -343,7 +343,7 @@ try {
   const managedResponse = await expectStatus(await adminFetch('/api/admin/cases'), 200, '登录后读取案例')
   const originalCases = await managedResponse.json()
   revision = managedResponse.headers.get('etag') || ''
-  if (!revision || originalCases.length !== 9) throw new Error('管理 API 未返回数据库版本或完整案例。')
+  if (!revision || originalCases.length !== 10) throw new Error('管理 API 未返回数据库版本或完整案例。')
 
   const managedSiteResponse = await expectStatus(await adminFetch('/api/admin/site-config'), 200, '登录后读取站点配置')
   const originalSiteConfig = await managedSiteResponse.json()
@@ -447,14 +447,14 @@ try {
   const acceptedWrite = writeA.status === 200 ? writeA : writeB
   revision = acceptedWrite.headers.get('etag') || ''
   const afterAdd = await (await expectStatus(await fetch(baseUrl + '/api/cases'), 200, '新增后公开读取')).json()
-  if (afterAdd.length !== 10 || !afterAdd.some(item => ['qa-tmpa', 'qa-tmpb'].includes(item.id))) {
+  if (afterAdd.length !== originalCases.length + 1 || !afterAdd.some(item => ['qa-tmpa', 'qa-tmpb'].includes(item.id))) {
     throw new Error('新增案例未通过数据库公开读取生效。')
   }
 
   const remove = await expectStatus(await save(originalCases), 200, '删除临时案例')
   revision = remove.headers.get('etag') || ''
   const afterDelete = await (await expectStatus(await fetch(baseUrl + '/api/cases'), 200, '删除后公开读取')).json()
-  if (afterDelete.length !== 9 || afterDelete.some(item => ['qa-tmpa', 'qa-tmpb'].includes(item.id))) {
+  if (afterDelete.length !== originalCases.length || afterDelete.some(item => ['qa-tmpa', 'qa-tmpb'].includes(item.id))) {
     throw new Error('删除案例后数据库未恢复。')
   }
 
@@ -478,7 +478,7 @@ try {
     throw new Error('数据库文件或轮换备份不符合预期。')
   }
 
-  console.log('SQLite migration: 9 seed cases')
+  console.log(`SQLite migration: ${originalCases.length} seed cases`)
   console.log('SQLite WAL/schema/health: verified')
   console.log('Public API ETag/304: verified')
   console.log('Public site configuration ETag/304: verified')
@@ -493,7 +493,7 @@ try {
   console.log('First-party anonymous analytics, aggregate dashboard and secret-free export: verified')
   console.log('Private-network AI endpoint opt-in: verified')
   console.log('Encrypted AI configuration and mock completion: verified')
-  console.log('Transactional create/delete: verified (9 -> 10 -> 9)')
+  console.log(`Transactional create/delete: verified (${originalCases.length} -> ${originalCases.length + 1} -> ${originalCases.length})`)
   console.log('Rotating database backups: verified')
   console.log('Logout invalidation: verified')
   console.log('Visitor, registration, persistent session and profile: verified')

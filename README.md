@@ -29,7 +29,7 @@ npm run build
 - `site/index.md`：个人门户首页与目录。
 - `site/profile.md`：职业时间线、能力底座与专业背书。
 - `site/cooperation.md`：合作匹配、四类方向与推进方式。
-- `site/cases.md`：九个产品交付、人才、渠道与生态案例。
+- `site/cases.md`：十个产品交付、人才、渠道与生态案例。
 - `site/admin/cases.md`：受账号保护的案例配置管理页，不出现在公开导航和搜索中。
 - `site/admin/site.md`：受账号保护的站点内容管理页，可配置身份、首页、联系、目录、履历和合作内容。
 - `site/admin/knowledge.md`：知识条目、RAG 和 AI 接口配置管理页。
@@ -80,7 +80,7 @@ npm run build
 | 精简版 | 企业 AI 商业合作伙伴介绍（精简背书标签） | `versions/index-v2.0.1-商业合作版.html` | `v2.0.1` |
 | 单页归档版 | 上海莲证科技 CIO 商业合作介绍 | `versions/index-v2.1.0-CIO商业合作版.html` | `v2.1.0` |
 | 多页面静态版 | 九案例图文商业合作主页 | `index.html` + `pages/` | `v2.3.2` |
-| 当前工作版 | 安全账号 + 可运营社区 + SQLite RAG + 第一方访问分析的个人知识门户 | `site/` | 本地版本 `v4.2.1` |
+| 当前工作版 | 安全账号 + 可运营社区 + SQLite RAG + 第一方访问分析的个人知识门户 | `site/` | 本地版本 `v4.2.2` |
 
 `v1.0.0` 与 `v1.1.0` 的 `index.html` 内容相同，因此只保留一份物理快照；两个 Git 标签仍完整存在。
 
@@ -90,7 +90,7 @@ npm run build
 git status
 git add site scripts config install bin docs Dockerfile compose.yaml .dockerignore .env.example .gitignore .github package.json package-lock.json CHANGELOG.md README.md
 git commit -m "重构个人知识与合作门户"
-git tag -a v4.2.1 -m "发布 v4.2.1"
+git tag -a v4.2.2 -m "发布 v4.2.2"
 ```
 
 ## 案例配置管理
