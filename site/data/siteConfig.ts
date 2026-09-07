@@ -16,6 +16,9 @@ export interface TimelineItem {
   role: string
   description: string
   current: boolean
+  type?: 'career' | 'appointment'
+  image?: string
+  imageAlt?: string
 }
 export interface CooperationDirection extends TextCard { items: string[] }
 

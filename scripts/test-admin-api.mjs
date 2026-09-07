@@ -147,8 +147,8 @@ try {
   const publicResponse = await expectStatus(await fetch(baseUrl + '/api/cases'), 200, '公开读取')
   const publicCases = await publicResponse.json()
   const publicEtag = publicResponse.headers.get('etag')
-  if (!Array.isArray(publicCases) || publicCases.length !== 10 || !publicEtag) {
-    throw new Error('公开 API 未返回 10 个迁移案例或缺少 ETag。')
+  if (!Array.isArray(publicCases) || publicCases.length !== 9 || !publicEtag) {
+    throw new Error('公开 API 未返回 9 个迁移案例或缺少 ETag。')
   }
   await expectStatus(await fetch(baseUrl + '/api/cases', {
     headers: { 'if-none-match': publicEtag }
@@ -343,12 +343,12 @@ try {
   const managedResponse = await expectStatus(await adminFetch('/api/admin/cases'), 200, '登录后读取案例')
   const originalCases = await managedResponse.json()
   revision = managedResponse.headers.get('etag') || ''
-  if (!revision || originalCases.length !== 10) throw new Error('管理 API 未返回数据库版本或完整案例。')
+  if (!revision || originalCases.length !== 9) throw new Error('管理 API 未返回数据库版本或完整案例。')
 
   const managedSiteResponse = await expectStatus(await adminFetch('/api/admin/site-config'), 200, '登录后读取站点配置')
   const originalSiteConfig = await managedSiteResponse.json()
   let siteRevision = managedSiteResponse.headers.get('etag') || ''
-  if (!siteRevision || originalSiteConfig.timeline.length !== 5) throw new Error('管理 API 未返回站点配置版本或完整时间线。')
+  if (!siteRevision || originalSiteConfig.timeline.length !== 6 || !originalSiteConfig.timeline.some(item => item.type === 'appointment' && item.image?.includes('aaia-aigc-appointment'))) throw new Error('管理 API 未返回站点配置版本、完整时间线或 AAIA 任职凭证。')
   const saveSite = (payload, match = siteRevision) => adminFetch('/api/admin/site-config', {
     method: 'PUT', headers: match ? { 'if-match': match } : {}, body: JSON.stringify(payload)
   })

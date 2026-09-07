@@ -104,12 +104,18 @@ export const validateSiteConfig = payload => {
     focusAreas: list(root.focusAreas, '工作主线', 1, 12).map((item, index) => card(item, `工作主线 ${index + 1}`, true)),
     timeline: list(root.timeline, '履历时间线', 1, 30).map((item, index) => {
       const row = object(item, `履历 ${index + 1}`)
+      const type = optionalText(row.type, `履历 ${index + 1}类型`, 20) || 'career'
+      const image = optionalText(row.image, `履历 ${index + 1}图片`, 500)
+      if (!['career', 'appointment'].includes(type)) throw new Error(`履历 ${index + 1}类型无效。`)
       return {
         period: text(row.period, `履历 ${index + 1}时间`, 80),
         organization: text(row.organization, `履历 ${index + 1}组织`, 160),
         role: text(row.role, `履历 ${index + 1}角色`, 160),
         description: text(row.description, `履历 ${index + 1}说明`, 600),
-        current: row.current === true
+        current: row.current === true,
+        type,
+        image: image ? urlOrPath(image, `履历 ${index + 1}图片`) : '',
+        imageAlt: optionalText(row.imageAlt, `履历 ${index + 1}图片说明`, 180)
       }
     }),
     cooperation: {

@@ -1,12 +1,12 @@
 # 安装与部署
 
-本系统使用 Node.js 内置 SQLite。运行时不需要额外数据库服务，Windows、Linux 与 Docker 使用相同的数据结构和管理 API。v4.2.2 包含十个公开案例、第一方匿名访问监控与数据分析，并提供可配置的隐私和数据保留控制。
+本系统使用 Node.js 内置 SQLite。运行时不需要额外数据库服务，Windows、Linux 与 Docker 使用相同的数据结构和管理 API。v4.3.0 包含九个公开案例、带任职凭证的可配置履历、第一方匿名访问监控与数据分析，并提供可配置的隐私和数据保留控制。
 
 ## 系统要求
 
 - Node.js 22.16 或更高版本。
 - 默认端口 4173。
-- 首次启动会将 config/cases.json 中的 10 个案例无损迁移到 data/portal.sqlite。
+- 首次启动会将 config/cases.json 中的 9 个案例无损迁移到 data/portal.sqlite。
 - 案例管理：http://127.0.0.1:4173/admin/cases
 - 站点管理：http://127.0.0.1:4173/admin/site
 - 知识与 AI 管理：http://127.0.0.1:4173/admin/knowledge
@@ -16,7 +16,7 @@
 
 ## Windows 安装包
 
-1. 解压 bai-yunfei-portal-v4.2.2.zip。
+1. 解压 bai-yunfei-portal-v4.3.0.zip。
 2. 在 PowerShell 中运行：
 
 ~~~powershell
@@ -40,8 +40,8 @@ powershell -ExecutionPolicy Bypass -File .\install\windows\install.ps1
 ## Linux 安装包
 
 ~~~bash
-tar -xzf bai-yunfei-portal-v4.2.2.tar.gz
-cd bai-yunfei-portal-v4.2.2
+tar -xzf bai-yunfei-portal-v4.3.0.tar.gz
+cd bai-yunfei-portal-v4.3.0
 chmod +x install/linux/install.sh
 ./install/linux/install.sh
 ~/.local/share/bai-yunfei-portal/bin/start-linux.sh

@@ -177,7 +177,7 @@ if (missingAdminAnchors.length) {
 if (caseAdminSource.includes('localStorage')) {
   throw new Error('Case admin must use server persistence, not browser localStorage')
 }
-const requiredSiteAdminAnchors = ['/api/admin/site-config', '首页目录与版块显隐', '职业时间线', '保存全部修改', '保存并生效', "'if-match': revision.value"]
+const requiredSiteAdminAnchors = ['/api/admin/site-config', '首页目录与版块显隐', '职业与行业任职时间线', '凭证图片路径', '保存全部修改', '保存并生效', "'if-match': revision.value"]
 const missingSiteAdminAnchors = requiredSiteAdminAnchors.filter(anchor => !siteAdminSource.includes(anchor))
 if (missingSiteAdminAnchors.length) throw new Error(`Missing site admin behavior: ${missingSiteAdminAnchors.join(', ')}`)
 if (siteAdminSource.includes('localStorage')) throw new Error('Site admin must use server persistence, not browser localStorage')
@@ -323,7 +323,7 @@ if (missingDockerAnchors.length) throw new Error(`Missing Docker behavior: ${mis
 if (!composeSource.includes('portal-data:/data') || !composeSource.includes('read_only: true') || !composeSource.includes('no-new-privileges:true')) {
   throw new Error('Compose must keep SQLite in a volume and apply container hardening')
 }
-if (packageMetadata.version !== '4.2.2' || packageMetadata.engines?.node !== '>=22.16' || packageMetadata.dependencies?.minisearch !== '^7.2.0' || packageMetadata.dependencies?.['@noble/hashes'] !== '^2.4.0' || packageMetadata.dependencies?.marked !== '^18.0.11' || packageMetadata.dependencies?.['sanitize-html'] !== '^2.17.7' || packageMetadata.dependencies?.nodemailer !== '^9.1.1' || packageMetadata.dependencies?.['@zxcvbn-ts/core'] !== '^4.2.0') {
+if (packageMetadata.version !== '4.3.0' || packageMetadata.engines?.node !== '>=22.16' || packageMetadata.dependencies?.minisearch !== '^7.2.0' || packageMetadata.dependencies?.['@noble/hashes'] !== '^2.4.0' || packageMetadata.dependencies?.marked !== '^18.0.11' || packageMetadata.dependencies?.['sanitize-html'] !== '^2.17.7' || packageMetadata.dependencies?.nodemailer !== '^9.1.1' || packageMetadata.dependencies?.['@zxcvbn-ts/core'] !== '^4.2.0') {
   throw new Error('Package version or Node.js SQLite runtime requirement is incorrect')
 }
 if (!ragServiceSource.includes("from 'minisearch'") || !ragServiceSource.includes('new MiniSearch') || !networkSecuritySource.includes('assertSafeOutboundUrl')) {
@@ -428,7 +428,10 @@ const facts = [
   '数十人研发团队',
   '上海 / 徐州',
   '公证系统开发',
-  'FDE 团队培育'
+  'FDE 团队培育',
+  '亚太人工智能学会（AAIA）',
+  'AIGC 委员会理事',
+  '2023.03 — 2028.03'
 ]
 const missingFacts = facts.filter(fact => !contentSource.includes(fact))
 if (missingFacts.length) throw new Error(`Missing factual anchors: ${missingFacts.join(', ')}`)
@@ -438,6 +441,7 @@ const localRefs = [
     item.image,
     ...(Array.isArray(item.partners) ? item.partners.map(partner => partner.logo) : [])
   ]),
+  ...siteConfig.timeline.map(item => item.image),
   ...[...readFileSync(resolve(root, 'site/data/life.ts'), 'utf8').matchAll(/(?:image|logo|src):\s*'(\/[^']+)'/g)]
     .map(match => match[1])
 ].filter(ref => typeof ref === 'string' && ref.startsWith('/'))
