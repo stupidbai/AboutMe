@@ -306,6 +306,7 @@ try {
       analyticsReport.summary.contactIntents !== 1 || analyticsReport.summary.caseOpens !== 1 || analyticsReport.performance.samples !== 2 ||
       analyticsReport.performance.averageLoadMs !== 1030 || analyticsReport.performance.p95LoadMs !== 1220 ||
       !analyticsReport.daily.some(item => item.pageViews === 2 && item.visitors === 2) ||
+      !analyticsReport.monthly.some(item => item.pageViews === 2 && item.visitors === 2 && item.sessions === 2) ||
       !analyticsReport.topPages.some(item => item.pagePath === '/knowledge' && item.pageViews === 1) ||
       !analyticsReport.sources.some(item => item.source === 'search' && item.visitors === 1) ||
       !analyticsReport.sources.some(item => item.source === 'social' && item.visitors === 1) ||
@@ -348,7 +349,7 @@ try {
   const managedSiteResponse = await expectStatus(await adminFetch('/api/admin/site-config'), 200, '登录后读取站点配置')
   const originalSiteConfig = await managedSiteResponse.json()
   let siteRevision = managedSiteResponse.headers.get('etag') || ''
-  if (!siteRevision || originalSiteConfig.timeline.length !== 6 || !originalSiteConfig.timeline.some(item => item.type === 'appointment' && item.image?.includes('aaia-aigc-appointment'))) throw new Error('管理 API 未返回站点配置版本、完整时间线或 AAIA 任职凭证。')
+  if (!siteRevision || originalSiteConfig.timeline.length !== 5 || originalSiteConfig.timeline.some(item => item.organization.includes('亚太人工智能学会')) || !originalSiteConfig.credentials.some(item => item.organization.includes('亚太人工智能学会') && item.title.includes('AIGC') && item.image?.includes('aaia-aigc-appointment'))) throw new Error('管理 API 未返回站点配置版本、职业时间线或 AAIA 专业背书凭证。')
   const saveSite = (payload, match = siteRevision) => adminFetch('/api/admin/site-config', {
     method: 'PUT', headers: match ? { 'if-match': match } : {}, body: JSON.stringify(payload)
   })
@@ -490,7 +491,7 @@ try {
   console.log('Knowledge CRUD and live RAG retrieval: verified')
   console.log('RAG query log, statistics and feedback: verified')
   console.log('Security status and secret-free export: verified')
-  console.log('First-party anonymous analytics, aggregate dashboard and secret-free export: verified')
+  console.log('First-party anonymous analytics, daily/monthly aggregate dashboard and secret-free export: verified')
   console.log('Private-network AI endpoint opt-in: verified')
   console.log('Encrypted AI configuration and mock completion: verified')
   console.log(`Transactional create/delete: verified (${originalCases.length} -> ${originalCases.length + 1} -> ${originalCases.length})`)

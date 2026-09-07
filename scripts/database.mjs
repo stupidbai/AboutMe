@@ -34,6 +34,7 @@ export class PortalDatabase {
     this.migrate()
     this.seedIfEmpty()
     this.seedSiteConfigIfEmpty()
+    this.migrateProfileCredentials()
     this.seedKnowledgeIfEmpty()
     this.seedAiSettingsIfEmpty()
     this.seedCommunitySettingsIfEmpty()
@@ -516,6 +517,50 @@ export class PortalDatabase {
       .run(now, 'json-seed')
   }
 
+  migrateProfileCredentials() {
+    const stored = this.database.prepare('SELECT json_value, revision FROM site_config WHERE id = 1').get()
+    if (!stored || !existsSync(this.siteConfigSeedFile)) return
+    const seed = validateSiteConfig(JSON.parse(readFileSync(this.siteConfigSeedFile, 'utf8')))
+    const config = JSON.parse(stored.json_value)
+    let changed = false
+    const isAaiAppointment = item => item?.organization?.includes('亚太人工智能学会') && item?.role?.includes('AIGC')
+    if (Array.isArray(config.timeline)) {
+      const timeline = config.timeline.filter(item => !isAaiAppointment(item))
+      if (timeline.length !== config.timeline.length) { config.timeline = timeline; changed = true }
+    }
+    const seedAaiCredential = seed.credentials.find(item => item.organization.includes('亚太人工智能学会'))
+    if (!Array.isArray(config.credentials)) {
+      config.credentials = seed.credentials
+      changed = true
+    } else if (seedAaiCredential && !config.credentials.some(item => item?.organization?.includes('亚太人工智能学会') && item?.title?.includes('AIGC'))) {
+      config.credentials.unshift(seedAaiCredential)
+      changed = true
+    }
+    const profileRoute = seed.routes.find(item => item.link === '/profile')
+    const profileIndex = Array.isArray(config.routes) ? config.routes.findIndex(item => item?.link === '/profile') : -1
+    if (profileRoute && profileIndex >= 0) {
+      const current = config.routes[profileIndex]
+      if (current.title?.includes('行业任职') || current.description?.includes('AAIA') || current.tags?.includes('行业任职')) {
+        config.routes[profileIndex] = profileRoute
+        changed = true
+      }
+    }
+    if (!changed) return
+    const now = new Date().toISOString()
+    const revision = Number(stored.revision) + 1
+    this.database.exec('BEGIN IMMEDIATE')
+    try {
+      this.database.prepare('UPDATE site_config SET json_value = ?, revision = ?, updated_at = ?, updated_by = ? WHERE id = 1')
+        .run(JSON.stringify(validateSiteConfig(config)), revision, now, 'v4.4-migration')
+      this.database.prepare('INSERT INTO site_config_changes (revision, changed_at, actor) VALUES (?, ?, ?)')
+        .run(revision, now, 'v4.4-migration')
+      this.database.exec('COMMIT')
+    } catch (error) {
+      this.database.exec('ROLLBACK')
+      throw error
+    }
+  }
+
   seedKnowledgeIfEmpty() {
     const initialized = this.database.prepare("SELECT value FROM metadata WHERE key = 'knowledge_revision'").get()
     if (initialized) return
@@ -755,6 +800,7 @@ export class PortalDatabase {
     const currentSince = new Date(Date.now() - safeDays * 86_400_000).toISOString()
     const previousSince = new Date(Date.now() - safeDays * 2 * 86_400_000).toISOString()
     const dayExpression = "strftime('%Y-%m-%d', created_at, '+8 hours')"
+    const monthExpression = "strftime('%Y-%m', created_at, '+8 hours')"
     const aggregate = (from, until = null, returnBefore = from) => {
       const range = until ? 'created_at >= ? AND created_at < ?' : 'created_at >= ?'
       const params = until ? [from, until] : [from]
@@ -791,6 +837,18 @@ export class PortalDatabase {
       FROM site_events WHERE created_at >= ? GROUP BY ${dayExpression} ORDER BY date
     `).all(currentSince).map(row => ({
       date: row.date, pageViews: Number(row.page_views || 0), visitors: Number(row.visitors || 0),
+      sessions: Number(row.sessions || 0), engagedSessions: Number(row.engaged_sessions || 0), contactIntents: Number(row.contact_intents || 0)
+    }))
+    const monthly = this.database.prepare(`
+      SELECT ${monthExpression} AS month,
+        SUM(CASE WHEN event_name = 'page_view' THEN 1 ELSE 0 END) AS page_views,
+        COUNT(DISTINCT CASE WHEN event_name = 'page_view' THEN visitor_hash END) AS visitors,
+        COUNT(DISTINCT CASE WHEN event_name = 'page_view' THEN session_hash END) AS sessions,
+        COUNT(DISTINCT CASE WHEN event_name = 'page_engaged' THEN session_hash END) AS engaged_sessions,
+        SUM(CASE WHEN event_name = 'contact_intent' THEN 1 ELSE 0 END) AS contact_intents
+      FROM site_events WHERE created_at >= ? GROUP BY ${monthExpression} ORDER BY month
+    `).all(currentSince).map(row => ({
+      month: row.month, pageViews: Number(row.page_views || 0), visitors: Number(row.visitors || 0),
       sessions: Number(row.sessions || 0), engagedSessions: Number(row.engaged_sessions || 0), contactIntents: Number(row.contact_intents || 0)
     }))
     const topPages = this.database.prepare(`
@@ -846,7 +904,7 @@ export class PortalDatabase {
         sessionsChange: percent(current.sessions, previous.sessions),
         contactIntentsChange: percent(current.contactIntents, previous.contactIntents)
       },
-      daily, topPages, sources, devices, conversions,
+      daily, monthly, topPages, sources, devices, conversions,
       performance: { samples: performanceRows.length, averageLoadMs: average('load_ms'), p95LoadMs: percentile('load_ms'), averageTtfbMs: average('ttfb_ms'), averageFcpMs: average('fcp_ms') }
     }
   }

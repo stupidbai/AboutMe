@@ -20,6 +20,14 @@ export interface TimelineItem {
   image?: string
   imageAlt?: string
 }
+export interface CredentialItem {
+  period: string
+  organization: string
+  title: string
+  description: string
+  image?: string
+  imageAlt?: string
+}
 export interface CooperationDirection extends TextCard { items: string[] }
 
 export interface SiteConfig {
@@ -58,6 +66,7 @@ export interface SiteConfig {
   routes: PortalRoute[]
   focusAreas: CodeCard[]
   timeline: TimelineItem[]
+  credentials: CredentialItem[]
   cooperation: {
     title: string
     description: string

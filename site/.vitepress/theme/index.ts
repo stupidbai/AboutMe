@@ -4,6 +4,7 @@ import { defineAsyncComponent, h } from 'vue'
 import { useData, useRoute } from 'vitepress'
 import HomePortal from './components/HomePortal.vue'
 import ProfileTimeline from './components/ProfileTimeline.vue'
+import ProfileCredentials from './components/ProfileCredentials.vue'
 import CaseGrid from './components/CaseGrid.vue'
 import CaseAdmin from './components/CaseAdmin.vue'
 import SiteAdmin from './components/SiteAdmin.vue'
@@ -38,6 +39,7 @@ export default {
   enhanceApp({ app }) {
     app.component('HomePortal', HomePortal)
     app.component('ProfileTimeline', ProfileTimeline)
+    app.component('ProfileCredentials', ProfileCredentials)
     app.component('CaseGrid', CaseGrid)
     app.component('CaseAdmin', CaseAdmin)
     app.component('SiteAdmin', SiteAdmin)

@@ -46,7 +46,7 @@ try {
   database.recordSiteEvent({ eventId: 'database-analytics-event-0002', visitorHash: 'visitor-a', sessionHash: 'session-a', eventName: 'page_engaged', pagePath: '/knowledge', deviceType: 'desktop' })
   database.recordSiteEvent({ eventId: 'database-analytics-event-0003', visitorHash: 'visitor-b', sessionHash: 'session-b', eventName: 'contact_intent', pagePath: '/contact', acquisitionSource: 'search', deviceType: 'mobile' })
   const analytics = database.getSiteAnalytics(1)
-  if (analytics.summary.pageViews !== 1 || analytics.summary.visitors !== 1 || analytics.summary.engagedSessions !== 1 || analytics.summary.contactIntents !== 1 || analytics.performance.averageLoadMs !== 820 || analytics.devices.find(item => item.device === 'desktop')?.visitors !== 1) {
+  if (analytics.summary.pageViews !== 1 || analytics.summary.visitors !== 1 || analytics.summary.engagedSessions !== 1 || analytics.summary.contactIntents !== 1 || analytics.performance.averageLoadMs !== 820 || analytics.devices.find(item => item.device === 'desktop')?.visitors !== 1 || analytics.monthly.length !== 1 || analytics.monthly[0].pageViews !== 1 || analytics.monthly[0].visitors !== 1) {
     throw new Error('访问监控事件或统计聚合失败。')
   }
   const savedAi = await database.replaceAiSettings({
@@ -123,7 +123,7 @@ try {
   console.log('Encrypted AI configuration persistence: verified')
   console.log('RAG query statistics and feedback persistence: verified')
   console.log('Community users, sessions, comments, likes and forum persistence: verified')
-  console.log('Anonymous traffic monitoring settings and daily aggregates: verified')
+  console.log('Anonymous traffic monitoring settings plus daily/monthly aggregates: verified')
 } finally {
   database?.close()
   rmSync(dataDir, { recursive: true, force: true })

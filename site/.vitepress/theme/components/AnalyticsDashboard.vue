@@ -4,10 +4,11 @@ import { withBase } from 'vitepress'
 
 interface Summary { pageViews:number; visitors:number; sessions:number; engagedSessions:number; engagementRate:number; contactIntents:number; contactRate:number; pagesPerSession:number; caseOpens:number; ragQueries:number; returningVisitors:number }
 interface Daily { date:string; pageViews:number; visitors:number; sessions:number; engagedSessions:number; contactIntents:number }
+interface Monthly { month:string; pageViews:number; visitors:number; sessions:number; engagedSessions:number; contactIntents:number }
 interface Analytics {
   days:number; timezone:string; collectedAt:string; summary:Summary
   comparison:{ pageViewsChange:number|null; visitorsChange:number|null; sessionsChange:number|null; contactIntentsChange:number|null }
-  daily:Daily[]; topPages:Array<{ pagePath:string; pageViews:number; visitors:number; engagedSessions:number }>
+  daily:Daily[]; monthly:Monthly[]; topPages:Array<{ pagePath:string; pageViews:number; visitors:number; engagedSessions:number }>
   sources:Array<{ source:string; visitors:number; pageViews:number }>; devices:Array<{ device:string; visitors:number; pageViews:number }>
   conversions:Array<{ eventName:string; events:number; visitors:number }>
   performance:{ samples:number; averageLoadMs:number; p95LoadMs:number; averageTtfbMs:number; averageFcpMs:number }
@@ -79,6 +80,10 @@ const deviceLabel = (device:string) => ({ desktop:'桌面端', mobile:'移动端
 const conversionLabel = (eventName:string) => ({ contact_intent:'发起联系', case_open:'打开案例资料', forum_open:'进入论坛', rag_query:'知识问答', account_open:'打开账号页', knowledge_open:'打开知识库' } as Record<string,string>)[eventName] || eventName
 
 const maxDailyPageViews = computed(() => Math.max(1, ...(analytics.value?.daily.map(item => item.pageViews) || [0])))
+const maxMonthlyPageViews = computed(() => Math.max(1, ...(analytics.value?.monthly.map(item => item.pageViews) || [0])))
+const latestDaily = computed(() => analytics.value?.daily.at(-1) || null)
+const latestMonthly = computed(() => analytics.value?.monthly.at(-1) || null)
+const displayMonth = (value:string) => value ? `${value.slice(2, 4)}.${value.slice(5)}` : '—'
 const insights = computed(() => {
   const data = analytics.value
   if (!data?.summary.pageViews) return ['监控已启用，首批数据会在真实访问发生后出现在这里。', '建议在外部渠道链接中使用 utm_source，以便比较不同推广来源。']
@@ -110,7 +115,7 @@ const insights = computed(() => {
         <div><span>FIRST-PARTY ANALYTICS</span><h1>访问监控与数据分析</h1><p>PV、独立访客、会话、来源、内容转化与性能均由本站第一方匿名事件计算。</p></div>
         <div class="site-admin__links"><a :href="withBase('/admin/users')">用户与社区 →</a><a :href="withBase('/contact')" target="_blank">查看联系页 ↗</a></div>
       </header>
-      <div class="analytics-dashboard__toolbar"><label>统计周期<select v-model.number="period" @change="fetchDashboard"><option :value="7">近 7 天</option><option :value="30">近 30 天</option><option :value="90">近 90 天</option></select></label><button @click="fetchDashboard">刷新数据</button><span>按 {{ analytics.timezone }} 统计 · 更新于 {{ analytics.collectedAt.slice(0,16).replace('T',' ') }}</span></div>
+      <div class="analytics-dashboard__toolbar"><label>统计周期<select v-model.number="period" @change="fetchDashboard"><option :value="7">近 7 天</option><option :value="30">近 30 天</option><option :value="90">近 90 天</option><option :value="365">近 365 天（按月）</option></select></label><button @click="fetchDashboard">刷新数据</button><span>按 {{ analytics.timezone }} 统计 · 更新于 {{ analytics.collectedAt.slice(0,16).replace('T',' ') }}</span></div>
       <p v-if="error" class="case-admin-feedback case-admin-feedback--error">{{ error }}</p><p v-if="message" class="case-admin-feedback">{{ message }}</p>
 
       <section class="analytics-summary" aria-label="核心访问指标">
@@ -120,9 +125,13 @@ const insights = computed(() => {
         <article><span>互动率</span><strong>{{ analytics.summary.engagementRate }}%</strong><small>{{ format(analytics.summary.engagedSessions) }} 个有效互动会话</small></article>
         <article><span>联系意向</span><strong>{{ format(analytics.summary.contactIntents) }}</strong><small>访客转化 {{ analytics.summary.contactRate }}%</small></article>
         <article><span>回访访客</span><strong>{{ format(analytics.summary.returningVisitors) }}</strong><small>曾在此前到访过本站</small></article>
+        <article><span>最新每日访问</span><strong>{{ format(latestDaily?.pageViews || 0) }}</strong><small>{{ latestDaily ? `${latestDaily.date} · UV ${latestDaily.visitors}` : '尚无每日数据' }}</small></article>
+        <article><span>最新每月访问</span><strong>{{ format(latestMonthly?.pageViews || 0) }}</strong><small>{{ latestMonthly ? `${latestMonthly.month} · UV ${latestMonthly.visitors}` : '尚无每月数据' }}</small></article>
       </section>
 
-      <section class="analytics-panel analytics-trend-panel"><header><div><h2>每日访问趋势</h2><p>柱高为每日 PV；标签同时展示当天独立访客。</p></div></header><div v-if="analytics.daily.length" class="analytics-bars"><div v-for="day in analytics.daily" :key="day.date" class="analytics-bar"><div class="analytics-bar__value">{{ day.pageViews }}</div><div class="analytics-bar__track"><i :style="{ height: `${Math.max(5, day.pageViews / maxDailyPageViews * 100)}%` }" /></div><strong>{{ day.date.slice(5) }}</strong><small>UV {{ day.visitors }}</small></div></div><div v-else class="community-empty">尚无访问事件。公开页面被真实访问后，趋势会自动出现。</div></section>
+      <section class="analytics-panel analytics-trend-panel"><header><div><h2>每日访问量</h2><p>按自然日汇总，柱高为 PV；标签同时展示当天独立访客 UV。</p></div></header><div v-if="analytics.daily.length" class="analytics-bars"><div v-for="day in analytics.daily" :key="day.date" class="analytics-bar"><div class="analytics-bar__value">{{ day.pageViews }}</div><div class="analytics-bar__track"><i :style="{ height: `${Math.max(5, day.pageViews / maxDailyPageViews * 100)}%` }" /></div><strong>{{ day.date.slice(5) }}</strong><small>UV {{ day.visitors }}</small></div></div><div v-else class="community-empty">尚无访问事件。公开页面被真实访问后，趋势会自动出现。</div></section>
+
+      <section class="analytics-panel analytics-monthly-panel"><header><div><h2>每月访问量</h2><p>按自然月累计 PV、UV 与会话；选择“近 365 天”可查看完整年度趋势。</p></div></header><div v-if="analytics.monthly.length" class="analytics-monthly-bars"><article v-for="item in analytics.monthly" :key="item.month" class="analytics-monthly-bar"><header><strong>{{ displayMonth(item.month) }}</strong><span>UV {{ item.visitors }}</span></header><div class="analytics-monthly-bar__track"><i :style="{ width: `${Math.max(4, item.pageViews / maxMonthlyPageViews * 100)}%` }" /></div><footer><span>PV {{ item.pageViews }}</span><span>{{ item.sessions }} 会话</span></footer></article></div><div v-else class="community-empty">尚无月度访问数据。</div><small class="analytics-note">统计口径：仅聚合本站第一方匿名访问事件；PV 为页面浏览次数，UV 为当期去重访客。</small></section>
 
       <div class="analytics-two-column">
         <section class="analytics-panel"><header><div><h2>页面表现</h2><p>按 PV 排序，互动会话反映停留超过 15 秒的访问。</p></div></header><div class="analytics-table-wrap"><table><thead><tr><th>页面</th><th>PV</th><th>访客</th><th>互动会话</th></tr></thead><tbody><tr v-for="item in analytics.topPages" :key="item.pagePath"><td><code>{{ item.pagePath }}</code></td><td>{{ item.pageViews }}</td><td>{{ item.visitors }}</td><td>{{ item.engagedSessions }}</td></tr></tbody></table><div v-if="!analytics.topPages.length" class="community-empty">暂无页面数据。</div></div></section>

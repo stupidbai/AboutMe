@@ -29,6 +29,7 @@ const requiredFiles = [
   'site/.vitepress/theme/components/CaseGrid.vue',
   'site/.vitepress/theme/components/CaseAdmin.vue',
   'site/.vitepress/theme/components/SiteAdmin.vue',
+  'site/.vitepress/theme/components/ProfileCredentials.vue',
   'site/.vitepress/theme/components/CooperationContent.vue',
   'site/.vitepress/theme/components/KnowledgeAdmin.vue',
   'site/.vitepress/theme/components/RagAssistant.vue',
@@ -177,11 +178,11 @@ if (missingAdminAnchors.length) {
 if (caseAdminSource.includes('localStorage')) {
   throw new Error('Case admin must use server persistence, not browser localStorage')
 }
-const requiredSiteAdminAnchors = ['/api/admin/site-config', '首页目录与版块显隐', '职业与行业任职时间线', '凭证图片路径', '保存全部修改', '保存并生效', "'if-match': revision.value"]
+const requiredSiteAdminAnchors = ['/api/admin/site-config', '首页目录与版块显隐', '职业时间线', '其他专业与组织背书', '凭证图片路径', '保存全部修改', '保存并生效', "'if-match': revision.value"]
 const missingSiteAdminAnchors = requiredSiteAdminAnchors.filter(anchor => !siteAdminSource.includes(anchor))
 if (missingSiteAdminAnchors.length) throw new Error(`Missing site admin behavior: ${missingSiteAdminAnchors.join(', ')}`)
 if (siteAdminSource.includes('localStorage')) throw new Error('Site admin must use server persistence, not browser localStorage')
-if (!Array.isArray(siteConfig.routes) || !Array.isArray(siteConfig.timeline) || !Array.isArray(siteConfig.cooperation?.directions)) {
+if (!Array.isArray(siteConfig.routes) || !Array.isArray(siteConfig.timeline) || !Array.isArray(siteConfig.credentials) || !Array.isArray(siteConfig.cooperation?.directions)) {
   throw new Error('Site configuration seed is incomplete')
 }
 const requiredKnowledgeAdminAnchors = ['/api/admin/knowledge', '/api/admin/ai-settings', '/api/admin/ai-test', '/api/admin/rag-stats', '/api/admin/export', '导入 Markdown/TXT', '保存知识库', '保存 AI 配置', 'API Key']
@@ -202,7 +203,7 @@ for (const [source, anchors] of requiredCommunityUiAnchors) {
 }
 const requiredAnalyticsUiAnchors = [
   [analyticsAdminPageSource, ['<AnalyticsDashboard />', 'noindex, nofollow']],
-  [analyticsDashboardSource, ['/api/admin/analytics', '/api/admin/analytics-settings', '页面浏览 PV', '独立访客 UV', '每日访问趋势', '行动转化', '体验性能', '监控隐私与保留', '保存并生效', 'P95']],
+  [analyticsDashboardSource, ['/api/admin/analytics', '/api/admin/analytics-settings', '页面浏览 PV', '独立访客 UV', '每日访问量', '每月访问量', '近 365 天', '行动转化', '体验性能', '监控隐私与保留', '保存并生效', 'P95']],
   [analyticsTrackerSource, ['/api/telemetry', 'page_view', 'page_engaged', 'navigator.sendBeacon', 'portal:analytics', 'data-analytics-event', '15_000']],
   [themeSource, ['SiteAnalyticsTracker', "app.component('AnalyticsDashboard'", "route.path.startsWith('/kb/')"]]
 ]
@@ -323,7 +324,7 @@ if (missingDockerAnchors.length) throw new Error(`Missing Docker behavior: ${mis
 if (!composeSource.includes('portal-data:/data') || !composeSource.includes('read_only: true') || !composeSource.includes('no-new-privileges:true')) {
   throw new Error('Compose must keep SQLite in a volume and apply container hardening')
 }
-if (packageMetadata.version !== '4.3.0' || packageMetadata.engines?.node !== '>=22.16' || packageMetadata.dependencies?.minisearch !== '^7.2.0' || packageMetadata.dependencies?.['@noble/hashes'] !== '^2.4.0' || packageMetadata.dependencies?.marked !== '^18.0.11' || packageMetadata.dependencies?.['sanitize-html'] !== '^2.17.7' || packageMetadata.dependencies?.nodemailer !== '^9.1.1' || packageMetadata.dependencies?.['@zxcvbn-ts/core'] !== '^4.2.0') {
+if (packageMetadata.version !== '4.4.0' || packageMetadata.engines?.node !== '>=22.16' || packageMetadata.dependencies?.minisearch !== '^7.2.0' || packageMetadata.dependencies?.['@noble/hashes'] !== '^2.4.0' || packageMetadata.dependencies?.marked !== '^18.0.11' || packageMetadata.dependencies?.['sanitize-html'] !== '^2.17.7' || packageMetadata.dependencies?.nodemailer !== '^9.1.1' || packageMetadata.dependencies?.['@zxcvbn-ts/core'] !== '^4.2.0') {
   throw new Error('Package version or Node.js SQLite runtime requirement is incorrect')
 }
 if (!ragServiceSource.includes("from 'minisearch'") || !ragServiceSource.includes('new MiniSearch') || !networkSecuritySource.includes('assertSafeOutboundUrl')) {
@@ -442,6 +443,7 @@ const localRefs = [
     ...(Array.isArray(item.partners) ? item.partners.map(partner => partner.logo) : [])
   ]),
   ...siteConfig.timeline.map(item => item.image),
+  ...siteConfig.credentials.map(item => item.image),
   ...[...readFileSync(resolve(root, 'site/data/life.ts'), 'utf8').matchAll(/(?:image|logo|src):\s*'(\/[^']+)'/g)]
     .map(match => match[1])
 ].filter(ref => typeof ref === 'string' && ref.startsWith('/'))
@@ -456,6 +458,7 @@ console.log(`Configured NAS case links: ${cases.filter(item => item.nasUrl.trim(
 console.log('Case management mode: protected server admin')
 console.log(`Configurable homepage routes: ${siteConfig.routes.length}`)
 console.log(`Configurable timeline entries: ${siteConfig.timeline.length}`)
+console.log(`Configurable professional credentials: ${siteConfig.credentials.length}`)
 console.log(`Knowledge entries: ${knowledgeCount}`)
 console.log(`Imported knowledge entries: ${importedKnowledgeCount} (${referenceKnowledgeCount} reference-only)`)
 console.log(`Imported knowledge pages without external navigation/media: ${importedMarkdownFiles.length}`)
@@ -463,4 +466,4 @@ console.log(`Local asset references: ${localRefs.length}`)
 console.log(`Missing local assets: ${missingAssets.length}`)
 console.log('Critical career and contact facts: verified')
 console.log('Visitor, account, comments, forum and user administration: verified')
-console.log('First-party anonymous traffic monitoring, analytics dashboard and privacy controls: verified')
+console.log('First-party anonymous traffic monitoring, daily/monthly analytics dashboard and privacy controls: verified')

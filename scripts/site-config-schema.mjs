@@ -118,6 +118,18 @@ export const validateSiteConfig = payload => {
         imageAlt: optionalText(row.imageAlt, `履历 ${index + 1}图片说明`, 180)
       }
     }),
+    credentials: list(root.credentials, '专业与组织背书', 1, 12).map((item, index) => {
+      const row = object(item, `专业与组织背书 ${index + 1}`)
+      const image = optionalText(row.image, `专业与组织背书 ${index + 1}图片`, 500)
+      return {
+        period: text(row.period, `专业与组织背书 ${index + 1}时间`, 80),
+        organization: text(row.organization, `专业与组织背书 ${index + 1}组织`, 160),
+        title: text(row.title, `专业与组织背书 ${index + 1}标题`, 160),
+        description: text(row.description, `专业与组织背书 ${index + 1}说明`, 600),
+        image: image ? urlOrPath(image, `专业与组织背书 ${index + 1}图片`) : '',
+        imageAlt: optionalText(row.imageAlt, `专业与组织背书 ${index + 1}图片说明`, 180)
+      }
+    }),
     cooperation: {
       title: text(cooperation.title, '合作页标题', 180),
       description: text(cooperation.description, '合作页说明', 600),
