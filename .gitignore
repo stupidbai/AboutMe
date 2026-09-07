@@ -4,7 +4,18 @@ Thumbs.db
 Desktop.ini
 .vscode/
 .idea/
+.env.local
+.env
+!.env.example
 node_modules/
+dist/
+data/
+release/
+site/.vitepress/cache/
+site/.vitepress/dist/
+.tmp/
+.playwright-cli/
+output/playwright/
 
 # Local server and temporary files
 *.log

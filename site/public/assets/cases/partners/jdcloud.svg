@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="220" viewBox="0 0 640 220">
+  <rect width="640" height="220" rx="34" fill="#ffffff"/>
+  <circle cx="105" cy="110" r="54" fill="#e1251b"/>
+  <path d="M78 111h54M105 84v54" stroke="#fff" stroke-width="12" stroke-linecap="round"/>
+  <text x="186" y="130" font-family="Arial, Microsoft YaHei, sans-serif" font-size="58" font-weight="700" fill="#111827">JD CLOUD</text>
+</svg>

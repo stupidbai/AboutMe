@@ -1,0 +1,40 @@
+name: bai-yunfei-portal
+
+services:
+  portal:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: bai-yunfei-portal:4.2.2
+    init: true
+    restart: unless-stopped
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    ports:
+      - "127.0.0.1:${CASE_PORT:-4173}:4173"
+    environment:
+      CASE_ADMIN_USERNAME: ${CASE_ADMIN_USERNAME:-admin}
+      CASE_ADMIN_PASSWORD: ${CASE_ADMIN_PASSWORD:?Create a .env file and set a strong CASE_ADMIN_PASSWORD}
+      ALLOW_INSECURE_ADMIN: ${ALLOW_INSECURE_ADMIN:-false}
+      CASE_ADMIN_HOST: 0.0.0.0
+      CASE_ADMIN_PORT: 4173
+      CASE_DATA_DIR: /data
+      CASE_BACKUP_LIMIT: ${CASE_BACKUP_LIMIT:-10}
+      CASE_SESSION_HOURS: ${CASE_SESSION_HOURS:-8}
+      COMMUNITY_SESSION_DAYS: ${COMMUNITY_SESSION_DAYS:-30}
+      PORTAL_ENCRYPTION_KEY: ${PORTAL_ENCRYPTION_KEY:-}
+    volumes:
+      - portal-data:/data
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4173/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+
+volumes:
+  portal-data:
+    name: bai-yunfei-portal-data
