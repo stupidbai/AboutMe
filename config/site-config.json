@@ -1,0 +1,84 @@
+{
+  "identity": {
+    "name": "白云飞",
+    "currentRole": "上海莲证科技 CIO",
+    "subtitle": "解决方案架构师 · AI 生态建设者",
+    "focus": "公证系统、可信数字化、企业 AI",
+    "capabilities": "产品架构、研发交付、团队与生态",
+    "city": "上海 / 徐州"
+  },
+  "home": {
+    "kicker": "CIO · ENTERPRISE AI · TRUSTED DIGITALIZATION",
+    "title": "把复杂业务、技术与资源，",
+    "highlight": "组织成可以落地的结果。",
+    "lead": "我是白云飞，现任上海莲证科技有限公司 CIO。这里是一份可以按目的进入的个人知识与合作地图。",
+    "primaryAction": { "label": "查看项目案例", "link": "/cases" },
+    "secondaryAction": { "label": "发起合作沟通", "link": "/contact" },
+    "directoryTitle": "按你的目的，进入对应版块",
+    "directoryDescription": "每个版块都是独立页面，支持站内搜索、右侧目录和直接分享。",
+    "focusTitle": "四条长期工作主线",
+    "focusDescription": "从业务理解，到能力组织，再到工程交付和生态复制。"
+  },
+  "contact": {
+    "title": "如果你有真实场景或互补资源，我们可以聊一聊",
+    "description": "首次联系时请简单说明面向的客户或行业、当前问题、已有资源、期望结果，以及希望我参与的角色。",
+    "phone": "17327057075",
+    "email": "616169394@qq.com",
+    "city": "上海 / 徐州",
+    "publicAccount": "白哥非白",
+    "wechatQr": "/assets/wechat-qr.png",
+    "wechatLabel": "微信扫码联系",
+    "wechatHint": "添加时请备注合作方向或业务场景"
+  },
+  "metrics": [
+    { "value": "数十人", "label": "研发团队管理经验" },
+    { "value": "60%", "label": "云产线模块交付周期缩短" },
+    { "value": "50%+", "label": "知识库支持效率提升" },
+    { "value": "100W+", "label": "AI 社群矩阵覆盖用户" }
+  ],
+  "routes": [
+    { "code": "01 · PROFILE", "title": "职业履历与能力底座", "description": "从华为研发与交付，到企业 AI 商业验证、京东云技术管理和莲证科技 CIO。", "link": "/profile", "tags": ["时间线", "技术能力", "组织背书"], "accent": "cyan", "enabled": true },
+    { "code": "02 · COOPERATION", "title": "合作方向与工作方式", "description": "面向可信数字化、企业 AI、厂商生态、FDE 团队与解决方案交付。", "link": "/cooperation", "tags": ["场景诊断", "方案共创", "联合交付"], "accent": "blue", "enabled": true },
+    { "code": "03 · CASES", "title": "项目案例与结果证明", "description": "九类真实场景，覆盖知识工程、研发效能、工业视觉、内容平台、人才与生态。", "link": "/cases", "tags": ["9 类场景", "产品交付", "生态协同"], "accent": "violet", "enabled": true },
+    { "code": "04 · INSIGHTS", "title": "主题地图与实践方法", "description": "把企业 AI 落地、可信系统、工程交付和生态建设组织成可进入的知识地图。", "link": "/insights", "tags": ["企业 AI", "可信系统", "FDE"], "accent": "orange", "enabled": true },
+    { "code": "05 · KNOWLEDGE", "title": "知识库与实践笔记", "description": "围绕企业 AI、知识工程、可信系统、交付管理和生态协同沉淀原创知识条目。", "link": "/knowledge", "tags": ["原创条目", "分类检索", "持续更新"], "accent": "blue", "enabled": true },
+    { "code": "06 · LIFE", "title": "工作之外的个人侧面", "description": "户外、骑行、摄影、口琴，以及持续表达与内容创作。", "link": "/life", "tags": ["户外影像", "公众号", "视频号"], "accent": "green", "enabled": true },
+    { "code": "07 · FORUM", "title": "交流论坛与社区共创", "description": "围绕企业 AI、工程实践、商业合作和生态连接持续讨论。", "link": "/forum", "tags": ["开放讨论", "经验互助", "合作连接"], "accent": "violet", "enabled": true },
+    { "code": "08 · CONTACT", "title": "联系方式与合作入口", "description": "从一个具体问题开始，说明场景、资源、目标和希望共同承担的角色。", "link": "/contact", "tags": ["微信", "电话", "邮箱"], "accent": "cyan", "enabled": true }
+  ],
+  "focusAreas": [
+    { "code": "TRUSTED DIGITAL", "title": "公证与可信数字化", "description": "把专业规则、业务流程和可信机制转化为可运行、可追溯、可持续演进的系统。" },
+    { "code": "ENTERPRISE AI", "title": "企业 AI 系统与产品", "description": "围绕知识库、Agent、多模型治理和行业 Copilot 建设企业 AI 能力底座。" },
+    { "code": "DELIVERY", "title": "研发与解决方案交付", "description": "贯通需求、架构、研发、质量、上线和运营，用工程机制提升交付确定性。" },
+    { "code": "ECOSYSTEM", "title": "伙伴网络与区域生态", "description": "连接模型、云、算力、高校、开发者和行业客户，形成可复制的联合方案。" }
+  ],
+  "timeline": [
+    { "period": "2017 — 2022", "organization": "华为技术有限公司", "role": "云服务工程师 → 项目经理 → 开发组 Leader", "description": "企业云服务研发、国际客户交付、DevOps 效能优化与数十人研发团队管理。", "current": false },
+    { "period": "2022 — 2023", "organization": "AI 应用开发与生态运营", "role": "独立开发者 / AI 生态运营", "description": "开发 AI 应用并完成商业验证，运营「白哥非白」及 AI 社群联盟。", "current": false },
+    { "period": "2023 — 2025", "organization": "江苏追光智能科技有限公司", "role": "技术总监 / 全栈工程师", "description": "交付企业知识库、工业视觉、企业协作平台及云服务运维体系。", "current": false },
+    { "period": "2025 — 2026.06", "organization": "京东云（徐州）AI 创新中心", "role": "技术总监", "description": "负责 AI 技术路线、ToB 解决方案、多模型平台与产业生态协同。", "current": false },
+    { "period": "2026.07 — 至今", "organization": "上海莲证科技有限公司", "role": "CIO", "description": "负责公证系统开发、AI 生态系统建设、FDE 团队培育与解决方案落地。", "current": true }
+  ],
+  "cooperation": {
+    "title": "不是只给建议，而是一起把事做成",
+    "description": "从商业机会识别开始，补齐方案、资源、工程与交付之间的断点，帮助合作伙伴降低 AI 项目的试错成本。",
+    "stages": [
+      { "code": "SCENE", "title": "有客户和真实场景", "description": "但缺少完整 AI 方案、架构能力或工程交付团队。" },
+      { "code": "RESOURCE", "title": "有模型、云或硬件资源", "description": "希望找到场景入口，形成更有竞争力、可销售的行业方案。" },
+      { "code": "PRODUCT", "title": "正在打造 AI 产品", "description": "需要补齐技术架构、研发工程化、团队机制和持续交付能力。" },
+      { "code": "ECOSYSTEM", "title": "建设区域 AI 生态", "description": "需要组织产业伙伴、创新中心、活动资源与联合项目落地。" }
+    ],
+    "directions": [
+      { "title": "公证与可信数字化系统", "description": "面向公证及专业服务场景，共同推进业务调研、系统规划、产品设计、研发实施与上线运营。", "items": ["公证系统与流程数字化", "可信存证与可追溯架构", "专业规则到稳定系统的转化"] },
+      { "title": "企业 AI 生态系统建设", "description": "围绕知识库、Agent、行业 Copilot 与多模型平台，连接模型、数据、工具和业务系统。", "items": ["AI 能力底座与系统集成", "产品共创与持续迭代", "从试点到规模化复用"] },
+      { "title": "模型与厂商生态协同", "description": "为模型、云、算力、数据与硬件厂商寻找场景入口，组合多方能力形成联合解决方案。", "items": ["资源对接与能力选型", "方案组合与联合拓展", "生态活动与项目转化"] },
+      { "title": "FDE 团队与交付体系", "description": "培育贴近客户现场的 FDE 团队，建立从需求洞察、方案验证到工程交付的协作机制。", "items": ["人才画像与实战培养", "方案验证与技术评审", "交付治理与经验沉淀"] }
+    ],
+    "process": [
+      { "title": "目标对齐", "description": "明确客户、业务场景、成功标准与双方投入资源。" },
+      { "title": "方案共创", "description": "完成需求拆解、技术路线、合作分工、成本与风险评估。" },
+      { "title": "小步验证", "description": "从关键场景或最小可行方案开始，用真实反馈验证价值。" },
+      { "title": "交付放大", "description": "推进工程实施、上线运营与能力复用，沉淀长期资产。" }
+    ]
+  }
+}

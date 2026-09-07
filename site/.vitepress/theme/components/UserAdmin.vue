@@ -1,0 +1,62 @@
+<script setup lang="ts">
+import { onMounted, reactive, ref } from 'vue'
+import { withBase } from 'vitepress'
+interface User { id:string; username:string; email:string; displayName:string; role:'member'|'moderator'; status:'active'|'suspended'; createdAt:string; lastLoginAt:string; emailVerified:boolean; commentCount:number; postCount:number; replyCount:number }
+interface Moderation { id:string; type:'comment'|'post'|'reply'; content:string; status:string; createdAt:string; context:string; author:string; pinned:boolean; featured:boolean }
+interface Stats { users:number; activeUsers:number; suspendedUsers:number; comments:number; posts:number; replies:number; hiddenContent:number }
+interface Metrics { days:number; newUsers:number; activeUsers:number; activatedUsers:number; activationRate:number; registrations:number; logins:number; comments:number; posts:number; replies:number; ragQueries:number; unansweredPosts:number }
+const state = ref<'loading'|'login'|'ready'|'unavailable'>('loading')
+const username = ref('admin'); const password = ref(''); const search = ref(''); const users = ref<User[]>([]); const moderation = ref<Moderation[]>([]); const stats = ref<Stats|null>(null); const metrics = ref<Metrics|null>(null)
+const settings = reactive({ registrationEnabled:true, requireEmailVerification:false, publicSiteUrl:'http://127.0.0.1:4173', smtpHost:'', smtpPort:587, smtpSecure:false, smtpUser:'', smtpFrom:'', smtpPassword:'', smtpPasswordSet:false, clearSmtpPassword:false, turnstileEnabled:false, turnstileSiteKey:'', turnstileSecret:'', turnstileSecretSet:false, clearTurnstileSecret:false })
+const settingsEtag = ref(''); const error = ref(''); const message = ref(''); const busy = ref('')
+const typeName = { comment:'文章评论', post:'论坛帖子', reply:'论坛回复' }
+const statName:Record<string,string> = { users:'用户', activeUsers:'正常用户', suspendedUsers:'停用用户', comments:'评论', posts:'帖子', replies:'回复', hiddenContent:'隐藏内容' }
+const readError = async (response:Response) => { try { return (await response.json()).error || `请求失败（${response.status}）` } catch { return `请求失败（${response.status}）` } }
+const load = async () => {
+  state.value = 'loading'; error.value = ''
+  try {
+    const responses = await Promise.all([
+      fetch(`/api/admin/users?search=${encodeURIComponent(search.value)}`, { credentials:'same-origin' }),
+      fetch('/api/admin/moderation?limit=100', { credentials:'same-origin' }),
+      fetch('/api/admin/community/stats', { credentials:'same-origin' }),
+      fetch('/api/admin/product-metrics?days=30', { credentials:'same-origin' }),
+      fetch('/api/admin/community-settings', { credentials:'same-origin' })
+    ])
+    if (responses.some(item => item.status === 401)) { state.value = 'login'; return }
+    if (responses.some(item => !item.ok)) { state.value = 'unavailable'; return }
+    users.value = await responses[0].json(); moderation.value = await responses[1].json(); stats.value = await responses[2].json(); metrics.value = await responses[3].json(); Object.assign(settings, await responses[4].json()); settingsEtag.value = responses[4].headers.get('etag') || ''; state.value = 'ready'
+  } catch { state.value = 'unavailable' }
+}
+onMounted(load)
+const login = async () => { busy.value = 'login'; error.value = ''; const response = await fetch('/api/admin/login', { method:'POST', credentials:'same-origin', headers:{'content-type':'application/json'}, body:JSON.stringify({ username:username.value, password:password.value }) }).catch(() => null); password.value = ''; if (!response?.ok) error.value = response ? await readError(response) : '无法连接管理服务。'; else await load(); busy.value = '' }
+const saveUser = async (user:User) => { busy.value = user.id; error.value = ''; const response = await fetch(`/api/admin/users/${user.id}`, { method:'PATCH', credentials:'same-origin', headers:{'content-type':'application/json'}, body:JSON.stringify({ role:user.role, status:user.status }) }); if (!response.ok) error.value = await readError(response); else { message.value = `用户 @${user.username} 已更新。`; await load() }; busy.value = '' }
+const deleteUser = async (user:User) => { if (!confirm(`确认永久删除用户 @${user.username}？`)) return; const response = await fetch(`/api/admin/users/${user.id}`, { method:'DELETE', credentials:'same-origin' }); if (!response.ok) error.value = await readError(response); else { message.value = '用户已删除。'; await load() } }
+const moderate = async (item:Moderation, status:string) => { busy.value = item.id; const response = await fetch(`/api/admin/moderation/${item.type}/${item.id}`, { method:'PATCH', credentials:'same-origin', headers:{'content-type':'application/json'}, body:JSON.stringify({ status, ...(item.type === 'post' ? { pinned:item.pinned, featured:item.featured } : {}) }) }); if (!response.ok) error.value = await readError(response); else await load(); busy.value = '' }
+const saveSettings = async () => { busy.value = 'settings'; error.value = ''; const response = await fetch('/api/admin/community-settings', { method:'PUT', credentials:'same-origin', headers:{'content-type':'application/json','if-match':settingsEtag.value}, body:JSON.stringify(settings) }); if (!response.ok) error.value = await readError(response); else { Object.assign(settings, await response.json()); settingsEtag.value = response.headers.get('etag') || ''; message.value = '社区开放与安全配置已保存。' }; busy.value = '' }
+const testSmtp = async () => { busy.value = 'smtp'; const response = await fetch('/api/admin/community-settings/test-smtp', { method:'POST', credentials:'same-origin' }); if (!response.ok) error.value = await readError(response); else message.value = 'SMTP 连接测试通过。'; busy.value = '' }
+</script>
+
+<template>
+  <section class="case-admin">
+    <div v-if="state === 'loading'" class="case-admin-state">正在读取用户与内容数据…</div>
+    <form v-else-if="state === 'login'" class="case-admin-login" @submit.prevent="login"><span>USER ADMIN</span><h1>用户与社区管理</h1><p>使用站点管理员账号登录。</p><label>账号<input v-model="username" autocomplete="username" required></label><label>密码<input v-model="password" type="password" autocomplete="current-password" required></label><button :disabled="busy === 'login'">登录管理后台</button><p v-if="error" class="case-admin-feedback case-admin-feedback--error">{{ error }}</p></form>
+    <div v-else-if="state === 'unavailable'" class="case-admin-state"><h1>管理服务未连接</h1><p>请运行 <code>npm run admin</code> 后重试。</p></div>
+    <template v-else>
+      <header class="case-admin__hero"><div><span>COMMUNITY OPERATIONS</span><h1>用户与社区管理</h1><p>管理注册、账号、内容审核、安全开关与产品漏斗。</p></div><div class="site-admin__links"><a :href="withBase('/forum')" target="_blank">查看论坛 ↗</a><a :href="withBase('/admin/knowledge')">知识与 AI →</a><a :href="withBase('/admin/analytics')">访问分析 →</a></div></header>
+      <div v-if="stats" class="community-stats"><article v-for="(value,key) in stats" :key="key"><strong>{{ value }}</strong><span>{{ statName[key] }}</span></article></div>
+      <p v-if="error" class="case-admin-feedback case-admin-feedback--error">{{ error }}</p><p v-if="message" class="case-admin-feedback">{{ message }}</p>
+
+      <section v-if="metrics" class="user-admin-section"><header><div><h2>30 天产品漏斗</h2><p>从注册到互动的最小运营闭环。</p></div></header><div class="product-metrics"><article><strong>{{ metrics.newUsers }}</strong><span>新增用户</span></article><article><strong>{{ metrics.activeUsers }}</strong><span>活跃用户</span></article><article><strong>{{ metrics.activatedUsers }}</strong><span>已互动用户</span></article><article><strong>{{ metrics.activationRate }}%</strong><span>激活率</span></article><article><strong>{{ metrics.ragQueries }}</strong><span>知识问答</span></article><article><strong>{{ metrics.unansweredPosts }}</strong><span>待回复帖子</span></article></div></section>
+
+      <section class="user-admin-section"><header><div><h2>开放与安全配置</h2><p>邮件验证和 Turnstile 均可按部署环境启用；密钥加密保存。</p></div></header><form class="community-form community-settings-form" @submit.prevent="saveSettings"><label class="community-consent"><input v-model="settings.registrationEnabled" type="checkbox"><span>开放注册</span></label><label class="community-consent"><input v-model="settings.requireEmailVerification" type="checkbox"><span>注册后验证邮箱</span></label><label class="wide"><span>公开站点地址</span><input v-model="settings.publicSiteUrl" type="url" required></label><label><span>SMTP 主机</span><input v-model="settings.smtpHost" placeholder="smtp.example.com"></label><label><span>SMTP 端口</span><input v-model.number="settings.smtpPort" type="number" min="1" max="65535"></label><label class="community-consent"><input v-model="settings.smtpSecure" type="checkbox"><span>SMTP TLS 直连</span></label><label><span>SMTP 用户名</span><input v-model="settings.smtpUser"></label><label><span>发件人</span><input v-model="settings.smtpFrom" placeholder="name@example.com"></label><label><span>SMTP 密码 {{ settings.smtpPasswordSet ? '（已保存）' : '' }}</span><input v-model="settings.smtpPassword" type="password" autocomplete="new-password"></label><label v-if="settings.smtpPasswordSet" class="community-consent"><input v-model="settings.clearSmtpPassword" type="checkbox"><span>清除已保存的 SMTP 密码</span></label><label class="community-consent"><input v-model="settings.turnstileEnabled" type="checkbox"><span>启用 Cloudflare Turnstile</span></label><label><span>Turnstile Site Key</span><input v-model="settings.turnstileSiteKey"></label><label><span>Turnstile Secret {{ settings.turnstileSecretSet ? '（已保存）' : '' }}</span><input v-model="settings.turnstileSecret" type="password" autocomplete="new-password"></label><label v-if="settings.turnstileSecretSet" class="community-consent"><input v-model="settings.clearTurnstileSecret" type="checkbox"><span>清除已保存的 Turnstile Secret</span></label><div class="wide admin-form-actions"><button type="submit" :disabled="busy === 'settings'">保存配置</button><button type="button" :disabled="busy === 'smtp' || !settings.smtpHost" @click="testSmtp">测试 SMTP</button></div></form></section>
+
+      <section class="user-admin-section"><header><div><h2>注册用户</h2><p>停用账号会立即注销其全部会话。</p></div><form class="forum-search" @submit.prevent="load"><input v-model="search" placeholder="用户名、显示名或邮箱"><button>搜索</button></form></header><div class="user-table-wrap"><table><thead><tr><th>用户</th><th>角色</th><th>状态</th><th>邮箱</th><th>内容</th><th>操作</th></tr></thead><tbody><tr v-for="user in users" :key="user.id"><td><strong>{{ user.displayName }}</strong><small>@{{ user.username }}<br>{{ user.email }}</small></td><td><select v-model="user.role"><option value="member">用户</option><option value="moderator">版主</option></select></td><td><select v-model="user.status"><option value="active">正常</option><option value="suspended">停用</option></select></td><td>{{ user.emailVerified ? '已验证' : '待验证' }}</td><td>{{ user.commentCount }} 评 / {{ user.postCount }} 帖 / {{ user.replyCount }} 回</td><td><button @click="saveUser(user)" :disabled="busy === user.id">保存</button><button class="danger" @click="deleteUser(user)">删除</button></td></tr></tbody></table><div v-if="!users.length" class="community-empty">没有匹配用户。</div></div></section>
+
+      <section class="user-admin-section"><header><div><h2>内容审核</h2><p>按时间倒序显示最新 100 条；论坛帖子可设为置顶或精选。</p></div></header><div class="moderation-list"><article v-for="item in moderation" :key="`${item.type}-${item.id}`"><header><strong>{{ typeName[item.type] }} · {{ item.author }}</strong><span>{{ item.status }} · {{ item.createdAt.slice(0,16).replace('T',' ') }}</span></header><p>{{ item.content }}</p><div v-if="item.type === 'post'" class="moderation-flags"><label><input v-model="item.pinned" type="checkbox"> 置顶</label><label><input v-model="item.featured" type="checkbox"> 精选</label><button @click="moderate(item, item.status)">保存标记</button></div><footer><button @click="moderate(item, 'active')">恢复</button><button @click="moderate(item, 'hidden')">隐藏</button><button v-if="item.type === 'post'" @click="moderate(item, 'locked')">锁定</button><button class="danger" @click="moderate(item, 'deleted')">删除</button></footer></article><div v-if="!moderation.length" class="community-empty">暂无社区内容。</div></div></section>
+      <div class="admin-save-dock" role="region" aria-label="社区配置保存">
+        <span>修改开放与安全配置后点击保存，设置立即生效</span>
+        <button type="button" class="case-admin-primary" :disabled="busy === 'settings'" @click="saveSettings">{{ busy === 'settings' ? '保存中…' : '保存并生效' }}</button>
+      </div>
+    </template>
+  </section>
+</template>
