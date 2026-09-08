@@ -186,6 +186,9 @@ if (siteAdminSource.includes('localStorage')) throw new Error('Site admin must u
 if (!Array.isArray(siteConfig.routes) || !Array.isArray(siteConfig.timeline) || !Array.isArray(siteConfig.credentials) || !Array.isArray(siteConfig.cooperation?.directions)) {
   throw new Error('Site configuration seed is incomplete')
 }
+if (siteConfig.metrics?.find(metric => metric.label === 'AI 社群矩阵覆盖用户')?.value !== '1000W+' || !databaseSource.includes('migrateCommunityCoverageMetric')) {
+  throw new Error('AI community coverage metric or its persistent configuration migration is missing')
+}
 const requiredKnowledgeAdminAnchors = ['/api/admin/knowledge', '/api/admin/ai-settings', '/api/admin/ai-test', '/api/admin/rag-stats', '/api/admin/export', '导入 Markdown/TXT', '保存知识库', '保存 AI 配置', 'API Key']
 const missingKnowledgeAdminAnchors = requiredKnowledgeAdminAnchors.filter(anchor => !knowledgeAdminSource.includes(anchor))
 if (missingKnowledgeAdminAnchors.length) throw new Error(`Missing knowledge admin behavior: ${missingKnowledgeAdminAnchors.join(', ')}`)
@@ -327,7 +330,7 @@ if (missingDockerAnchors.length) throw new Error(`Missing Docker behavior: ${mis
 if (!composeSource.includes('portal-data:/data') || !composeSource.includes('read_only: true') || !composeSource.includes('no-new-privileges:true')) {
   throw new Error('Compose must keep SQLite in a volume and apply container hardening')
 }
-if (packageMetadata.version !== '4.5.0' || packageMetadata.engines?.node !== '>=22.16' || packageMetadata.dependencies?.minisearch !== '^7.2.0' || packageMetadata.dependencies?.['@noble/hashes'] !== '^2.4.0' || packageMetadata.dependencies?.marked !== '^18.0.11' || packageMetadata.dependencies?.['sanitize-html'] !== '^2.17.7' || packageMetadata.dependencies?.nodemailer !== '^9.1.1' || packageMetadata.dependencies?.['@zxcvbn-ts/core'] !== '^4.2.0') {
+if (packageMetadata.version !== '4.5.1' || packageMetadata.engines?.node !== '>=22.16' || packageMetadata.dependencies?.minisearch !== '^7.2.0' || packageMetadata.dependencies?.['@noble/hashes'] !== '^2.4.0' || packageMetadata.dependencies?.marked !== '^18.0.11' || packageMetadata.dependencies?.['sanitize-html'] !== '^2.17.7' || packageMetadata.dependencies?.nodemailer !== '^9.1.1' || packageMetadata.dependencies?.['@zxcvbn-ts/core'] !== '^4.2.0') {
   throw new Error('Package version or Node.js SQLite runtime requirement is incorrect')
 }
 if (!ragServiceSource.includes("from 'minisearch'") || !ragServiceSource.includes('new MiniSearch') || !networkSecuritySource.includes('assertSafeOutboundUrl')) {

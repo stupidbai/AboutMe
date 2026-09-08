@@ -36,6 +36,7 @@ export class PortalDatabase {
     this.seedSiteConfigIfEmpty()
     this.migrateProfileCredentials()
     this.migrateTimelineDates()
+    this.migrateCommunityCoverageMetric()
     this.seedKnowledgeIfEmpty()
     this.migrateWaytoAgiKnowledge()
     this.seedAiSettingsIfEmpty()
@@ -603,6 +604,37 @@ export class PortalDatabase {
           .run(revision, now, 'v4.5-migration')
       }
       this.database.prepare("INSERT INTO metadata (key, value) VALUES ('timeline_dates_v45', ?)").run(now)
+      this.database.exec('COMMIT')
+    } catch (error) {
+      this.database.exec('ROLLBACK')
+      throw error
+    }
+  }
+
+  migrateCommunityCoverageMetric() {
+    if (this.database.prepare("SELECT value FROM metadata WHERE key = 'community_coverage_v451'").get()) return
+    const stored = this.database.prepare('SELECT json_value, revision FROM site_config WHERE id = 1').get()
+    if (!stored) return
+    const config = JSON.parse(stored.json_value)
+    let changed = false
+    if (Array.isArray(config.metrics)) {
+      config.metrics = config.metrics.map(metric => {
+        if (metric?.label !== 'AI 社群矩阵覆盖用户' || metric.value === '1000W+') return metric
+        changed = true
+        return { ...metric, value: '1000W+' }
+      })
+    }
+    const now = new Date().toISOString()
+    this.database.exec('BEGIN IMMEDIATE')
+    try {
+      if (changed) {
+        const revision = Number(stored.revision) + 1
+        this.database.prepare('UPDATE site_config SET json_value = ?, revision = ?, updated_at = ?, updated_by = ? WHERE id = 1')
+          .run(JSON.stringify(validateSiteConfig(config)), revision, now, 'v4.5.1-migration')
+        this.database.prepare('INSERT INTO site_config_changes (revision, changed_at, actor) VALUES (?, ?, ?)')
+          .run(revision, now, 'v4.5.1-migration')
+      }
+      this.database.prepare("INSERT INTO metadata (key, value) VALUES ('community_coverage_v451', ?)").run(now)
       this.database.exec('COMMIT')
     } catch (error) {
       this.database.exec('ROLLBACK')
