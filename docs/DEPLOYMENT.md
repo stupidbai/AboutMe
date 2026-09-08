@@ -1,6 +1,6 @@
 # 安装与部署
 
-本系统使用 Node.js 内置 SQLite。运行时不需要额外数据库服务，Windows、Linux 与 Docker 使用相同的数据结构和管理 API。v4.5.1 包含九个公开案例、精确到月的职业时间线、22 条可配置知识、RAG/AI 问答、社区功能，以及第一方匿名访问监控与日/月数据分析；升级时会同步首页的 AI 社群矩阵覆盖用户指标。
+本系统使用 Node.js 内置 SQLite。运行时不需要额外数据库服务，Windows、Linux 与 Docker 使用相同的数据结构和管理 API。v4.5.2 包含九个公开案例、精确到月的职业时间线、22 条可配置知识、RAG/AI 问答、社区功能，以及第一方匿名访问监控与日/月数据分析；升级时会同步首页的 AI 社群矩阵覆盖用户指标。
 
 ## 系统要求
 
@@ -16,7 +16,7 @@
 
 ## Windows 安装包
 
-1. 解压 bai-yunfei-portal-v4.5.1.zip。
+1. 解压 bai-yunfei-portal-v4.5.2.zip。
 2. 在 PowerShell 中运行：
 
 ~~~powershell
@@ -40,8 +40,8 @@ powershell -ExecutionPolicy Bypass -File .\install\windows\install.ps1
 ## Linux 安装包
 
 ~~~bash
-tar -xzf bai-yunfei-portal-v4.5.1.tar.gz
-cd bai-yunfei-portal-v4.5.1
+tar -xzf bai-yunfei-portal-v4.5.2.tar.gz
+cd bai-yunfei-portal-v4.5.2
 chmod +x install/linux/install.sh
 ./install/linux/install.sh
 ~/.local/share/bai-yunfei-portal/bin/start-linux.sh
