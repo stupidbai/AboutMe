@@ -34,7 +34,7 @@
     { "value": "数十人", "label": "研发团队管理经验" },
     { "value": "60%", "label": "云产线模块交付周期缩短" },
     { "value": "50%+", "label": "知识库支持效率提升" },
-    { "value": "100W+", "label": "AI 社群矩阵覆盖用户" }
+    { "value": "1000W+", "label": "AI 社群矩阵覆盖用户" }
   ],
   "routes": [
     { "code": "01 · PROFILE", "title": "职业履历与能力底座", "description": "从华为研发与交付，到企业 AI 商业验证、京东云技术管理和莲证科技 CIO。", "link": "/profile", "tags": ["职业时间线", "技术能力", "组织背书"], "accent": "cyan", "enabled": true },
