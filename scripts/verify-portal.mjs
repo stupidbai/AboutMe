@@ -77,6 +77,7 @@ const requiredFiles = [
   'bin/start-linux.sh',
   'docs/DEPLOYMENT.md',
   'docs/knowledge-migration-manifest.json',
+  'docs/waytoagi-knowledge-sources.json',
   'THIRD_PARTY_NOTICES.md',
   'site/public/assets/wechat-qr.png',
   '.env.example'
@@ -296,8 +297,10 @@ const requiredDatabaseAnchors = [
   'CREATE TABLE IF NOT EXISTS analytics_settings',
   'CREATE TABLE IF NOT EXISTS analytics_settings_changes',
   'CREATE TABLE IF NOT EXISTS site_events',
-  'SCHEMA_VERSION = 7',
-  'PRAGMA user_version = 7',
+  'SCHEMA_VERSION = 8',
+  'PRAGMA user_version = 8',
+  'source_name TEXT NOT NULL',
+  'source_url TEXT NOT NULL',
   'retention_days',
   'visitor_hash',
   'session_hash',
@@ -324,7 +327,7 @@ if (missingDockerAnchors.length) throw new Error(`Missing Docker behavior: ${mis
 if (!composeSource.includes('portal-data:/data') || !composeSource.includes('read_only: true') || !composeSource.includes('no-new-privileges:true')) {
   throw new Error('Compose must keep SQLite in a volume and apply container hardening')
 }
-if (packageMetadata.version !== '4.4.0' || packageMetadata.engines?.node !== '>=22.16' || packageMetadata.dependencies?.minisearch !== '^7.2.0' || packageMetadata.dependencies?.['@noble/hashes'] !== '^2.4.0' || packageMetadata.dependencies?.marked !== '^18.0.11' || packageMetadata.dependencies?.['sanitize-html'] !== '^2.17.7' || packageMetadata.dependencies?.nodemailer !== '^9.1.1' || packageMetadata.dependencies?.['@zxcvbn-ts/core'] !== '^4.2.0') {
+if (packageMetadata.version !== '4.5.0' || packageMetadata.engines?.node !== '>=22.16' || packageMetadata.dependencies?.minisearch !== '^7.2.0' || packageMetadata.dependencies?.['@noble/hashes'] !== '^2.4.0' || packageMetadata.dependencies?.marked !== '^18.0.11' || packageMetadata.dependencies?.['sanitize-html'] !== '^2.17.7' || packageMetadata.dependencies?.nodemailer !== '^9.1.1' || packageMetadata.dependencies?.['@zxcvbn-ts/core'] !== '^4.2.0') {
   throw new Error('Package version or Node.js SQLite runtime requirement is incorrect')
 }
 if (!ragServiceSource.includes("from 'minisearch'") || !ragServiceSource.includes('new MiniSearch') || !networkSecuritySource.includes('assertSafeOutboundUrl')) {
@@ -332,8 +335,16 @@ if (!ragServiceSource.includes("from 'minisearch'") || !ragServiceSource.include
 }
 
 const knowledgeCount = knowledgeConfig.length
-if (knowledgeCount !== 12) throw new Error(`Expected 12 knowledge entries, found ${knowledgeCount}`)
+if (knowledgeCount !== 22) throw new Error(`Expected 22 knowledge entries, found ${knowledgeCount}`)
 if (knowledgeConfig.some(entry => !entry.body || typeof entry.published !== 'boolean')) throw new Error('Configurable knowledge entries require body and published fields')
+const waytoAgiEntries = knowledgeConfig.filter(entry => entry.id.startsWith('wta-'))
+if (waytoAgiEntries.length !== 10 || waytoAgiEntries.some(entry => !entry.sourceName || !entry.sourceUrl?.startsWith('https://www.waytoagi.com/'))) {
+  throw new Error('WayToAGI technical digests require 10 local source-backed entries')
+}
+const waytoAgiManifest = JSON.parse(readFileSync(resolve(root, 'docs/waytoagi-knowledge-sources.json'), 'utf8'))
+if (waytoAgiManifest.items?.length !== 10 || waytoAgiManifest.resolvedDomain !== 'www.waytoagi.com' || waytoAgiManifest.items.some(item => !waytoAgiEntries.some(entry => entry.id === item.id && entry.sourceUrl === item.sourceUrl))) {
+  throw new Error('WayToAGI source manifest is missing or incomplete')
+}
 
 const importedKnowledgeCount = (importedKnowledgeSource.match(/"id":\s*"a\d{2}"/g) || []).length
 const referenceKnowledgeCount = (importedKnowledgeSource.match(/"isReference":\s*true/g) || []).length
@@ -358,7 +369,7 @@ if (missingImportedAssets.length) {
 }
 
 const knowledgePage = readFileSync(resolve(root, 'site/knowledge.md'), 'utf8')
-if (!knowledgePage.includes('可通过管理后台新增、编辑、排序和控制发布状态')) {
+if (!knowledgePage.includes('可通过管理后台新增、编辑、排序、配置来源并控制发布状态')) {
   throw new Error('Knowledge page must describe its configurable content workflow')
 }
 if (knowledgePage.includes('](http')) {
@@ -424,7 +435,10 @@ const facts = [
   '上海莲证科技有限公司',
   '2026.07 — 至今',
   '京东云（徐州）AI 创新中心',
-  '2025 — 2026.06',
+  '2017.08 — 2022.09',
+  '2022.10 — 2023.08',
+  '2023.09 — 2025.07',
+  '2025.09 — 2026.06',
   '技术总监 / 全栈工程师',
   '数十人研发团队',
   '上海 / 徐州',

@@ -1,6 +1,6 @@
 # 安装与部署
 
-本系统使用 Node.js 内置 SQLite。运行时不需要额外数据库服务，Windows、Linux 与 Docker 使用相同的数据结构和管理 API。v4.4.0 包含九个公开案例、可配置的职业时间线和专业与组织背书、第一方匿名访问监控与日/月数据分析，并提供可配置的隐私和数据保留控制。
+本系统使用 Node.js 内置 SQLite。运行时不需要额外数据库服务，Windows、Linux 与 Docker 使用相同的数据结构和管理 API。v4.5.0 包含九个公开案例、精确到月的职业时间线、22 条可配置知识、RAG/AI 问答、社区功能，以及第一方匿名访问监控与日/月数据分析。
 
 ## 系统要求
 
@@ -16,7 +16,7 @@
 
 ## Windows 安装包
 
-1. 解压 bai-yunfei-portal-v4.4.0.zip。
+1. 解压 bai-yunfei-portal-v4.5.0.zip。
 2. 在 PowerShell 中运行：
 
 ~~~powershell
@@ -40,8 +40,8 @@ powershell -ExecutionPolicy Bypass -File .\install\windows\install.ps1
 ## Linux 安装包
 
 ~~~bash
-tar -xzf bai-yunfei-portal-v4.4.0.tar.gz
-cd bai-yunfei-portal-v4.4.0
+tar -xzf bai-yunfei-portal-v4.5.0.tar.gz
+cd bai-yunfei-portal-v4.5.0
 chmod +x install/linux/install.sh
 ./install/linux/install.sh
 ~/.local/share/bai-yunfei-portal/bin/start-linux.sh
@@ -92,7 +92,8 @@ docker compose down
 - 管理 API 使用 ETag/If-Match 防止两个管理页面互相覆盖。
 - AI API Key、SMTP 密码和 Turnstile 服务端密钥使用 AES-256-GCM 加密后写入 SQLite。配置 `PORTAL_ENCRYPTION_KEY` 时使用该值；省略时会在数据目录生成权限受限的 `.portal-encryption-key`，部署后不要删除或修改。
 - RAG 索引由 MiniSearch 在进程内构建并缓存，包含已发布的动态知识条目和安装包内的历史知识 HTML，不依赖外部向量数据库。
-- SQLite v7 保存注册用户、哈希后的社区会话、单次邮箱令牌、文章评论、点赞、论坛板块/帖子/回复、产品事件、审核日志及匿名访问事件；密码只保存 scrypt 哈希，不保存明文。
+- SQLite v8 保存知识来源字段、注册用户、哈希后的社区会话、单次邮箱令牌、文章评论、点赞、论坛板块/帖子/回复、产品事件、审核日志及匿名访问事件；密码只保存 scrypt 哈希，不保存明文。
+- 从旧版本升级时会一次性精确四段履历时间并追加 10 条 WayToAGI 技术导读，已有案例、知识、账号、评论、论坛、统计、密钥和管理配置均会保留。
 - 问答日志只保存问答编号、脱敏访问来源、问题、响应模式、命中数量、耗时与反馈，不保存访问者姓名或联系方式。
 - 评论和论坛 Markdown 先解析再按严格白名单清洗；社区写操作要求同源请求、有效的签名 CSRF 令牌，并执行账号与来源频率限制。
 - 访问事件只保存第一方 Cookie 的访客/会话单向摘要、公开页面路径、来源域名（不含完整 URL）及渠道分类、设备分类、行动类型与浏览器性能数值；不保存 IP、账号标识、原始 User-Agent 或完整来源 URL。

@@ -31,6 +31,11 @@ onMounted(async () => {
       <p class="knowledge-detail__lead">{{ entry.summary }}</p>
       <div class="knowledge-detail__body">{{ entry.body }}</div>
       <section><h2>关键要点</h2><ul><li v-for="takeaway in entry.takeaways" :key="takeaway">{{ takeaway }}</li></ul></section>
+      <aside v-if="entry.sourceName && entry.sourceUrl" class="knowledge-detail__source">
+        <span>来源记录</span>
+        <p>本文为本站基于公开资料整理的本地技术导读，不复制原文全文。</p>
+        <a :href="entry.sourceUrl" target="_blank" rel="noopener noreferrer">{{ entry.sourceName }} ↗</a>
+      </aside>
       <footer><span>{{ entry.id.toUpperCase() }}</span><time>{{ entry.updated }}</time></footer>
     </article>
     <ArticleComments :article-path="`/knowledge/item/${entry.id}`" />

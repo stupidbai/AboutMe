@@ -9,6 +9,8 @@ export interface KnowledgeEntry {
   takeaways: string[]
   stage: string
   updated: string
+  sourceName?: string
+  sourceUrl?: string
   published: boolean
 }
 

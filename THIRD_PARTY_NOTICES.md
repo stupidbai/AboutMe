@@ -50,3 +50,10 @@ Copyright 2022 Luca Ongaro. Permission is hereby granted, free of charge, to any
 - 用途：在浏览器端估算注册与修改密码的强度并给出提示。
 
 完整许可文本保存在安装包的 `node_modules/@zxcvbn-ts/` 对应目录。
+
+## WayToAGI 公开技术资料
+
+- 来源：https://www.waytoagi.com/
+- 用途：为知识库中的 10 条 RAG、Agent、模型接入与本地部署技术导读提供公开参考。
+- 使用边界：本站内容为重新撰写的摘要和实践要点，不复制来源页面全文；每条导读保留来源名称与原始链接。
+- 来源清单：`docs/waytoagi-knowledge-sources.json`。

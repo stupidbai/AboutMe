@@ -7,7 +7,7 @@ import { validateSiteConfig } from './site-config-schema.mjs'
 import { defaultAiSettings, validateAiSettings, validateKnowledgeEntries } from './knowledge-schema.mjs'
 import { defaultCommunitySettings, validateCommunitySettings } from './community-settings.mjs'
 
-const SCHEMA_VERSION = 7
+const SCHEMA_VERSION = 8
 
 export class DatabaseConflictError extends Error {
   constructor(message = '配置已被其他管理员更新，请刷新后重试。') {
@@ -35,7 +35,9 @@ export class PortalDatabase {
     this.seedIfEmpty()
     this.seedSiteConfigIfEmpty()
     this.migrateProfileCredentials()
+    this.migrateTimelineDates()
     this.seedKnowledgeIfEmpty()
+    this.migrateWaytoAgiKnowledge()
     this.seedAiSettingsIfEmpty()
     this.seedCommunitySettingsIfEmpty()
     this.seedAnalyticsSettingsIfEmpty()
@@ -419,6 +421,15 @@ export class PortalDatabase {
         COMMIT;
       `)
     }
+    if (currentVersion < 8) {
+      this.database.exec(`
+        BEGIN IMMEDIATE;
+        ALTER TABLE knowledge_entries ADD COLUMN source_name TEXT NOT NULL DEFAULT '';
+        ALTER TABLE knowledge_entries ADD COLUMN source_url TEXT NOT NULL DEFAULT '';
+        PRAGMA user_version = 8;
+        COMMIT;
+      `)
+    }
   }
 
   seedCommunitySettingsIfEmpty() {
@@ -561,12 +572,65 @@ export class PortalDatabase {
     }
   }
 
+  migrateTimelineDates() {
+    if (this.database.prepare("SELECT value FROM metadata WHERE key = 'timeline_dates_v45'").get()) return
+    const stored = this.database.prepare('SELECT json_value, revision FROM site_config WHERE id = 1').get()
+    if (!stored) return
+    const periods = new Map([
+      ['华为技术有限公司', '2017.08 — 2022.09'],
+      ['AI 应用开发与生态运营', '2022.10 — 2023.08'],
+      ['江苏追光智能科技有限公司', '2023.09 — 2025.07'],
+      ['京东云（徐州）AI 创新中心', '2025.09 — 2026.06']
+    ])
+    const config = JSON.parse(stored.json_value)
+    let changed = false
+    if (Array.isArray(config.timeline)) {
+      config.timeline = config.timeline.map(item => {
+        const period = periods.get(item.organization)
+        if (!period || item.period === period) return item
+        changed = true
+        return { ...item, period }
+      })
+    }
+    const now = new Date().toISOString()
+    this.database.exec('BEGIN IMMEDIATE')
+    try {
+      if (changed) {
+        const revision = Number(stored.revision) + 1
+        this.database.prepare('UPDATE site_config SET json_value = ?, revision = ?, updated_at = ?, updated_by = ? WHERE id = 1')
+          .run(JSON.stringify(validateSiteConfig(config)), revision, now, 'v4.5-migration')
+        this.database.prepare('INSERT INTO site_config_changes (revision, changed_at, actor) VALUES (?, ?, ?)')
+          .run(revision, now, 'v4.5-migration')
+      }
+      this.database.prepare("INSERT INTO metadata (key, value) VALUES ('timeline_dates_v45', ?)").run(now)
+      this.database.exec('COMMIT')
+    } catch (error) {
+      this.database.exec('ROLLBACK')
+      throw error
+    }
+  }
+
   seedKnowledgeIfEmpty() {
     const initialized = this.database.prepare("SELECT value FROM metadata WHERE key = 'knowledge_revision'").get()
     if (initialized) return
     if (!existsSync(this.knowledgeSeedFile)) throw new Error(`缺少知识库种子文件：${this.knowledgeSeedFile}`)
     const entries = validateKnowledgeEntries(JSON.parse(readFileSync(this.knowledgeSeedFile, 'utf8')))
     this.replaceKnowledgeInsideTransaction(entries, 1, 'json-seed')
+  }
+
+  migrateWaytoAgiKnowledge() {
+    if (this.database.prepare("SELECT value FROM metadata WHERE key = 'waytoagi_knowledge_v1'").get()) return
+    if (!existsSync(this.knowledgeSeedFile)) return
+    const seedEntries = validateKnowledgeEntries(JSON.parse(readFileSync(this.knowledgeSeedFile, 'utf8')))
+    const importedEntries = seedEntries.filter(item => item.id.startsWith('wta-'))
+    const currentEntries = this.getKnowledgeEntries()
+    const existingIds = new Set(currentEntries.map(item => item.id))
+    const missingEntries = importedEntries.filter(item => !existingIds.has(item.id))
+    if (missingEntries.length) {
+      this.replaceKnowledgeInsideTransaction([...currentEntries, ...missingEntries], this.getKnowledgeRevision() + 1, 'v4.5-migration')
+    }
+    this.database.prepare("INSERT INTO metadata (key, value) VALUES ('waytoagi_knowledge_v1', ?)")
+      .run(new Date().toISOString())
   }
 
   seedAiSettingsIfEmpty() {
@@ -640,7 +704,7 @@ export class PortalDatabase {
 
   getKnowledgeEntries({ publishedOnly = false } = {}) {
     const rows = this.database.prepare(`
-      SELECT id, category, title, summary, body, stage, updated_label, published
+      SELECT id, category, title, summary, body, stage, updated_label, source_name, source_url, published
       FROM knowledge_entries
       ${publishedOnly ? 'WHERE published = 1' : ''}
       ORDER BY sort_order
@@ -656,6 +720,8 @@ export class PortalDatabase {
       takeaways: (byEntry.get(row.id) || []).map(item => item.takeaway),
       stage: row.stage,
       updated: row.updated_label,
+      sourceName: row.source_name,
+      sourceUrl: row.source_url,
       published: Boolean(row.published)
     }))
   }
@@ -1062,8 +1128,9 @@ export class PortalDatabase {
     const insertEntry = this.database.prepare(`
       INSERT INTO knowledge_entries (
         id, sort_order, category, title, summary, body, stage, updated_label,
+        source_name, source_url,
         published, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `)
     const insertTakeaway = this.database.prepare('INSERT INTO knowledge_takeaways (entry_id, position, takeaway) VALUES (?, ?, ?)')
     const now = new Date().toISOString()
@@ -1073,7 +1140,7 @@ export class PortalDatabase {
       this.database.exec('DELETE FROM knowledge_entries')
       entries.forEach((item, index) => {
         insertEntry.run(item.id, index, item.category, item.title, item.summary, item.body, item.stage,
-          item.updated, item.published ? 1 : 0, createdAt.get(item.id) || now, now)
+          item.updated, item.sourceName, item.sourceUrl, item.published ? 1 : 0, createdAt.get(item.id) || now, now)
         item.takeaways.forEach((takeaway, position) => insertTakeaway.run(item.id, position, takeaway))
       })
       this.database.prepare(`

@@ -140,7 +140,7 @@ const telemetryFetch = (payload, options = {}) => fetch(baseUrl + '/api/telemetr
 
 try {
   const health = await waitForHealth()
-  if (health.status !== 'ok' || health.database.schemaVersion !== 7 || health.database.siteConfigRevision !== 1 || health.database.knowledgeCount !== 12 || health.database.ragQueryCount !== 0 || health.database.siteEventCount !== 0 || !health.database.analyticsEnabled || health.database.communityUserCount !== 0 || health.database.forumPostCount !== 4 || health.database.journalMode !== 'wal') {
+  if (health.status !== 'ok' || health.database.schemaVersion !== 8 || health.database.siteConfigRevision !== 1 || health.database.knowledgeCount !== 22 || health.database.ragQueryCount !== 0 || health.database.siteEventCount !== 0 || !health.database.analyticsEnabled || health.database.communityUserCount !== 0 || health.database.forumPostCount !== 4 || health.database.journalMode !== 'wal') {
     throw new Error('SQLite 健康状态不符合预期。')
   }
 
@@ -163,10 +163,10 @@ try {
   const publicKnowledgeResponse = await expectStatus(await fetch(baseUrl + '/api/knowledge'), 200, '公开读取知识库')
   const publicKnowledge = await publicKnowledgeResponse.json()
   const publicKnowledgeEtag = publicKnowledgeResponse.headers.get('etag')
-  if (publicKnowledge.length !== 12 || !publicKnowledgeEtag) throw new Error('公开知识库未返回 12 条种子数据或 ETag。')
+  if (publicKnowledge.length !== 22 || !publicKnowledgeEtag || publicKnowledge.filter(item => item.sourceUrl?.includes('waytoagi.com')).length !== 10) throw new Error('公开知识库未返回 22 条种子数据、10 条 WayToAGI 技术导读或 ETag。')
   await expectStatus(await fetch(baseUrl + '/api/knowledge', { headers: { 'if-none-match': publicKnowledgeEtag } }), 304, '知识库缓存协商')
   const aiStatus = await (await expectStatus(await fetch(baseUrl + '/api/ai/status'), 200, '公开读取 AI 状态')).json()
-  if (aiStatus.enabled || aiStatus.knowledgeEntries !== 12 || aiStatus.localDocuments < 10) throw new Error('AI 初始状态或本地文档索引无效。')
+  if (aiStatus.enabled || aiStatus.knowledgeEntries !== 22 || aiStatus.localDocuments < 10) throw new Error('AI 初始状态或本地文档索引无效。')
 
   const publicAnalyticsStatus = await (await expectStatus(await fetch(baseUrl + '/api/analytics/status'), 200, '公开读取访问监控状态')).json()
   if (!publicAnalyticsStatus.enabled || !publicAnalyticsStatus.respectDnt || Object.hasOwn(publicAnalyticsStatus, 'retentionDays')) {
@@ -349,7 +349,8 @@ try {
   const managedSiteResponse = await expectStatus(await adminFetch('/api/admin/site-config'), 200, '登录后读取站点配置')
   const originalSiteConfig = await managedSiteResponse.json()
   let siteRevision = managedSiteResponse.headers.get('etag') || ''
-  if (!siteRevision || originalSiteConfig.timeline.length !== 5 || originalSiteConfig.timeline.some(item => item.organization.includes('亚太人工智能学会')) || !originalSiteConfig.credentials.some(item => item.organization.includes('亚太人工智能学会') && item.title.includes('AIGC') && item.image?.includes('aaia-aigc-appointment'))) throw new Error('管理 API 未返回站点配置版本、职业时间线或 AAIA 专业背书凭证。')
+  const expectedTimelinePeriods = ['2017.08 — 2022.09', '2022.10 — 2023.08', '2023.09 — 2025.07', '2025.09 — 2026.06', '2026.07 — 至今']
+  if (!siteRevision || originalSiteConfig.timeline.length !== 5 || originalSiteConfig.timeline.map(item => item.period).join('|') !== expectedTimelinePeriods.join('|') || originalSiteConfig.timeline.some(item => item.organization.includes('亚太人工智能学会')) || !originalSiteConfig.credentials.some(item => item.organization.includes('亚太人工智能学会') && item.title.includes('AIGC') && item.image?.includes('aaia-aigc-appointment'))) throw new Error('管理 API 未返回精确职业时间线或 AAIA 专业背书凭证。')
   const saveSite = (payload, match = siteRevision) => adminFetch('/api/admin/site-config', {
     method: 'PUT', headers: match ? { 'if-match': match } : {}, body: JSON.stringify(payload)
   })
@@ -367,6 +368,7 @@ try {
   const managedKnowledgeResponse = await expectStatus(await adminFetch('/api/admin/knowledge'), 200, '登录后读取知识库')
   const originalKnowledge = await managedKnowledgeResponse.json()
   let knowledgeRevision = managedKnowledgeResponse.headers.get('etag') || ''
+  if (originalKnowledge.filter(item => item.id.startsWith('wta-')).length !== 10 || !originalKnowledge.every(item => 'sourceName' in item && 'sourceUrl' in item)) throw new Error('管理 API 未返回完整的 WayToAGI 来源导读字段。')
   const saveKnowledge = (payload, match = knowledgeRevision) => adminFetch('/api/admin/knowledge', {
     method: 'PUT', headers: match ? { 'if-match': match } : {}, body: JSON.stringify(payload)
   })

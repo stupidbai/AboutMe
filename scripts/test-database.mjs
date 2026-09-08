@@ -30,6 +30,10 @@ try {
   if (initialKnowledge.revision !== 1 || initialKnowledge.entries.length !== seedKnowledge.length) {
     throw new Error('知识库首次 JSON 到 SQLite 迁移失败。')
   }
+  const sourcedKnowledge = initialKnowledge.entries.find(item => item.id === 'wta-vector-retrieval')
+  if (!sourcedKnowledge?.sourceName.includes('WayToAGI') || !sourcedKnowledge.sourceUrl.startsWith('https://www.waytoagi.com/')) {
+    throw new Error('知识来源名称或链接未持久化。')
+  }
   const changedKnowledge = structuredClone(initialKnowledge.entries)
   changedKnowledge[0].summary += ' 数据库测试。'
   const savedKnowledge = await database.replaceKnowledge(changedKnowledge, { expectedRevision: 1, actor: 'database-test' })
@@ -37,8 +41,8 @@ try {
 
   const initialAi = database.getAiSettings()
   const analyticsSettings = database.getAnalyticsSettings()
-  if (database.getHealth().schemaVersion !== 7 || initialAi.dailyLimit !== 200 || initialAi.allowPrivateNetwork !== false || !analyticsSettings.enabled || !analyticsSettings.respectDnt || analyticsSettings.retentionDays !== 365) {
-    throw new Error('数据库 v7、AI 安全或访问监控默认值迁移失败。')
+  if (database.getHealth().schemaVersion !== 8 || initialAi.dailyLimit !== 200 || initialAi.allowPrivateNetwork !== false || !analyticsSettings.enabled || !analyticsSettings.respectDnt || analyticsSettings.retentionDays !== 365) {
+    throw new Error('数据库 v8、知识来源、AI 安全或访问监控默认值迁移失败。')
   }
   const savedAnalyticsSettings = await database.replaceAnalyticsSettings({ enabled: true, respectDnt: true, retentionDays: 90 }, { expectedRevision: analyticsSettings.revision, actor: 'database-test' })
   if (savedAnalyticsSettings.revision !== 2 || savedAnalyticsSettings.retentionDays !== 90) throw new Error('访问监控配置更新失败。')

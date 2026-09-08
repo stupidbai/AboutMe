@@ -49,7 +49,7 @@ onMounted(async () => {
 
     <div class="knowledge-summary">
       <span>{{ filteredEntries.length }} 条结果</span>
-      <span>原创整理 · 持续更新</span>
+      <span>原创方法卡 · 公开来源技术导读</span>
     </div>
 
     <div v-if="filteredEntries.length" class="knowledge-grid">
@@ -60,6 +60,7 @@ onMounted(async () => {
         </div>
         <h2>{{ entry.title }}</h2>
         <p>{{ entry.summary }}</p>
+        <span v-if="entry.sourceName" class="knowledge-card__source">来源导读 · {{ entry.sourceName }}</span>
         <ul>
           <li v-for="takeaway in entry.takeaways" :key="takeaway">{{ takeaway }}</li>
         </ul>

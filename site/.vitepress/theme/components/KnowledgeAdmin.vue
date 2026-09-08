@@ -104,7 +104,7 @@ const testAi = async () => {
 
 const addEntry = () => {
   const number = entries.value.reduce((max, item) => Math.max(max, Number.parseInt(item.id.replace(/\D/g, ''), 10) || 0), 0) + 1
-  entries.value.push({ id: `k${String(number).padStart(2, '0')}`, category: '企业 AI', title: '新知识条目', summary: '请填写摘要。', body: '请填写知识正文。', takeaways: [], takeawayText: '', stage: '实践笔记', updated: new Date().toISOString().slice(0, 7), published: false })
+  entries.value.push({ id: `k${String(number).padStart(2, '0')}`, category: '企业 AI', title: '新知识条目', summary: '请填写摘要。', body: '请填写知识正文。', takeaways: [], takeawayText: '', stage: '实践笔记', updated: new Date().toISOString().slice(0, 7), sourceName: '', sourceUrl: '', published: false })
 }
 const importTextFiles = async (event: Event) => {
   const input = event.target as HTMLInputElement
@@ -116,7 +116,7 @@ const importTextFiles = async (event: Event) => {
     const title = body.match(/^#\s+(.+)$/m)?.[1]?.trim() || file.name.replace(/\.[^.]+$/, '')
     const summary = body.split(/\n\s*\n/).map(part => part.replace(/^#+\s*/gm, '').trim()).find(part => part && part !== title)?.slice(0, 300) || '待完善摘要。'
     const number = entries.value.reduce((max, item) => Math.max(max, Number.parseInt(item.id.replace(/\D/g, ''), 10) || 0), 0) + 1
-    entries.value.push({ id: `k${String(number).padStart(2, '0')}`, category: '待整理', title, summary, body, takeaways: [], takeawayText: '', stage: '导入文档', updated: new Date().toISOString().slice(0, 7), published: false })
+    entries.value.push({ id: `k${String(number).padStart(2, '0')}`, category: '待整理', title, summary, body, takeaways: [], takeawayText: '', stage: '导入文档', updated: new Date().toISOString().slice(0, 7), sourceName: '', sourceUrl: '', published: false })
   }
   input.value = ''
   message.value = files.length ? '文本文件已导入为未发布草稿，检查后请保存知识库。' : ''
@@ -168,7 +168,7 @@ onMounted(load)
       </div></details>
 
       <div class="case-admin-list"><article v-for="(entry, index) in entries" :key="entry.id" class="case-admin-card"><header><div><span>{{ entry.id }}</span><strong>{{ entry.title }}</strong></div><div class="case-admin-card__actions"><button :disabled="index === 0" @click="move(index, -1)">↑</button><button :disabled="index === entries.length - 1" @click="move(index, 1)">↓</button><button class="danger" @click="remove(index)">删除</button></div></header><div class="case-admin-fields">
-        <label><span>编号</span><input v-model="entry.id" maxlength="40"></label><label><span>分类</span><input v-model="entry.category"></label><label class="wide"><span>标题</span><input v-model="entry.title"></label><label class="wide"><span>摘要</span><textarea v-model="entry.summary" rows="2"></textarea></label><label class="wide"><span>正文（RAG 检索内容）</span><textarea v-model="entry.body" rows="7"></textarea></label><label class="wide"><span>核心要点（每行一项）</span><textarea v-model="entry.takeawayText" rows="3"></textarea></label><label><span>内容类型</span><input v-model="entry.stage"></label><label><span>更新时间</span><input v-model="entry.updated"></label><label class="case-admin-check"><input v-model="entry.published" type="checkbox"><span>公开发布并纳入 RAG</span></label>
+        <label><span>编号</span><input v-model="entry.id" maxlength="40"></label><label><span>分类</span><input v-model="entry.category"></label><label class="wide"><span>标题</span><input v-model="entry.title"></label><label class="wide"><span>摘要</span><textarea v-model="entry.summary" rows="2"></textarea></label><label class="wide"><span>正文（RAG 检索内容）</span><textarea v-model="entry.body" rows="7"></textarea></label><label class="wide"><span>核心要点（每行一项）</span><textarea v-model="entry.takeawayText" rows="3"></textarea></label><label><span>内容类型</span><input v-model="entry.stage"></label><label><span>更新时间</span><input v-model="entry.updated"></label><label><span>来源名称（可选）</span><input v-model="entry.sourceName" placeholder="例如：WayToAGI 公开知识问答"></label><label class="wide"><span>来源链接（可选）</span><input v-model="entry.sourceUrl" type="url" placeholder="https://..."></label><label class="case-admin-check"><input v-model="entry.published" type="checkbox"><span>公开发布并纳入 RAG</span></label>
       </div></article></div>
       <div class="admin-save-dock admin-save-dock--multiple" role="region" aria-label="知识库与 AI 配置保存">
         <span>修改后选择对应配置保存，公开页面刷新后立即生效</span>

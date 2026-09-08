@@ -11,6 +11,20 @@ const list = (value, label, max = 20) => {
   if (!Array.isArray(value) || value.length > max) throw new Error(`${label} 必须是最多 ${max} 项的数组。`)
   return value
 }
+const optionalText = (value, label, max = 1000) => {
+  if (value === undefined || value === null || value === '') return ''
+  if (typeof value !== 'string') throw new Error(`${label} 必须是文本。`)
+  if (value.trim().length > max) throw new Error(`${label} 不能超过 ${max} 个字符。`)
+  return value.trim()
+}
+const optionalWebUrl = (value, label) => {
+  const candidate = optionalText(value, label, 1000)
+  if (!candidate) return ''
+  let parsed
+  try { parsed = new URL(candidate) } catch { throw new Error(`${label}格式无效。`) }
+  if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error(`${label}必须使用 http:// 或 https://。`)
+  return parsed.toString()
+}
 
 export const validateKnowledgeEntries = payload => {
   if (!Array.isArray(payload) || payload.length > 500) throw new Error('知识条目必须是最多 500 项的数组。')
@@ -29,6 +43,8 @@ export const validateKnowledgeEntries = payload => {
       takeaways: list(item.takeaways, `${id} 要点`, 20).map((entry, entryIndex) => text(entry, `${id} 要点 ${entryIndex + 1}`, 300)),
       stage: text(item.stage, `${id} 类型`, 40),
       updated: text(item.updated, `${id} 更新时间`, 40),
+      sourceName: optionalText(item.sourceName, `${id} 来源名称`, 120),
+      sourceUrl: optionalWebUrl(item.sourceUrl, `${id} 来源链接`),
       published: item.published !== false
     }
   })
