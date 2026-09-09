@@ -4,6 +4,7 @@ import { portalHref, useSiteConfig } from '../useSiteConfig'
 
 const { config, load } = useSiteConfig()
 const visibleRoutes = computed(() => config.value.routes.filter(route => route.enabled))
+const actionEvent = (link: string) => link === '/cases' ? 'case_open' : link === '/contact' ? 'contact_intent' : undefined
 onMounted(load)
 </script>
 
@@ -15,9 +16,10 @@ onMounted(load)
         <h1>{{ config.home.title }}<span>{{ config.home.highlight }}</span></h1>
         <p class="portal-lead">{{ config.home.lead }}</p>
         <div class="portal-actions">
-          <a class="portal-button portal-button--primary" :href="portalHref(config.home.primaryAction.link)">{{ config.home.primaryAction.label }}</a>
-          <a class="portal-button" :href="portalHref(config.home.secondaryAction.link)">{{ config.home.secondaryAction.label }}</a>
+          <a class="portal-button portal-button--primary" :href="portalHref(config.home.primaryAction.link)" :data-analytics-event="actionEvent(config.home.primaryAction.link)">{{ config.home.primaryAction.label }}</a>
+          <a class="portal-button" :href="portalHref(config.home.secondaryAction.link)" :data-analytics-event="actionEvent(config.home.secondaryAction.link)">{{ config.home.secondaryAction.label }}</a>
         </div>
+        <p class="portal-action-note">先看可验证的案例，再用一个具体场景开启合作沟通。</p>
       </div>
       <aside class="identity-panel">
         <span class="identity-panel__label">CURRENT ROLE</span>
@@ -44,7 +46,7 @@ onMounted(load)
         <p>{{ config.home.directoryDescription }}</p>
       </header>
       <div class="route-grid">
-        <a v-for="route in visibleRoutes" :key="route.code" class="route-card" :class="`route-card--${route.accent}`" :href="portalHref(route.link)">
+        <a v-for="route in visibleRoutes" :key="route.code" class="route-card" :class="`route-card--${route.accent}`" :href="portalHref(route.link)" :data-analytics-event="actionEvent(route.link)">
           <span class="route-card__code">{{ route.code }}</span>
           <span class="route-card__arrow" aria-hidden="true">↗</span>
           <h3>{{ route.title }}</h3>
@@ -52,6 +54,19 @@ onMounted(load)
           <div class="tag-row"><span v-for="tag in route.tags" :key="tag">{{ tag }}</span></div>
         </a>
       </div>
+    </section>
+
+    <section class="collaboration-path" aria-label="合作路径与直接联系方式">
+      <header>
+        <div><p class="portal-kicker">START HERE</p><h2>从一个明确的下一步开始。</h2></div>
+        <p>无论从哪里来到本站，都可以先选择最贴近当前需求的路径；如需直接沟通，可通过电话、邮箱或微信联系。</p>
+      </header>
+      <div class="collaboration-path__grid">
+        <a :href="portalHref('/cases')" data-analytics-event="case_open"><span>01 · 看证明</span><strong>我想先看案例</strong><p>从知识工程、研发效能、工业 AI 到生态连接，快速确认可协同的能力边界。</p><b>查看合作案例 →</b></a>
+        <a :href="portalHref('/contact')" data-analytics-event="contact_intent"><span>02 · 说场景</span><strong>我有一个业务问题</strong><p>说明行业、当前问题、已有资源和目标结果，直接进入合作沟通。</p><b>发起合作沟通 →</b></a>
+        <a :href="portalHref('/cooperation')"><span>03 · 对路径</span><strong>我需要资源协同</strong><p>了解企业 AI、可信数字化、FDE 与生态合作如何组织为联合方案。</p><b>查看合作方式 →</b></a>
+      </div>
+      <p class="collaboration-path__contact">直接联系：<a :href="`tel:${config.contact.phone}`" data-analytics-event="contact_intent">{{ config.contact.phone }}</a><span> · </span><a :href="`mailto:${config.contact.email}`" data-analytics-event="contact_intent">{{ config.contact.email }}</a><span> · 上海 / 徐州可跨区域合作</span></p>
     </section>
 
     <section class="portal-section portal-section--focus">

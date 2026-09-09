@@ -12,7 +12,7 @@
     "title": "把复杂业务、技术与资源，",
     "highlight": "组织成可以落地的结果。",
     "lead": "我是白云飞，现任上海莲证科技有限公司 CIO。这里是一份可以按目的进入的个人知识与合作地图。",
-    "primaryAction": { "label": "查看项目案例", "link": "/cases" },
+    "primaryAction": { "label": "查看合作案例", "link": "/cases" },
     "secondaryAction": { "label": "发起合作沟通", "link": "/contact" },
     "directoryTitle": "按你的目的，进入对应版块",
     "directoryDescription": "每个版块都是独立页面，支持站内搜索、右侧目录和直接分享。",
@@ -60,7 +60,7 @@
     { "period": "2026.07 — 至今", "organization": "上海莲证科技有限公司", "role": "CIO", "description": "负责公证系统开发、AI 生态系统建设、FDE 团队培育与解决方案落地。", "current": true }
   ],
   "credentials": [
-    { "period": "2023.03 — 2028.03", "organization": "亚太人工智能学会（AAIA）", "title": "AIGC 委员会理事", "description": "获聘担任 AAIA AIGC 委员会理事，持续参与 AIGC 技术、产业应用与生态合作交流。", "image": "/assets/cases/aaia-aigc-appointment.jpg", "imageAlt": "白云飞担任亚太人工智能学会 AIGC 委员会理事的聘书" },
+    { "period": "2023.03 — 2028.03", "organization": "亚太人工智能学会（AAIA）", "title": "AIGC 委员会理事", "description": "获聘担任 AAIA AIGC 委员会理事，持续参与 AIGC 技术、产业应用与生态合作交流。", "image": "/assets/cases/aaia-aigc-appointment.webp", "imageAlt": "白云飞担任亚太人工智能学会 AIGC 委员会理事的聘书" },
     { "period": "区域生态", "organization": "WaytoAGI", "title": "徐州负责人", "description": "持续组织本地 AI 社群交流、资源连接与项目对接。" },
     { "period": "专业认可", "organization": "华为技术有限公司", "title": "“明日之星”与优秀新员工", "description": "获得大厂工程体系与组织协作中的专业认可。" },
     { "period": "学习与工程基础", "organization": "国家奖学金 / 电子设计竞赛", "title": "两次国家奖学金 / 国家二等奖", "description": "长期学习能力与工程实践基础的阶段性证明。" }

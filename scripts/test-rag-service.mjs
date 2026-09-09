@@ -27,7 +27,16 @@ try {
 if (!blocked) throw new Error('默认应阻止回环 AI 接口。')
 const allowed = await assertSafeOutboundUrl('http://127.0.0.1:11434/v1/chat/completions', { allowPrivateNetwork: true })
 if (allowed.hostname !== '127.0.0.1') throw new Error('显式允许内网接口后仍无法使用。')
+const trustedJd = await assertSafeOutboundUrl('https://agentrs.jd.com/api/saas/openai-u/v1/chat/completions')
+if (trustedJd.hostname !== 'agentrs.jd.com') throw new Error('京东云受限 OpenAI 兼容接口未放行。')
+let broadenedJdTrust = false
+try {
+  await assertSafeOutboundUrl('https://agentrs.jd.com/api/saas/openai-u/v1/models')
+  broadenedJdTrust = true
+} catch {}
+if (broadenedJdTrust) throw new Error('京东云可信放行范围不能扩展到任意路径。')
 
 console.log('MiniSearch Chinese tokenization and chunk retrieval: verified')
 console.log('MiniSearch fuzzy English retrieval: verified')
 console.log('AI endpoint private-network guard: verified')
+console.log('Exact JD OpenAI-compatible endpoint exception: verified')

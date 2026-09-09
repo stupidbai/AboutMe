@@ -5,7 +5,7 @@
     "title": "企业 AI 知识库与 RAG 系统",
     "kicker": "企业知识工程 · 全栈交付",
     "description": "围绕设备文档、工艺资料和异常记录构建智能检索与问答系统，覆盖需求分析、系统设计、开发、部署与运维。",
-    "image": "/assets/cases/rag-knowledge-system.png",
+    "image": "/assets/cases/rag-knowledge-system.webp",
     "imageAlt": "企业文档经检索、知识网络与答案验证形成 RAG 系统的示意图",
     "tags": [
       "知识工程",
@@ -55,7 +55,7 @@
     "title": "工业 AI 视觉检测系统",
     "kicker": "工业智能 · 边缘部署",
     "description": "基于 YOLO、OpenCV 与 TensorRT 构建工业视觉方案，在 Jetson、瑞芯微等平台完成算法优化、边缘部署与现场联调。",
-    "image": "/assets/cases/industrial-vision-system.png",
+    "image": "/assets/cases/industrial-vision-system.webp",
     "imageAlt": "生产线相机与边缘计算设备进行工业视觉缺陷检测的示意图",
     "tags": [
       "视觉算法",
@@ -100,7 +100,7 @@
     "title": "电商视频图片生成平台",
     "kicker": "生成式内容 · 产品平台",
     "description": "整合商品图生成、视频复刻、AI 模特试穿和营销素材变体能力，形成内容批量生产工作台。",
-    "image": "/assets/cases/ecommerce-content-platform.png",
+    "image": "/assets/cases/ecommerce-content-platform.webp",
     "imageAlt": "电商视频与图片生成平台功能界面",
     "tags": [
       "图像生成",
@@ -154,7 +154,7 @@
     "title": "AI 生态建设",
     "kicker": "生态社群 · 长期建设",
     "description": "持续汇聚开发者、高校、厂商与企业需求，形成发现需求、组织能力、联合验证和复制交付的闭环。",
-    "image": "/assets/cases/ecosystem-community.jpg",
+    "image": "/assets/cases/ecosystem-community.webp",
     "imageAlt": "AI 生态伙伴共创交流活动现场",
     "tags": [
       "生态社群",

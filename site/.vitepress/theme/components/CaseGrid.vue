@@ -57,7 +57,7 @@ onMounted(async () => {
               <span>{{ partner.name }}</span>
             </div>
           </div>
-          <img v-else :src="assetUrl(item.image)" :alt="item.imageAlt" loading="lazy" width="720" height="450">
+          <img v-else :src="assetUrl(item.image)" :alt="item.imageAlt" loading="lazy" decoding="async" width="720" height="450">
           <span class="case-card__index">{{ item.id }}</span>
         </div>
         <div class="case-card__body">

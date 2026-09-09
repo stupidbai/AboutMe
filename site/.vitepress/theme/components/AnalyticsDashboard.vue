@@ -5,6 +5,7 @@ import { withBase } from 'vitepress'
 interface Summary { pageViews:number; visitors:number; sessions:number; engagedSessions:number; engagementRate:number; contactIntents:number; contactRate:number; pagesPerSession:number; caseOpens:number; ragQueries:number; returningVisitors:number }
 interface Daily { date:string; pageViews:number; visitors:number; sessions:number; engagedSessions:number; contactIntents:number }
 interface Monthly { month:string; pageViews:number; visitors:number; sessions:number; engagedSessions:number; contactIntents:number }
+interface DailyRecommendation { priority:'high'|'medium'|'low'|'observe'; title:string; detail:string; action:string }
 interface Analytics {
   days:number; timezone:string; collectedAt:string; summary:Summary
   comparison:{ pageViewsChange:number|null; visitorsChange:number|null; sessionsChange:number|null; contactIntentsChange:number|null }
@@ -12,6 +13,7 @@ interface Analytics {
   sources:Array<{ source:string; visitors:number; pageViews:number }>; devices:Array<{ device:string; visitors:number; pageViews:number }>
   conversions:Array<{ eventName:string; events:number; visitors:number }>
   performance:{ samples:number; averageLoadMs:number; p95LoadMs:number; averageTtfbMs:number; averageFcpMs:number }
+  dailyOptimization:{ date:string; generatedAt:string; metrics:{ pageViews:number; visitors:number; sessions:number; engagementRate:number; directVisitors:number; homeActionCount:number; topPage:string; performance:{ samples:number; p95LoadMs:number } }; recommendations:DailyRecommendation[] }
 }
 
 const state = ref<'loading'|'login'|'ready'|'unavailable'>('loading')
@@ -78,6 +80,7 @@ const formatMs = (value:number) => value ? `${format(value)} ms` : '暂无样本
 const sourceLabel = (source:string) => source.startsWith('utm:') ? `UTM · ${source.slice(4)}` : ({ direct:'直接访问', search:'搜索引擎', social:'社交平台', referral:'外部引荐' } as Record<string,string>)[source] || source
 const deviceLabel = (device:string) => ({ desktop:'桌面端', mobile:'移动端', tablet:'平板', other:'其他' } as Record<string,string>)[device] || device
 const conversionLabel = (eventName:string) => ({ contact_intent:'发起联系', case_open:'打开案例资料', forum_open:'进入论坛', rag_query:'知识问答', account_open:'打开账号页', knowledge_open:'打开知识库' } as Record<string,string>)[eventName] || eventName
+const recommendationPriority = (priority:DailyRecommendation['priority']) => ({ high:'优先处理', medium:'本周优化', low:'持续完善', observe:'继续观察' } as Record<DailyRecommendation['priority'], string>)[priority]
 
 const maxDailyPageViews = computed(() => Math.max(1, ...(analytics.value?.daily.map(item => item.pageViews) || [0])))
 const maxMonthlyPageViews = computed(() => Math.max(1, ...(analytics.value?.monthly.map(item => item.pageViews) || [0])))
@@ -143,7 +146,9 @@ const insights = computed(() => {
         <section class="analytics-panel"><header><div><h2>体验性能</h2><p>来自浏览器导航性能数据，P95 用于识别慢页面风险。</p></div></header><div class="analytics-performance"><article><span>平均加载</span><strong>{{ formatMs(analytics.performance.averageLoadMs) }}</strong></article><article><span>P95 加载</span><strong>{{ formatMs(analytics.performance.p95LoadMs) }}</strong></article><article><span>平均 TTFB</span><strong>{{ formatMs(analytics.performance.averageTtfbMs) }}</strong></article><article><span>平均 FCP</span><strong>{{ formatMs(analytics.performance.averageFcpMs) }}</strong></article></div><small class="analytics-note">当前性能样本：{{ analytics.performance.samples }}。低于一个样本时不做性能判断。</small></section>
       </div>
 
-      <section class="analytics-panel analytics-insights"><header><div><h2>自动分析提示</h2><p>基于当前周期的实际访问数据生成，便于决定下一轮内容与渠道优化重点。</p></div></header><ul><li v-for="item in insights" :key="item">{{ item }}</li></ul></section>
+      <section class="analytics-panel analytics-daily-optimization"><header><div><h2>每日自动优化建议</h2><p>按 {{ analytics.dailyOptimization.date }} 的自然日匿名数据重新计算；样本不足时只提示继续观察，不把推断当成结论。</p></div><span>每日刷新</span></header><div class="analytics-recommendations"><article v-for="item in analytics.dailyOptimization.recommendations" :key="item.title" :class="`analytics-recommendation--${item.priority}`"><small>{{ recommendationPriority(item.priority) }}</small><h3>{{ item.title }}</h3><p>{{ item.detail }}</p><strong>{{ item.action }}</strong></article></div></section>
+
+      <section class="analytics-panel analytics-insights"><header><div><h2>周期分析提示</h2><p>基于所选周期的实际访问数据生成，便于决定下一轮内容与渠道优化重点。</p></div></header><ul><li v-for="item in insights" :key="item">{{ item }}</li></ul></section>
 
       <section class="analytics-panel analytics-settings"><header><div><h2>监控隐私与保留</h2><p>仅使用第一方匿名 Cookie 的单向摘要进行去重；不保存 IP、账号信息或完整来源 URL。</p></div></header><form class="community-form" @submit.prevent="saveSettings"><label class="community-consent"><input v-model="settings.enabled" type="checkbox"><span>启用站内访问监控</span></label><label class="community-consent"><input v-model="settings.respectDnt" type="checkbox"><span>遵守浏览器“禁止跟踪”偏好</span></label><label><span>事件保留天数</span><input v-model.number="settings.retentionDays" type="number" min="30" max="1825" required></label><div class="wide admin-form-actions"><button type="submit" :disabled="busy === 'settings'">保存监控配置</button></div></form></section>
       <div class="admin-save-dock" role="region" aria-label="访问监控配置保存">

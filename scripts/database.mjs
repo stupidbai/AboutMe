@@ -37,6 +37,8 @@ export class PortalDatabase {
     this.migrateProfileCredentials()
     this.migrateTimelineDates()
     this.migrateCommunityCoverageMetric()
+    this.migrateOptimizedAssetPaths()
+    this.migrateHomeActionLabels()
     this.seedKnowledgeIfEmpty()
     this.migrateWaytoAgiKnowledge()
     this.seedAiSettingsIfEmpty()
@@ -642,6 +644,81 @@ export class PortalDatabase {
     }
   }
 
+  migrateOptimizedAssetPaths() {
+    if (this.database.prepare("SELECT value FROM metadata WHERE key = 'optimized_assets_v460'").get()) return
+    const imagePaths = new Map([
+      ['/assets/cases/rag-knowledge-system.png', '/assets/cases/rag-knowledge-system.webp'],
+      ['/assets/cases/industrial-vision-system.png', '/assets/cases/industrial-vision-system.webp'],
+      ['/assets/cases/ecommerce-content-platform.png', '/assets/cases/ecommerce-content-platform.webp'],
+      ['/assets/cases/ecosystem-community.jpg', '/assets/cases/ecosystem-community.webp']
+    ])
+    const currentCases = this.getCases()
+    let casesChanged = false
+    const optimizedCases = currentCases.map(item => {
+      const image = imagePaths.get(item.image)
+      if (!image) return item
+      casesChanged = true
+      return { ...item, image }
+    })
+    if (casesChanged) this.replaceInsideTransaction(validateCases(optimizedCases), this.getRevision() + 1, 'v4.6.0-asset-migration')
+
+    const stored = this.database.prepare('SELECT json_value, revision FROM site_config WHERE id = 1').get()
+    if (stored) {
+      const config = JSON.parse(stored.json_value)
+      let siteChanged = false
+      if (Array.isArray(config.credentials)) {
+        config.credentials = config.credentials.map(item => {
+          if (item?.image !== '/assets/cases/aaia-aigc-appointment.jpg') return item
+          siteChanged = true
+          return { ...item, image: '/assets/cases/aaia-aigc-appointment.webp' }
+        })
+      }
+      if (siteChanged) {
+        const now = new Date().toISOString()
+        const revision = Number(stored.revision) + 1
+        this.database.exec('BEGIN IMMEDIATE')
+        try {
+          this.database.prepare('UPDATE site_config SET json_value = ?, revision = ?, updated_at = ?, updated_by = ? WHERE id = 1')
+            .run(JSON.stringify(validateSiteConfig(config)), revision, now, 'v4.6.0-asset-migration')
+          this.database.prepare('INSERT INTO site_config_changes (revision, changed_at, actor) VALUES (?, ?, ?)')
+            .run(revision, now, 'v4.6.0-asset-migration')
+          this.database.exec('COMMIT')
+        } catch (error) {
+          this.database.exec('ROLLBACK')
+          throw error
+        }
+      }
+    }
+    this.database.prepare("INSERT INTO metadata (key, value) VALUES ('optimized_assets_v460', ?)")
+      .run(new Date().toISOString())
+  }
+
+  migrateHomeActionLabels() {
+    if (this.database.prepare("SELECT value FROM metadata WHERE key = 'home_action_labels_v460'").get()) return
+    const stored = this.database.prepare('SELECT json_value, revision FROM site_config WHERE id = 1').get()
+    if (!stored) return
+    const config = JSON.parse(stored.json_value)
+    if (config.home?.primaryAction?.label !== '查看项目案例') {
+      this.database.prepare("INSERT INTO metadata (key, value) VALUES ('home_action_labels_v460', ?)").run(new Date().toISOString())
+      return
+    }
+    config.home.primaryAction = { ...config.home.primaryAction, label: '查看合作案例' }
+    const now = new Date().toISOString()
+    const revision = Number(stored.revision) + 1
+    this.database.exec('BEGIN IMMEDIATE')
+    try {
+      this.database.prepare('UPDATE site_config SET json_value = ?, revision = ?, updated_at = ?, updated_by = ? WHERE id = 1')
+        .run(JSON.stringify(validateSiteConfig(config)), revision, now, 'v4.6.0-home-action-migration')
+      this.database.prepare('INSERT INTO site_config_changes (revision, changed_at, actor) VALUES (?, ?, ?)')
+        .run(revision, now, 'v4.6.0-home-action-migration')
+      this.database.prepare("INSERT INTO metadata (key, value) VALUES ('home_action_labels_v460', ?)").run(now)
+      this.database.exec('COMMIT')
+    } catch (error) {
+      this.database.exec('ROLLBACK')
+      throw error
+    }
+  }
+
   seedKnowledgeIfEmpty() {
     const initialized = this.database.prepare("SELECT value FROM metadata WHERE key = 'knowledge_revision'").get()
     if (initialized) return
@@ -899,6 +976,12 @@ export class PortalDatabase {
     const previousSince = new Date(Date.now() - safeDays * 2 * 86_400_000).toISOString()
     const dayExpression = "strftime('%Y-%m-%d', created_at, '+8 hours')"
     const monthExpression = "strftime('%Y-%m', created_at, '+8 hours')"
+    const shanghaiDate = () => {
+      const values = Object.fromEntries(new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit'
+      }).formatToParts(new Date()).map(part => [part.type, part.value]))
+      return `${values.year}-${values.month}-${values.day}`
+    }
     const aggregate = (from, until = null, returnBefore = from) => {
       const range = until ? 'created_at >= ? AND created_at < ?' : 'created_at >= ?'
       const params = until ? [from, until] : [from]
@@ -981,11 +1064,69 @@ export class PortalDatabase {
       WHERE created_at >= ? AND event_name = 'page_view' AND load_ms > 0
       ORDER BY created_at DESC LIMIT 10000
     `).all(currentSince)
-    const average = field => performanceRows.length ? Math.round(performanceRows.reduce((total, row) => total + Number(row[field] || 0), 0) / performanceRows.length) : 0
-    const percentile = field => {
-      if (!performanceRows.length) return 0
-      const values = performanceRows.map(row => Number(row[field] || 0)).sort((left, right) => left - right)
-      return values[Math.min(values.length - 1, Math.ceil(values.length * 0.95) - 1)]
+    const summarizePerformance = rows => {
+      const average = field => rows.length ? Math.round(rows.reduce((total, row) => total + Number(row[field] || 0), 0) / rows.length) : 0
+      const percentile = field => {
+        if (!rows.length) return 0
+        const values = rows.map(row => Number(row[field] || 0)).sort((left, right) => left - right)
+        return values[Math.min(values.length - 1, Math.ceil(values.length * 0.95) - 1)]
+      }
+      return { samples: rows.length, averageLoadMs: average('load_ms'), p95LoadMs: percentile('load_ms'), averageTtfbMs: average('ttfb_ms'), averageFcpMs: average('fcp_ms') }
+    }
+    const performance = summarizePerformance(performanceRows)
+    const dailyOptimizationDate = shanghaiDate()
+    const dailyRow = this.database.prepare(`
+      SELECT
+        SUM(CASE WHEN event_name = 'page_view' THEN 1 ELSE 0 END) AS page_views,
+        COUNT(DISTINCT CASE WHEN event_name = 'page_view' THEN visitor_hash END) AS visitors,
+        COUNT(DISTINCT CASE WHEN event_name = 'page_view' THEN session_hash END) AS sessions,
+        COUNT(DISTINCT CASE WHEN event_name = 'page_engaged' THEN session_hash END) AS engaged_sessions,
+        SUM(CASE WHEN event_name = 'contact_intent' THEN 1 ELSE 0 END) AS contact_intents,
+        SUM(CASE WHEN event_name = 'case_open' THEN 1 ELSE 0 END) AS case_opens
+      FROM site_events WHERE ${dayExpression} = ?
+    `).get(dailyOptimizationDate)
+    const today = {
+      pageViews: Number(dailyRow.page_views || 0), visitors: Number(dailyRow.visitors || 0), sessions: Number(dailyRow.sessions || 0),
+      engagedSessions: Number(dailyRow.engaged_sessions || 0), contactIntents: Number(dailyRow.contact_intents || 0), caseOpens: Number(dailyRow.case_opens || 0)
+    }
+    today.engagementRate = today.sessions ? Math.round((today.engagedSessions / today.sessions) * 1000) / 10 : 0
+    const dailyPerformance = summarizePerformance(this.database.prepare(`
+      SELECT load_ms, ttfb_ms, fcp_ms FROM site_events
+      WHERE ${dayExpression} = ? AND event_name = 'page_view' AND load_ms > 0
+      ORDER BY created_at DESC LIMIT 10000
+    `).all(dailyOptimizationDate))
+    const dailyTopPage = this.database.prepare(`
+      SELECT page_path, SUM(CASE WHEN event_name = 'page_view' THEN 1 ELSE 0 END) AS page_views
+      FROM site_events WHERE ${dayExpression} = ? AND event_name = 'page_view'
+      GROUP BY page_path ORDER BY page_views DESC LIMIT 1
+    `).get(dailyOptimizationDate)
+    const directVisitors = Number(this.database.prepare(`
+      SELECT COUNT(DISTINCT visitor_hash) AS visitors FROM site_events
+      WHERE ${dayExpression} = ? AND event_name = 'page_view' AND acquisition_source = 'direct'
+    `).get(dailyOptimizationDate).visitors || 0)
+    const homeActionCount = Number(this.database.prepare(`
+      SELECT COUNT(*) AS events FROM site_events
+      WHERE ${dayExpression} = ? AND page_path = '/' AND event_name IN ('case_open', 'contact_intent')
+    `).get(dailyOptimizationDate).events || 0)
+    const recommendations = []
+    if (!today.pageViews) {
+      recommendations.push({ priority: 'observe', title: '等待今日首批真实访问数据', detail: '当前自然日尚未收到公开页面访问事件，因此不对转化或性能作判断。', action: '继续通过带 utm_source 的渠道链接引流，首批访问会自动纳入明日分析。' })
+    } else {
+      if (dailyPerformance.samples >= 5 && dailyPerformance.p95LoadMs > 3000) {
+        recommendations.push({ priority: 'high', title: '优先把大图页面的 P95 加载压到 3 秒以内', detail: `今日 P95 加载为 ${dailyPerformance.p95LoadMs} ms（${dailyPerformance.samples} 个性能样本）。`, action: '先检查首页与案例图的 WebP 体积、懒加载和首屏资源，再复测性能趋势。' })
+      }
+      if (today.sessions >= 5 && today.engagementRate < 35) {
+        recommendations.push({ priority: 'medium', title: '提升访问最多页面的下一步行动', detail: `今日会话互动率为 ${today.engagementRate}%，访问最多页面为「${dailyTopPage?.page_path || '/'}」。`, action: '在该页首屏保持“查看案例 / 发起合作”两个清晰入口，并用短文案说明下一步。' })
+      }
+      if (today.pageViews >= 5 && Number(dailyTopPage?.page_views || 0) && dailyTopPage.page_path === '/' && homeActionCount === 0) {
+        recommendations.push({ priority: 'medium', title: '把首页访问转成案例查看或合作沟通', detail: `首页今日有 ${dailyTopPage.page_views} 次浏览，但尚未记录首页案例或联系按钮点击。`, action: '检查首屏按钮可见性、文案和移动端点击区域；后续在“行动转化”中观察 case_open 与 contact_intent。' })
+      }
+      if (today.visitors >= 5 && directVisitors / today.visitors >= 0.6) {
+        recommendations.push({ priority: 'low', title: '为直接访问补充更短的合作路径', detail: `直接访问占今日独立访客的 ${Math.round((directVisitors / today.visitors) * 100)}%。`, action: '在首页保留“看案例—说场景—对合作方式”的路径，并提供电话、邮箱和微信联系入口。' })
+      }
+      if (!recommendations.length) {
+        recommendations.push({ priority: 'observe', title: '今日关键指标暂未发现明显风险', detail: `已记录 ${today.pageViews} 次页面浏览、${today.visitors} 位访客和 ${today.sessions} 个会话。`, action: '持续观察完整自然日数据，并用带 UTM 的渠道链接比较不同引流路径。' })
+      }
     }
     return {
       days: safeDays, timezone: 'Asia/Shanghai', collectedAt: new Date().toISOString(),
@@ -1002,8 +1143,12 @@ export class PortalDatabase {
         sessionsChange: percent(current.sessions, previous.sessions),
         contactIntentsChange: percent(current.contactIntents, previous.contactIntents)
       },
-      daily, monthly, topPages, sources, devices, conversions,
-      performance: { samples: performanceRows.length, averageLoadMs: average('load_ms'), p95LoadMs: percentile('load_ms'), averageTtfbMs: average('ttfb_ms'), averageFcpMs: average('fcp_ms') }
+      daily, monthly, topPages, sources, devices, conversions, performance,
+      dailyOptimization: {
+        date: dailyOptimizationDate, generatedAt: new Date().toISOString(),
+        metrics: { ...today, directVisitors, homeActionCount, topPage: dailyTopPage?.page_path || '', performance: dailyPerformance },
+        recommendations
+      }
     }
   }
 

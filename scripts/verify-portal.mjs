@@ -102,6 +102,7 @@ const communityServiceSource = readFileSync(resolve(root, 'scripts/community-ser
 const analyticsDashboardSource = readFileSync(resolve(root, 'site/.vitepress/theme/components/AnalyticsDashboard.vue'), 'utf8')
 const analyticsTrackerSource = readFileSync(resolve(root, 'site/.vitepress/theme/components/SiteAnalyticsTracker.vue'), 'utf8')
 const analyticsAdminPageSource = readFileSync(resolve(root, 'site/admin/analytics.md'), 'utf8')
+const homePortalSource = readFileSync(resolve(root, 'site/.vitepress/theme/components/HomePortal.vue'), 'utf8')
 const themeSource = readFileSync(resolve(root, 'site/.vitepress/theme/index.ts'), 'utf8')
 const privacySource = readFileSync(resolve(root, 'site/privacy.md'), 'utf8')
 const ragServiceSource = readFileSync(resolve(root, 'scripts/rag-service.mjs'), 'utf8')
@@ -207,8 +208,9 @@ for (const [source, anchors] of requiredCommunityUiAnchors) {
 }
 const requiredAnalyticsUiAnchors = [
   [analyticsAdminPageSource, ['<AnalyticsDashboard />', 'noindex, nofollow']],
-  [analyticsDashboardSource, ['/api/admin/analytics', '/api/admin/analytics-settings', '页面浏览 PV', '独立访客 UV', '每日访问量', '每月访问量', '近 365 天', '行动转化', '体验性能', '监控隐私与保留', '保存并生效', 'P95']],
+  [analyticsDashboardSource, ['/api/admin/analytics', '/api/admin/analytics-settings', '页面浏览 PV', '独立访客 UV', '每日访问量', '每月访问量', '近 365 天', '行动转化', '体验性能', '每日自动优化建议', '每日刷新', '监控隐私与保留', '保存并生效', 'P95']],
   [analyticsTrackerSource, ['/api/telemetry', 'page_view', 'page_engaged', 'navigator.sendBeacon', 'portal:analytics', 'data-analytics-event', '15_000']],
+  [homePortalSource, ['portal-action-note', 'collaboration-path', 'data-analytics-event="case_open"', 'data-analytics-event="contact_intent"', 'actionEvent']],
   [themeSource, ['SiteAnalyticsTracker', "app.component('AnalyticsDashboard'", "route.path.startsWith('/kb/')"]]
 ]
 for (const [source, anchors] of requiredAnalyticsUiAnchors) {
@@ -313,6 +315,9 @@ const requiredDatabaseAnchors = [
   'replaceAnalyticsSettings',
   'recordSiteEvent',
   'getSiteAnalytics',
+  'dailyOptimization',
+  'homeActionCount',
+  'directVisitors',
   'maybePruneAnalyticsEvents',
   "createCipheriv('aes-256-gcm'",
   'CREATE INDEX IF NOT EXISTS',
@@ -330,7 +335,7 @@ if (missingDockerAnchors.length) throw new Error(`Missing Docker behavior: ${mis
 if (!composeSource.includes('portal-data:/data') || !composeSource.includes('read_only: true') || !composeSource.includes('no-new-privileges:true')) {
   throw new Error('Compose must keep SQLite in a volume and apply container hardening')
 }
-if (packageMetadata.version !== '4.5.2' || packageMetadata.engines?.node !== '>=22.16' || packageMetadata.dependencies?.minisearch !== '^7.2.0' || packageMetadata.dependencies?.['@noble/hashes'] !== '^2.4.0' || packageMetadata.dependencies?.marked !== '^18.0.11' || packageMetadata.dependencies?.['sanitize-html'] !== '^2.17.7' || packageMetadata.dependencies?.nodemailer !== '^9.1.1' || packageMetadata.dependencies?.['@zxcvbn-ts/core'] !== '^4.2.0') {
+if (packageMetadata.version !== '4.6.0' || packageMetadata.engines?.node !== '>=22.16' || packageMetadata.dependencies?.minisearch !== '^7.2.0' || packageMetadata.dependencies?.['@noble/hashes'] !== '^2.4.0' || packageMetadata.dependencies?.marked !== '^18.0.11' || packageMetadata.dependencies?.['sanitize-html'] !== '^2.17.7' || packageMetadata.dependencies?.nodemailer !== '^9.1.1' || packageMetadata.dependencies?.['@zxcvbn-ts/core'] !== '^4.2.0') {
   throw new Error('Package version or Node.js SQLite runtime requirement is incorrect')
 }
 if (!ragServiceSource.includes("from 'minisearch'") || !ragServiceSource.includes('new MiniSearch') || !networkSecuritySource.includes('assertSafeOutboundUrl')) {
@@ -343,6 +348,9 @@ if (knowledgeConfig.some(entry => !entry.body || typeof entry.published !== 'boo
 const waytoAgiEntries = knowledgeConfig.filter(entry => entry.id.startsWith('wta-'))
 if (waytoAgiEntries.length !== 10 || waytoAgiEntries.some(entry => !entry.sourceName || !entry.sourceUrl?.startsWith('https://www.waytoagi.com/'))) {
   throw new Error('WayToAGI technical digests require 10 local source-backed entries')
+}
+if (!networkSecuritySource.includes('isTrustedJdAgentEndpoint') || !networkSecuritySource.includes('/api/saas/openai-u/v1/chat/completions')) {
+  throw new Error('JD OpenAI-compatible endpoint exception must remain narrowly scoped')
 }
 const waytoAgiManifest = JSON.parse(readFileSync(resolve(root, 'docs/waytoagi-knowledge-sources.json'), 'utf8'))
 if (waytoAgiManifest.items?.length !== 10 || waytoAgiManifest.resolvedDomain !== 'www.waytoagi.com' || waytoAgiManifest.items.some(item => !waytoAgiEntries.some(entry => entry.id === item.id && entry.sourceUrl === item.sourceUrl))) {
