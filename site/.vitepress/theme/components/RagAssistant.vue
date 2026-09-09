@@ -12,18 +12,27 @@ const error = ref('')
 const available = ref(true)
 const aiEnabled = ref(false)
 const provider = ref('')
+const statusBusy = ref(false)
 const feedback = ref(0)
 const examples = ['RAG 项目应该先做什么？', 'FDE 团队如何培养？', '高风险 AI 功能有哪些上线边界？']
 
-onMounted(async () => {
+const refreshStatus = async () => {
+  statusBusy.value = true
   try {
     const response = await fetch('/api/ai/status', { headers: { accept: 'application/json' } })
-    if (!response.ok || !response.headers.get('content-type')?.includes('application/json')) { available.value = false; return }
+    if (!response.ok || !response.headers.get('content-type')?.includes('application/json')) throw new Error('状态接口不可用')
     const status = await response.json()
+    available.value = true
     aiEnabled.value = status.enabled
     provider.value = [status.provider, status.model].filter(Boolean).join(' · ')
-  } catch { available.value = false }
-})
+  } catch {
+    available.value = false
+    aiEnabled.value = false
+    provider.value = ''
+  } finally { statusBusy.value = false }
+}
+
+onMounted(refreshStatus)
 
 const ask = async () => {
   const value = question.value.trim()
@@ -33,6 +42,8 @@ const ask = async () => {
   result.value = null
   feedback.value = 0
   try {
+    await refreshStatus()
+    if (!available.value) throw new Error('问答服务当前未连接，请检查管理服务后重试。')
     const response = await fetch('/api/rag/query', {
       method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json' },
       body: JSON.stringify({ question: value })
@@ -57,7 +68,7 @@ const sendFeedback = async (value: 1 | -1) => {
 
 <template>
   <section class="rag-assistant">
-    <header><div><span class="portal-kicker">LOCAL RAG · AI Q&A</span><h2>向知识库提问</h2><p>先检索本地资料，再由已配置的 AI 模型组织回答；引用来源会随答案一起展示。</p></div><span class="rag-status" :class="{ active: aiEnabled }">{{ aiEnabled ? `AI 已启用${provider ? ` · ${provider}` : ''}` : '本地检索模式' }}</span></header>
+    <header><div><span class="portal-kicker">LOCAL RAG · AI Q&A</span><h2>向知识库提问</h2><p>先检索本地资料，再由已配置的 AI 模型组织回答；引用来源会随答案一起展示。</p></div><div class="rag-status-group"><span class="rag-status" :class="{ active: aiEnabled }">{{ aiEnabled ? `AI 已启用${provider ? ` · ${provider}` : ''}` : '本地检索模式' }}</span><button class="rag-status-refresh" type="button" :disabled="statusBusy || busy" @click="refreshStatus">{{ statusBusy ? '检查中…' : '刷新模型状态' }}</button></div></header>
     <div v-if="!available" class="rag-notice">当前为纯静态预览。请通过 Node 或 Docker 管理服务启动，才能使用知识库问答。</div>
     <template v-else>
       <form class="rag-form" @submit.prevent="ask"><label><span>你的问题</span><textarea v-model="question" rows="3" maxlength="500" placeholder="例如：企业做 RAG 项目时，第一步应该关注什么？"></textarea></label><button :disabled="busy">{{ busy ? '正在检索与生成…' : '开始提问' }}</button></form>

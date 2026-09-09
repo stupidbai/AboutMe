@@ -278,6 +278,10 @@
 .rag-assistant header p { max-width: 680px; margin: 0 !important; color: rgba(255,255,255,.7); }
 .rag-status { flex: 0 0 auto; padding: 7px 11px; border: 1px solid rgba(255,255,255,.18); border-radius: 999px; color: rgba(255,255,255,.68); font-size: 11px; font-weight: 800; }
 .rag-status.active { border-color: var(--portal-teal); color: var(--portal-teal); }
+.rag-status-group { display: flex; flex: 0 0 auto; align-items: center; gap: 8px; }
+.rag-status-refresh { min-height: 30px; padding: 0 10px; border: 1px solid rgba(255,255,255,.18); border-radius: 999px; color: rgba(255,255,255,.78); background: transparent; cursor: pointer; font: inherit; font-size: 11px; font-weight: 800; }
+.rag-status-refresh:hover:not(:disabled) { border-color: var(--portal-teal); color: var(--portal-teal); }
+.rag-status-refresh:disabled { cursor: wait; opacity: .58; }
 .rag-form { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: end; margin-top: 24px; }
 .rag-form label { display: grid; gap: 7px; color: rgba(255,255,255,.68); font-size: 12px; font-weight: 800; }
 .rag-form textarea { width: 100%; resize: vertical; padding: 13px 14px; border: 1px solid rgba(255,255,255,.18); border-radius: 14px; color: white; background: rgba(0,0,0,.2); font: inherit; }
@@ -633,6 +637,7 @@
   .case-admin-fields { grid-template-columns: 1fr; }
   .case-admin-fields label.wide, .case-admin-fields .case-admin-check { grid-column: auto; }
   .rag-assistant > header { flex-direction: column; }
+  .rag-status-group { flex-wrap: wrap; }
   .rag-form { grid-template-columns: 1fr; }
   .community-form, .account-grid { grid-template-columns: 1fr; }
   .community-form .wide { grid-column: auto; }

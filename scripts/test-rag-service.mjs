@@ -36,7 +36,26 @@ try {
 } catch {}
 if (broadenedJdTrust) throw new Error('京东云可信放行范围不能扩展到任意路径。')
 
+const originalFetch = globalThis.fetch
+let jdRequest = null
+globalThis.fetch = async (_url, options) => {
+  jdRequest = JSON.parse(options.body)
+  return new Response(JSON.stringify({ choices: [{ message: { content: '这是模型最终回答。' } }] }), {
+    status: 200, headers: { 'content-type': 'application/json' }
+  })
+}
+try {
+  const answer = await service.askAi('知识库如何落地？', [{ title: 'RAG 指南', excerpt: '先治理资料，再接入模型。' }], {
+    apiUrl: 'https://agentrs.jd.com/api/saas/openai-u/v1/chat/completions', apiKey: 'test-key', model: 'GLM-5.2',
+    temperature: 0.2, maxTokens: 1200, systemPrompt: '仅基于资料回答。', allowPrivateNetwork: false
+  })
+  if (answer !== '这是模型最终回答。' || jdRequest?.thinking?.type !== 'disabled') {
+    throw new Error('京东云 GLM 问答未关闭深度推理或未读取最终回答。')
+  }
+} finally { globalThis.fetch = originalFetch }
+
 console.log('MiniSearch Chinese tokenization and chunk retrieval: verified')
 console.log('MiniSearch fuzzy English retrieval: verified')
 console.log('AI endpoint private-network guard: verified')
 console.log('Exact JD OpenAI-compatible endpoint exception: verified')
+console.log('JD GLM reasoning control and final-answer parsing: verified')
